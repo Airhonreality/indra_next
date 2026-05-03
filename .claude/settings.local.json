@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\javir\\\\Documents\\\\DEVs\\\\indra-next-sovereign_A\" -Force)",
+      "Bash(Select-Object Name, FullName, PSIsContainer)",
+      "Bash(Format-Table)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\javir\\\\Documents\\\\DEVs\\\\indra-next-sovereign_A\\\\src\" -Recurse -Force | Where-Object { -not $_.PSIsContainer } | Select-Object FullName | Sort-Object FullName)",
+      "Bash(npx tsc *)",
+      "Bash(node -e \"const {Inngest} = require\\('inngest'\\); const c = new Inngest\\({id:'test'}\\); console.log\\(Object.keys\\(c\\).filter\\(k=>k.includes\\('create'\\)\\)\\);\")",
+      "Bash(Get-ChildItem node_modules/@base-ui)",
+      "Bash(Get-ChildItem node_modules)",
+      "Bash(Where-Object Name -match \"clsx|tailwind-merge|class-variance\")",
+      "PowerShell(Test-Path *)",
+      "Bash(npm install *)",
+      "Bash(node -e \"const {Inngest} = require\\('inngest'\\); const c = new Inngest\\({id:'test'}\\); console.log\\(typeof c.send\\);\")",
+      "Bash(timeout 15 npm run dev)"
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowRight, Zap, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { FractalViewer, type IntegrationConfig } from '@/components/fractal-viewer';
 import { WidgetProjector } from '@/components/widget-projector';

@@ -63,7 +63,14 @@ export class IntegrityEngine {
 
       const hash = bufferToHex(await crypto.subtle.digest('SHA-256', buffer));
       chunkHashes.push(hash);
-      chunks.push({ index: i, offset, size, hash, status: 'ready' });
+      chunks.push({ 
+        index: i, 
+        offset, 
+        size, 
+        hash, 
+        status: 'ready',
+        totalSize: file.size 
+      });
 
       onProgress?.(Math.round(((i + 1) / totalChunks) * 100));
     }

@@ -42,6 +42,8 @@ export interface ChunkDescriptor {
   /** SHA-256 hex of the chunk bytes */
   hash: string;
   status: 'pending' | 'hashing' | 'ready' | 'uploading' | 'done' | 'failed';
+  /** Total size of the file this chunk belongs to */
+  totalSize?: number;
 }
 
 export interface IntegrityManifest {

@@ -4,22 +4,12 @@ import { useState } from 'react';
 import { ArrowRight, Zap, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { FractalViewer, type IntegrationConfig } from '@/components/fractal-viewer';
 import { WidgetProjector } from '@/components/widget-projector';
+import { IntegrationsManager } from '@/components/integrations-manager';
 import { executePipeline } from '@/app/actions/pipeline';
 import type { SourceItem } from '@/app/actions/pipeline';
 import type { FieldSchema } from '@/core/types/integration';
 import { cn } from '@/lib/utils';
 
-const DEMO_INTEGRATIONS: IntegrationConfig[] = [
-  {
-    id: 'storage-local',
-    label: 'Local Storage',
-    integration: 'storage',
-    basePath: './data',
-  },
-  // Add Notion / Sheets here once connectionIds are configured:
-  // { id: 'notion-main', label: 'Notion Workspace', integration: 'notion', connectionId: '...' },
-  // { id: 'sheets-main', label: 'Google Sheets', integration: 'google-sheets', connectionId: '...' },
-];
 
 type PipelineStatus = 'idle' | 'pending' | 'dispatched' | 'error';
 
@@ -112,9 +102,32 @@ function PipelineBuilder({ source, target }: { source: SelectedSource; target: S
 // ── PAGE ──────────────────────────────────────────────────────────────────────
 
 export default function Home() {
+  const [integrations, setIntegrations] = useState<IntegrationConfig[]>([]);
   const [sourceSelection, setSourceSelection] = useState<SelectedSource | null>(null);
   const [targetSelection, setTargetSelection] = useState<SelectedSource | null>(null);
   const [selecting, setSelecting] = useState<'source' | 'target'>('source');
+
+  useEffect(() => {
+    const loadIntegrations = async () => {
+      const res = await fetch('/api/integrations');
+      const data = await res.json();
+      
+      // Mapeamos las conexiones de la DB al formato que entiende el FractalViewer
+      const activeIntegrations: IntegrationConfig[] = data.integrations.map((i: any) => ({
+        id: i.id,
+        label: i.label,
+        integration: i.type,
+        connectionId: i.connectionId
+      }));
+
+      // Siempre incluimos el storage local para testing
+      setIntegrations([
+        { id: 'storage-local', label: 'Local Storage', integration: 'storage', basePath: './data' },
+        ...activeIntegrations
+      ]);
+    };
+    loadIntegrations();
+  }, []);
 
   const handleSelect = (source: SourceItem, schema: FieldSchema[]) => {
     if (selecting === 'source') {
@@ -168,7 +181,7 @@ export default function Home() {
           </p>
 
           <FractalViewer
-            integrations={DEMO_INTEGRATIONS}
+            integrations={integrations}
             onSelect={handleSelect}
             selectedSourceId={selecting === 'source' ? sourceSelection?.source.id : targetSelection?.source.id}
           />
@@ -220,6 +233,13 @@ export default function Home() {
               <p className="text-sm">Select a source to preview its schema and test field rendering.</p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* BOTTOM: Infrastructure Management */}
+      <div className="max-w-7xl mx-auto p-6 border-t border-border mt-12">
+        <div className="bg-muted/30 rounded-2xl p-8 border border-border">
+          <IntegrationsManager />
         </div>
       </div>
     </div>

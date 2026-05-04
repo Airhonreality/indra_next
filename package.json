@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
+    "@nangohq/frontend": "^0.70.1",
     "@nangohq/node": "^0.70.1",
     "@neondatabase/serverless": "^1.1.0",
     "class-variance-authority": "^0.7.1",

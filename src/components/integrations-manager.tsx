@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Zap, Shield, Link2, CheckCircle2, Circle, Loader2, Plus } from 'lucide-react';
+import { Zap, Shield, Link2, CheckCircle2, Circle, Loader2, Plus, Database } from 'lucide-react';
 import Nango from '@nangohq/frontend';
 import { cn } from '@/lib/utils';
 import { SchemaManager } from './schema-manager';
+import type { FieldSchema } from '@/core/types/integration';
 
 interface NangoConfig {
   unique_key: string;

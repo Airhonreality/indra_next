@@ -16,6 +16,7 @@ import type {
   MediaOperationResult,
   PipelineUploadAdapter,
   UploadSession,
+  UploadContext,
 } from './types';
 
 // ─── Circuit Breaker ──────────────────────────────────────────────────────────
@@ -124,12 +125,20 @@ export class SovereignPipeline {
       const stageResult = await stageChunkToOpfs(opfsRoot, session.sessionId, chunk, file);
       if (!stageResult.ok) return { ok: false, error: stageResult.error, durationMs: Date.now() - start };
 
+      const context: UploadContext = {
+        fileSize: manifest.fileSize,
+        mimeType: manifest.mimeType,
+        fileName: manifest.fileName,
+        fileId: manifest.fileId
+      };
+
       // Upload with backoff
       const uploadResult = await this.uploadWithBackoff(
         stageResult.data!,
         chunk,
         session.sessionId,
-        adapter
+        adapter,
+        context
       );
 
       if (!uploadResult.ok) {
@@ -157,13 +166,14 @@ export class SovereignPipeline {
     chunkBytes: Uint8Array,
     descriptor: ChunkDescriptor,
     sessionId: string,
-    adapter: PipelineUploadAdapter
+    adapter: PipelineUploadAdapter,
+    context: UploadContext
   ): Promise<MediaOperationResult<{ etag?: string }>> {
     const maxRetries = 5;
     const baseDelayMs = 1_000;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      const result = await adapter.uploadChunk(chunkBytes, descriptor, sessionId);
+      const result = await adapter.uploadChunk(chunkBytes, descriptor, sessionId, context);
       if (result.ok) return result;
 
       if (attempt === maxRetries) {

@@ -198,7 +198,7 @@ function makePortAdapter(
   resumableUri?: string // ← Paso 1: Recibir URI de Drive
 ): PipelineUploadAdapter {
   return {
-    async uploadChunk(chunk: Uint8Array, descriptor: ChunkDescriptor, sessionId: string): Promise<MediaOperationResult<{ etag?: string }>> {
+    async uploadChunk(chunk: Uint8Array, descriptor: ChunkDescriptor, sessionId: string, context: UploadContext): Promise<MediaOperationResult<{ etag?: string }>> {
       const start = Date.now();
       try {
         const headers: Record<string, string> = {
@@ -212,7 +212,7 @@ function makePortAdapter(
         if (resumableUri) {
           headers['x-resumable-uri'] = resumableUri;
           headers['x-byte-range-start'] = String(descriptor.offset);
-          headers['x-file-size'] = String(descriptor.totalSize || chunk.length);
+          headers['x-file-size'] = String(context.fileSize);
         }
 
         const res = await fetch(`/api/p/${slug}/upload`, {

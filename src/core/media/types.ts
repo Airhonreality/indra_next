@@ -42,8 +42,13 @@ export interface ChunkDescriptor {
   /** SHA-256 hex of the chunk bytes */
   hash: string;
   status: 'pending' | 'hashing' | 'ready' | 'uploading' | 'done' | 'failed';
-  /** Total size of the file this chunk belongs to */
-  totalSize?: number;
+}
+
+export interface UploadContext {
+  fileSize: number;
+  mimeType: string;
+  fileName: string;
+  fileId: string;
 }
 
 export interface IntegrityManifest {
@@ -161,7 +166,8 @@ export interface PipelineUploadAdapter {
   uploadChunk(
     chunk: Uint8Array,
     descriptor: ChunkDescriptor,
-    sessionId: string
+    sessionId: string,
+    context: UploadContext
   ): Promise<MediaOperationResult<{ etag?: string }>>;
 
   finalizeSession(

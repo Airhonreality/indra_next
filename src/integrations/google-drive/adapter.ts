@@ -40,6 +40,10 @@ export class GoogleDriveAdapter extends BaseAdapter {
     ]);
   }
 
+  async pushRecords(targetId: string, records: any[]): Promise<OperationResult<any>> {
+    return this.error('Direct push not implemented. Use createResumableSession for large files.');
+  }
+
   async getRecords(sourceId: string, options?: any): Promise<OperationResult<any[]>> {
     const folderId = sourceId || 'root';
     const response = await this.client.request({
@@ -50,10 +54,6 @@ export class GoogleDriveAdapter extends BaseAdapter {
       },
     });
     return this.result(response.files);
-  }
-
-  async pushRecords(targetId: string, records: any[]): Promise<OperationResult<any>> {
-    return this.error('Direct push not implemented. Use createResumableSession for large files.');
   }
 
   /**

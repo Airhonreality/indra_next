@@ -103,17 +103,19 @@ function PipelineBuilder({ source, target }: { source: SelectedSource; target: S
 // ── PAGE ──────────────────────────────────────────────────────────────────────
 
 export default function Home() {
+  const { userId, isLoaded } = useSovereignUser();
   const [integrations, setIntegrations] = useState<IntegrationConfig[]>([]);
   const [sourceSelection, setSourceSelection] = useState<SelectedSource | null>(null);
   const [targetSelection, setTargetSelection] = useState<SelectedSource | null>(null);
   const [selecting, setSelecting] = useState<'source' | 'target'>('source');
 
   useEffect(() => {
+    if (!isLoaded || !userId) return;
+
     const loadIntegrations = async () => {
-      const res = await fetch('/api/integrations');
+      const res = await fetch(`/api/integrations?connectionId=${userId}`);
       const data = await res.json();
       
-      // Mapeamos las conexiones de la DB al formato que entiende el FractalViewer
       const activeIntegrations: IntegrationConfig[] = data.integrations.map((i: any) => ({
         id: i.id,
         label: i.label,
@@ -121,14 +123,13 @@ export default function Home() {
         connectionId: i.connectionId
       }));
 
-      // Siempre incluimos el storage local para testing
       setIntegrations([
         { id: 'storage-local', label: 'Local Storage', integration: 'storage', basePath: './data' },
         ...activeIntegrations
       ]);
     };
     loadIntegrations();
-  }, []);
+  }, [isLoaded, userId]);
 
   const handleSelect = (source: SourceItem, schema: FieldSchema[]) => {
     if (selecting === 'source') {

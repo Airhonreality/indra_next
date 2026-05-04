@@ -10,15 +10,22 @@ export const nango = new Nango({
 });
 
 /**
- * Helper to call the Notion Proxy via Nango.
+ * Helper to call any Silo Proxy via Nango.
+ * @param providerConfigKey The key defined in Nango (e.g. 'google-drive', 'notion')
  * @param connectionId The ID of the user's connection in Nango
- * @param endpoint The Notion API endpoint (e.g., '/databases/{id}/query')
+ * @param endpoint The API endpoint
  */
-export async function callNotionProxy(connectionId: string, endpoint: string, method: 'GET' | 'POST' | 'PATCH' = 'GET', data?: any) {
+export async function callSiloProxy(
+  providerConfigKey: string,
+  connectionId: string,
+  endpoint: string,
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' = 'GET',
+  data?: any
+) {
   return nango.proxy({
     method,
     endpoint,
-    providerConfigKey: 'notion', // Defined in your Nango dashboard
+    providerConfigKey,
     connectionId,
     data
   });

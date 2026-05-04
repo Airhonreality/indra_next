@@ -108,4 +108,15 @@ export interface IntegrationAdapter {
     label: string;
     type: 'database' | 'spreadsheet' | 'file' | 'folder';
   }[]>>;
+
+  /** 
+   * NEW: Support for native resumable uploads (Sovereign Ingestion).
+   * If implemented, allows direct-to-vault streaming bypass.
+   */
+  createResumableSession?(
+    targetId: string, 
+    fileName: string, 
+    mimeType: string, 
+    totalSize: number
+  ): Promise<OperationResult<{ resumableUri: string; sessionId: string }>>;
 }

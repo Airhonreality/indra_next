@@ -1,4 +1,5 @@
 import { pgTable, text, timestamp, jsonb, uuid, boolean } from "drizzle-orm/pg-core";
+import type { FieldSchema } from "@/core/types/integration";
 
 /**
  * INTEGRATIONS TABLE
@@ -36,6 +37,39 @@ export const records = pgTable("records", {
   }>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
+ * INGESTION PORTS TABLE
+ * Public upload endpoints. Each port maps to an integration + target path.
+ * Third-parties reach a port via /p/[slug] — no Indra account required.
+ */
+export interface PortConfig {
+  /** Path-template with field + metadata placeholders, e.g. "/{project}/{capture_date}" */
+  pattern?: string;
+  maxFileSizeBytes?: number;
+  allowedMimeTypes?: string[];
+}
+
+/** Extends FieldSchema with an optional SME metadata key binding */
+export interface PortFieldSchema extends FieldSchema {
+  /** Maps to a SME metadata path, e.g. "exif.capturedAt" or "video.creationTimeUtc" */
+  mapToMetadata?: string;
+}
+
+export const ingestionPorts = pgTable("ingestion_ports", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  integrationId: uuid("integration_id").references(() => integrations.id).notNull(),
+  /** Destination folder/bucket/database ID inside the integration */
+  targetPath: text("target_path").notNull(),
+  config: jsonb("config").$type<PortConfig>(),
+  /** Dynamic form fields shown to uploaders */
+  schema: jsonb("schema").$type<PortFieldSchema[]>(),
+  /** URL-safe unique identifier: /p/[slug] */
+  slug: text("slug").notNull().unique(),
+  label: text("label").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 /**

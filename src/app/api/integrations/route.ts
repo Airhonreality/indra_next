@@ -3,9 +3,19 @@ import { db } from '@/lib/db';
 import { integrations } from '@/core/db/schema';
 import { eq } from 'drizzle-orm';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const list = await db.select().from(integrations);
+    const { searchParams } = new URL(req.url);
+    const connectionId = searchParams.get('connectionId');
+
+    let query = db.select().from(integrations);
+    
+    if (connectionId) {
+      // @ts-ignore - drizzle type check
+      query = db.select().from(integrations).where(eq(integrations.connectionId, connectionId));
+    }
+
+    const list = await query;
     return NextResponse.json({ integrations: list });
   } catch (error) {
     console.error('Fetch Integrations Error:', error);

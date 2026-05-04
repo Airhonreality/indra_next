@@ -26,7 +26,10 @@ interface CatalogItem {
   icon: string;
 }
 
+import { useSovereignUser } from '@/hooks/use-sovereign-user';
+
 export function IntegrationsManager() {
+  const { userId, isLoaded } = useSovereignUser();
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [available, setAvailable] = useState<NangoConfig[]>([]);
   const [connected, setConnected] = useState<Integration[]>([]);
@@ -42,10 +45,11 @@ export function IntegrationsManager() {
   });
 
   const fetchData = async () => {
+    if (!userId) return;
     try {
       const [discoveryRes, connectedRes, catalogRes] = await Promise.all([
         fetch('/api/discovery/integrations'),
-        fetch('/api/integrations'),
+        fetch(`/api/integrations?connectionId=${userId}`),
         fetch('/api/discovery/catalog')
       ]);
 
@@ -54,7 +58,8 @@ export function IntegrationsManager() {
       const catalogData = await catalogRes.json();
 
       setAvailable(discoveryData.integrations || []);
-      setConnected(connectedData.integrations || []);
+      // Filter connections that belong to THIS user
+      setConnected((connectedData.integrations || []).filter((i: any) => i.connectionId === userId));
       setCatalog(catalogData.catalog || []);
     } catch (err) {
       console.error('Failed to fetch integrations:', err);
@@ -64,8 +69,8 @@ export function IntegrationsManager() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (isLoaded) fetchData();
+  }, [isLoaded, userId]);
 
   const handleProvision = async (provider: string) => {
     if (!newConfig.client_id || !newConfig.client_secret) {
@@ -94,17 +99,18 @@ export function IntegrationsManager() {
   };
 
   const handleConnect = async (provider: string) => {
+    if (!userId) return;
     setConnecting(provider);
     try {
-      const connectionId = `conn_${Math.random().toString(36).substring(7)}`;
-      await nango.auth(provider, connectionId);
+      // AXIOMA: connectionId = userId (Coherencia de Usuario)
+      await nango.auth(provider, userId);
 
       await fetch('/api/integrations', {
         method: 'POST',
         body: JSON.stringify({
           type: provider,
-          label: `${provider.charAt(0).toUpperCase() + provider.slice(1)} Connection`,
-          connectionId: connectionId
+          label: `${provider.charAt(0).toUpperCase() + provider.slice(1)} Sovereign Silo`,
+          connectionId: userId
         })
       });
 
@@ -121,37 +127,46 @@ export function IntegrationsManager() {
     !available.some(a => a.provider === item.id)
   );
 
-  if (loading && available.length === 0) {
+  if (!isLoaded || (loading && available.length === 0)) {
     return (
-      <div className="flex items-center justify-center p-12">
+      <div className="flex flex-col items-center justify-center p-12 space-y-4">
         <Loader2 className="size-6 animate-spin text-primary" />
+        <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Synchronizing Sovereign Identity...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-foreground italic font-serif tracking-tight">Infrastructure Discovery</h3>
-          <p className="text-xs text-muted-foreground font-mono uppercase tracking-widest opacity-60">autonomous resource awareness</p>
+    <div className="space-y-8">
+      {/* ── Sovereign Header ── */}
+      <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-4 border-b border-primary/10 pb-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-primary font-bold text-[10px] uppercase tracking-[0.2em]">
+            <Shield className="size-4" />
+            Active Infrastructure Identity
+          </div>
+          <h3 className="text-2xl font-bold text-foreground tracking-tighter">Sovereign Profile</h3>
+          <p className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded inline-block">ID: {userId}</p>
         </div>
-        <button 
-          onClick={() => setShowProvision(!showProvision)}
-          className="flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-primary hover:bg-primary/20 transition-all border border-primary/20"
-        >
-          {showProvision ? 'Close Portal' : 'Inject Capacity'}
-        </button>
+        
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setShowProvision(!showProvision)}
+            className="flex items-center gap-2 rounded-xl bg-muted px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:bg-muted/80 transition-all border border-border"
+          >
+            {showProvision ? 'Close Portal' : 'Service Provisioning'}
+          </button>
+        </div>
       </div>
 
       {showProvision && (
-        <div className="bg-card border border-primary/30 rounded-2xl p-8 space-y-6 animate-in fade-in zoom-in-95 duration-300 shadow-2xl shadow-primary/5">
+        <div className="bg-card border border-amber-500/30 rounded-2xl p-8 space-y-6 animate-in fade-in slide-in-from-top-4 duration-500 shadow-2xl shadow-amber-500/5">
           <div className="space-y-2">
-            <h4 className="text-sm font-bold text-foreground flex items-center gap-2 uppercase tracking-tighter">
-              <Zap className="size-4 text-amber-500 fill-amber-500/20" />
-              Provisioning Layer
+            <h4 className="text-sm font-bold text-foreground flex items-center gap-2 uppercase tracking-tighter text-amber-600">
+              <Zap className="size-4 fill-amber-500/20" />
+              Advanced: Capacity Injection
             </h4>
-            <p className="text-xs text-muted-foreground">Select a provider from the catalog and inject its secrets into the infrastructure.</p>
+            <p className="text-xs text-muted-foreground">Add new service providers by injecting their API secrets into the core. Use this to enable Drive or Notion on your own server.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -160,14 +175,14 @@ export function IntegrationsManager() {
                 <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Client Credentials</label>
                 <input 
                   placeholder="Client ID" 
-                  className="bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  className="bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all"
                   value={newConfig.client_id}
                   onChange={e => setNewConfig({ ...newConfig, client_id: e.target.value })}
                 />
                 <input 
                   placeholder="Client Secret" 
                   type="password"
-                  className="bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  className="bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all"
                   value={newConfig.client_secret}
                   onChange={e => setNewConfig({ ...newConfig, client_secret: e.target.value })}
                 />
@@ -176,10 +191,10 @@ export function IntegrationsManager() {
 
             <div className="space-y-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Service Catalog</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Universal Catalog</label>
                 <input 
-                  placeholder="Search providers..." 
-                  className="bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  placeholder="Filter providers..." 
+                  className="bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all"
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                 />
@@ -188,10 +203,10 @@ export function IntegrationsManager() {
                     <button
                       key={item.id}
                       onClick={() => handleProvision(item.id)}
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-primary/5 border border-transparent hover:border-primary/20 transition-all text-left"
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-amber-500/5 border border-transparent hover:border-amber-500/20 transition-all text-left"
                     >
-                      <img src={item.icon} alt={item.name} className="size-6 rounded" />
-                      <span className="text-xs font-semibold">{item.name}</span>
+                      <img src={item.icon} alt={item.name} className="size-5 rounded" />
+                      <span className="text-[10px] font-bold uppercase tracking-tight">{item.name}</span>
                     </button>
                   ))}
                 </div>
@@ -201,25 +216,33 @@ export function IntegrationsManager() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {available.map((config) => {
-          const isConnected = connected.some(c => c.type === config.provider);
-          const catalogItem = catalog.find(c => c.id === config.provider);
-          
-          return (
-            <div 
-              key={config.unique_key}
-              className={cn(
-                "group relative overflow-hidden rounded-2xl border p-6 transition-all duration-500",
-                isConnected 
-                  ? "bg-emerald-500/[0.02] border-emerald-500/20 shadow-lg shadow-emerald-500/[0.02]" 
-                  : "bg-card border-border hover:border-primary/30 hover:shadow-xl hover:shadow-primary/[0.02]"
-              )}
-            >
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <div className="size-12 rounded-xl bg-muted/50 flex items-center justify-center border border-border group-hover:scale-110 transition-transform duration-500 overflow-hidden">
+        {/* ── Active Silos ── */}
+      <div className="space-y-4">
+        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-50 ml-1">Autonomous Silos</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {available.map((config) => {
+            const isConnected = connected.some(c => c.type === config.provider);
+            const catalogItem = catalog.find(c => c.id === config.provider);
+            
+            return (
+              <div 
+                key={config.unique_key}
+                className={cn(
+                  "group relative overflow-hidden rounded-3xl border p-6 transition-all duration-700",
+                  isConnected 
+                    ? "bg-emerald-500/[0.03] border-emerald-500/30 shadow-xl shadow-emerald-500/[0.05]" 
+                    : "bg-card border-border hover:border-primary/40 hover:shadow-2xl hover:shadow-primary/[0.03]"
+                )}
+              >
+                {/* Background Ornament */}
+                <div className={cn(
+                  "absolute -right-4 -top-4 size-24 blur-3xl opacity-20 transition-all duration-700 group-hover:scale-150",
+                  isConnected ? "bg-emerald-500" : "bg-primary"
+                )} />
+
+                <div className="relative flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-4">
+                    <div className="size-14 rounded-2xl bg-muted/80 flex items-center justify-center border border-border group-hover:rotate-6 transition-transform duration-500 overflow-hidden shadow-inner">
                       {catalogItem ? (
                         <img src={catalogItem.icon} alt={config.provider} className="size-8" />
                       ) : (
@@ -227,80 +250,75 @@ export function IntegrationsManager() {
                       )}
                     </div>
                     <div>
-                      <p className="font-bold text-lg tracking-tight capitalize text-foreground">
+                      <p className="font-black text-lg tracking-tighter text-foreground group-hover:translate-x-1 transition-transform">
                         {catalogItem?.name || config.provider}
                       </p>
-                      {isConnected ? (
-                        <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 px-2 py-0.5 rounded-full">
-                          <Shield className="size-3" />
-                          Protocol Active
+                      <div className="flex items-center gap-2">
+                        <div className={cn("size-1.5 rounded-full", isConnected ? "bg-emerald-500 animate-pulse" : "bg-zinc-600")} />
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+                          {isConnected ? 'Active Protocol' : 'Standby'}
                         </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
-                          <Circle className="size-3" />
-                          Standby
-                        </span>
-                      )}
+                      </div>
                     </div>
                   </div>
                 </div>
-                
-                <div className={cn(
-                  "size-8 rounded-full flex items-center justify-center transition-all duration-500",
-                  isConnected ? "bg-emerald-500/10 text-emerald-600 rotate-12" : "bg-primary/10 text-primary -rotate-12"
-                )}>
-                  {isConnected ? <CheckCircle2 className="size-4" /> : <Plus className="size-4" />}
-                </div>
-              </div>
 
-              <div className="mt-8 flex gap-2">
-                <button
-                  onClick={() => handleConnect(config.provider)}
-                  disabled={!!connecting}
-                  className={cn(
-                    "flex-1 flex items-center justify-center gap-3 rounded-xl py-3 text-xs font-black uppercase tracking-widest transition-all duration-300",
-                    isConnected 
-                      ? "bg-muted/50 text-muted-foreground hover:bg-muted/80 border border-border" 
-                      : "bg-primary text-primary-foreground hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5"
-                  )}
-                >
-                  {connecting === config.provider ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : isConnected ? (
-                    'Reconfigure'
-                  ) : (
-                    'Authorize Access'
-                  )}
-                </button>
-                
-                {isConnected && (
+                <div className="mt-auto space-y-3">
                   <button
-                    onClick={() => setManagingSchema(managingSchema === config.provider ? null : config.provider)}
-                    className="p-3 rounded-xl bg-primary/5 text-primary border border-primary/20 hover:bg-primary/10 transition-all"
+                    onClick={() => handleConnect(config.provider)}
+                    disabled={!!connecting}
+                    className={cn(
+                      "w-full flex items-center justify-center gap-3 rounded-2xl py-4 text-[10px] font-black uppercase tracking-widest transition-all duration-500",
+                      isConnected 
+                        ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20" 
+                        : "bg-primary text-primary-foreground hover:shadow-[0_8px_20px_rgba(var(--primary-rgb),0.3)] hover:-translate-y-1"
+                    )}
                   >
-                    <Database className="size-4" />
+                    {connecting === config.provider ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : isConnected ? (
+                      'Refresh Connection'
+                    ) : (
+                      'Authorize Silo'
+                    )}
                   </button>
+                  
+                  {isConnected && (
+                    <button
+                      onClick={() => setManagingSchema(managingSchema === config.provider ? null : config.provider)}
+                      className="w-full py-3 flex items-center justify-center gap-2 rounded-2xl bg-primary/5 text-primary border border-primary/20 hover:bg-primary/10 text-[9px] font-bold uppercase tracking-widest transition-all"
+                    >
+                      <Database className="size-3" />
+                      Manage Schema
+                    </button>
+                  )}
+                </div>
+
+                {managingSchema === config.provider && (
+                  <div className="mt-6 pt-6 border-t border-emerald-500/10 animate-in slide-in-from-bottom-2 duration-500">
+                    <SchemaManager 
+                      integrationId={connected.find(c => c.type === config.provider)?.id || ''}
+                      currentSchema={connected.find(c => c.type === config.provider)?.dynamicSchema || []}
+                      onUpdate={fetchData}
+                    />
+                  </div>
                 )}
               </div>
+            );
+          })}
 
-              {managingSchema === config.provider && (
-                <div className="mt-4 pt-4 border-t border-border animate-in slide-in-from-bottom-2 duration-300">
-                  <SchemaManager 
-                    integrationId={connected.find(c => c.type === config.provider)?.id || ''}
-                    currentSchema={connected.find(c => c.type === config.provider)?.dynamicSchema || []}
-                    onUpdate={fetchData}
-                  />
-                </div>
-              )}
+          {available.length === 0 && (
+            <div className="col-span-full rounded-3xl border border-dashed border-border p-16 text-center bg-muted/20">
+              <p className="text-xs text-muted-foreground uppercase font-bold tracking-widest mb-4">No discovered infrastructure</p>
+              <button 
+                onClick={() => setShowProvision(true)}
+                className="text-primary text-[10px] font-black uppercase tracking-[0.2em] hover:underline"
+              >
+                Inject First Capacity →
+              </button>
             </div>
-          );
-        })}
-
-        {available.length === 0 && (
-          <div className="col-span-full rounded-xl border border-dashed border-border p-12 text-center">
-            <p className="text-sm text-muted-foreground">No integrations discovered. Add one in your Nango dashboard to see it here.</p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

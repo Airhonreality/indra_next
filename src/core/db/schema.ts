@@ -14,6 +14,7 @@ export const integrations = pgTable("integrations", {
     spreadsheetId?: string;
     [key: string]: any;
   }>(),
+  dynamicSchema: jsonb("dynamic_schema").$type<FieldSchema[]>(),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Zap, Shield, Link2, CheckCircle2, Circle, Loader2, Plus } from 'lucide-react';
 import Nango from '@nangohq/frontend';
 import { cn } from '@/lib/utils';
+import { SchemaManager } from './schema-manager';
 
 interface NangoConfig {
   unique_key: string;
@@ -15,6 +16,7 @@ interface Integration {
   type: string;
   label: string;
   isConnected: boolean;
+  dynamicSchema?: FieldSchema[];
 }
 
 interface CatalogItem {
@@ -30,6 +32,7 @@ export function IntegrationsManager() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [showProvision, setShowProvision] = useState(false);
+  const [managingSchema, setManagingSchema] = useState<string | null>(null);
   const [newConfig, setNewConfig] = useState({ provider: '', client_id: '', client_secret: '' });
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -249,12 +252,12 @@ export function IntegrationsManager() {
                 </div>
               </div>
 
-              <div className="mt-8">
+              <div className="mt-8 flex gap-2">
                 <button
                   onClick={() => handleConnect(config.provider)}
                   disabled={!!connecting}
                   className={cn(
-                    "w-full flex items-center justify-center gap-3 rounded-xl py-3 text-xs font-black uppercase tracking-widest transition-all duration-300",
+                    "flex-1 flex items-center justify-center gap-3 rounded-xl py-3 text-xs font-black uppercase tracking-widest transition-all duration-300",
                     isConnected 
                       ? "bg-muted/50 text-muted-foreground hover:bg-muted/80 border border-border" 
                       : "bg-primary text-primary-foreground hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5"
@@ -268,7 +271,26 @@ export function IntegrationsManager() {
                     'Authorize Access'
                   )}
                 </button>
+                
+                {isConnected && (
+                  <button
+                    onClick={() => setManagingSchema(managingSchema === config.provider ? null : config.provider)}
+                    className="p-3 rounded-xl bg-primary/5 text-primary border border-primary/20 hover:bg-primary/10 transition-all"
+                  >
+                    <Database className="size-4" />
+                  </button>
+                )}
               </div>
+
+              {managingSchema === config.provider && (
+                <div className="mt-4 pt-4 border-t border-border animate-in slide-in-from-bottom-2 duration-300">
+                  <SchemaManager 
+                    integrationId={connected.find(c => c.type === config.provider)?.id || ''}
+                    currentSchema={connected.find(c => c.type === config.provider)?.dynamicSchema || []}
+                    onUpdate={fetchData}
+                  />
+                </div>
+              )}
             </div>
           );
         })}

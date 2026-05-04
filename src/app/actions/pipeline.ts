@@ -82,8 +82,27 @@ export async function getSourceSchema(
   try {
     const adapter = registry.resolve(integration, context);
     const result = await adapter.getSchema(sourceId);
-    return result.ok ? result.data : [];
-  } catch {
+    const baseFields = result.ok ? result.data : [];
+
+    // Si tenemos un connectionId, buscamos campos dinámicos en la DB
+    if (context.connectionId) {
+      const { db } = await import('@/lib/db');
+      const { integrations } = await import('@/core/db/schema');
+      const { eq } = await import('drizzle-orm');
+
+      const config = await db.select()
+        .from(integrations)
+        .where(eq(integrations.connectionId, context.connectionId))
+        .limit(1);
+
+      if (config[0]?.dynamicSchema) {
+        return [...baseFields, ...config[0].dynamicSchema];
+      }
+    }
+
+    return baseFields;
+  } catch (error) {
+    console.error('Error fetching schema:', error);
     return [];
   }
 }

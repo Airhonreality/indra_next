@@ -15,7 +15,7 @@
  */
 
 import { useReducer, useCallback, useEffect, useRef, useState, DragEvent } from 'react';
-import type { IntegrityManifest, MediaMetadata, ChunkDescriptor, PipelineUploadAdapter, MediaOperationResult } from '@/core/media/types';
+import type { IntegrityManifest, MediaMetadata, ChunkDescriptor, PipelineUploadAdapter, MediaOperationResult, UploadContext } from '@/core/media/types';
 import type { PortFieldSchema, PortConfig } from '@/core/db/schema';
 import { IntegrityEngine } from '@/core/media/integrity';
 import { SovereignPipeline } from '@/core/media/pipeline';

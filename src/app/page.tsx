@@ -1,4 +1,5 @@
 'use client';
+// Indra NEXT Sovereign - Production Fix Build
 
 import { useState, useEffect } from 'react';
 import { ArrowRight, Zap, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';

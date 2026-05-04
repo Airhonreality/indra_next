@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Zap, Shield, Link2, CheckCircle2, Circle, Loader2, Plus, Database } from 'lucide-react';
+import { Zap, Shield, Link2, Loader2, Database } from 'lucide-react';
 import Nango from '@nangohq/frontend';
 import { cn } from '@/lib/utils';
 import { SchemaManager } from './schema-manager';
@@ -40,9 +40,9 @@ export function IntegrationsManager() {
   const [newConfig, setNewConfig] = useState({ provider: '', client_id: '', client_secret: '' });
   const [searchTerm, setSearchTerm] = useState('');
 
-  const nango = new Nango({
-    publicKey: process.env.NEXT_PUBLIC_NANGO_PUBLIC_KEY || ''
-  });
+  // AXIOMA: Nango nueva API no usa publicKey en el frontend.
+  // El flujo correcto es: backend genera sessionToken → frontend abre ConnectUI con ese token.
+  const nango = new Nango();
 
   const fetchData = async () => {
     if (!userId) return;
@@ -102,19 +102,39 @@ export function IntegrationsManager() {
     if (!userId) return;
     setConnecting(provider);
     try {
-      // AXIOMA: connectionId = userId (Coherencia de Usuario)
-      await nango.auth(provider, userId);
-
-      await fetch('/api/integrations', {
+      // PASO 1: Backend genera un session token de corta duración (30min)
+      const sessionRes = await fetch('/api/nango/session', {
         method: 'POST',
-        body: JSON.stringify({
-          type: provider,
-          label: `${provider.charAt(0).toUpperCase() + provider.slice(1)} Sovereign Silo`,
-          connectionId: userId
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, integrationId: provider }),
       });
+      const { sessionToken, error } = await sessionRes.json();
+      if (error) throw new Error(error);
 
-      await fetchData();
+      // PASO 2: Frontend abre el Connect UI con el session token
+      // AXIOMA: connectionId = userId (Coherencia de Usuario Soberana)
+      await new Promise<void>((resolve, reject) => {
+        const connect = nango.openConnectUI({
+          onEvent: (event) => {
+            if (event.type === 'connect') {
+              // PASO 3: Persiste la integración en la DB de Indra
+              fetch('/api/integrations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: provider,
+                  label: `${provider.charAt(0).toUpperCase() + provider.slice(1)} Sovereign Silo`,
+                  connectionId: userId
+                })
+              }).then(() => fetchData()).then(resolve);
+            } else if (event.type === 'close') {
+              resolve(); // Usuario cerró sin conectar
+            }
+          },
+        });
+        // Inyectar el token al UI (muestra spinner hasta recibirlo)
+        connect.setSessionToken(sessionToken);
+      });
     } catch (err) {
       console.error('Connection failed:', err);
     } finally {

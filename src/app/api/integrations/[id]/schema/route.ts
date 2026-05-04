@@ -5,9 +5,10 @@ import { eq } from 'drizzle-orm';
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const { dynamicSchema } = await req.json();
 
     await db.update(integrations)
@@ -15,7 +16,7 @@ export async function PATCH(
         dynamicSchema,
         updatedAt: new Date()
       })
-      .where(eq(integrations.id, params.id));
+      .where(eq(integrations.id, id));
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -680,16 +680,19 @@ export function IngestionClient({ slug, portLabel, schema, config }: IngestionCl
       dispatch({ type: 'ADD_ALERT', msg: `↩ Reanudando "${entry.file.name}" desde chunk ${stored.uploadedChunks.length}.` });
     }
 
+    let speedSampleStart = Date.now();
+    let speedSampleBytes = 0;
+
     const uploadResult = await pipelineInstance.run(
       entry.file,
       manifest,
       adapter,
-      async (uploaded) => {
+      async (uploaded, total) => {
         const elapsed = (Date.now() - speedSampleStart) / 1000;
         speedSampleBytes += manifest.chunkSize;
         const bps = elapsed > 0 ? speedSampleBytes / elapsed : 0;
 
-        // Reset speed sample every 5 chunks
+        // Reset speed sample every 5 chunks for a more reactive measurement
         if (uploaded % 5 === 0) {
           speedSampleStart = Date.now();
           speedSampleBytes = 0;
@@ -700,9 +703,17 @@ export function IngestionClient({ slug, portLabel, schema, config }: IngestionCl
           patch: { uploadedChunks: uploaded, totalChunks: total, bytesPerSec: bps },
         });
 
-        // Update IndexedDB session
+        // Update IndexedDB session with full context for resumability
         const currentUploaded = Array.from({ length: uploaded }, (_, i) => i);
-        await saveIdbSession({ sovereignId: sovereignFileId, sessionId: manifest.fileId, uploadedChunks: currentUploaded, manifest });
+        await saveIdbSession({ 
+          sovereignId: sovereignFileId, 
+          sessionId: manifest.fileId, 
+          uploadedChunks: currentUploaded, 
+          manifest,
+          resumableUri,
+          formValues: currentFormValues,
+          savedAt: Date.now()
+        });
       }
     );
 

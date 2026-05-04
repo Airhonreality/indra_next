@@ -31,3 +31,36 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to discover integrations' }, { status: 500 });
   }
 }
+
+export async function POST(req: Request) {
+  const NANGO_SECRET_KEY = process.env.NANGO_SECRET_KEY;
+
+  try {
+    const { provider, client_id, client_secret } = await req.json();
+
+    // Registramos la configuración directamente en Nango
+    const response = await fetch('https://api.nango.dev/config', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${NANGO_SECRET_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        provider: provider,
+        unique_key: provider, // Usamos el nombre del proveedor como clave única
+        client_id: client_id,
+        client_secret: client_secret
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.message || 'Failed to register in Nango');
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Provisioning Error:', error);
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+  }
+}

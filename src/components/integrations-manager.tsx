@@ -26,10 +26,12 @@ interface CatalogItem {
   icon: string;
 }
 
-import { useSovereignUser } from '@/hooks/use-sovereign-user';
+import { useSession } from 'next-auth/react';
 
 export function IntegrationsManager() {
-  const { userId, isLoaded } = useSovereignUser();
+  const { data: session, status } = useSession();
+  const userId = session?.user?.id;
+  const isLoaded = status !== 'loading';
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [available, setAvailable] = useState<NangoConfig[]>([]);
   const [connected, setConnected] = useState<Integration[]>([]);
@@ -49,7 +51,7 @@ export function IntegrationsManager() {
     try {
       const [discoveryRes, connectedRes, catalogRes] = await Promise.all([
         fetch('/api/discovery/integrations'),
-        fetch(`/api/integrations?connectionId=${userId}`),
+        fetch(`/api/integrations?userId=${userId}`),
         fetch('/api/discovery/catalog')
       ]);
 
@@ -58,8 +60,7 @@ export function IntegrationsManager() {
       const catalogData = await catalogRes.json();
 
       setAvailable(discoveryData.integrations || []);
-      // Filter connections that belong to THIS user
-      setConnected((connectedData.integrations || []).filter((i: any) => i.connectionId === userId));
+      setConnected(connectedData.integrations || []);
       setCatalog(catalogData.catalog || []);
     } catch (err) {
       console.error('Failed to fetch integrations:', err);

@@ -9,6 +9,7 @@ import { IntegrationsManager } from '@/components/integrations-manager';
 import { executePipeline } from '@/app/actions/pipeline';
 import type { SourceItem } from '@/app/actions/pipeline';
 import type { FieldSchema } from '@/core/types/integration';
+import { useSession, signIn, signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 
 
@@ -103,17 +104,20 @@ function PipelineBuilder({ source, target }: { source: SelectedSource; target: S
 // ── PAGE ──────────────────────────────────────────────────────────────────────
 
 export default function Home() {
-  const { userId, isLoaded } = useSovereignUser();
+  const { data: session, status } = useSession();
+  const userId = session?.user?.id;
+  const isLoaded = status !== 'loading';
+  
   const [integrations, setIntegrations] = useState<IntegrationConfig[]>([]);
   const [sourceSelection, setSourceSelection] = useState<SelectedSource | null>(null);
   const [targetSelection, setTargetSelection] = useState<SelectedSource | null>(null);
   const [selecting, setSelecting] = useState<'source' | 'target'>('source');
 
   useEffect(() => {
-    if (!isLoaded || !userId) return;
+    if (status !== 'authenticated' || !userId) return;
 
     const loadIntegrations = async () => {
-      const res = await fetch(`/api/integrations?connectionId=${userId}`);
+      const res = await fetch(`/api/integrations?userId=${userId}`);
       const data = await res.json();
       
       const activeIntegrations: IntegrationConfig[] = data.integrations.map((i: any) => ({
@@ -129,7 +133,55 @@ export default function Home() {
       ]);
     };
     loadIntegrations();
-  }, [isLoaded, userId]);
+  }, [status, userId]);
+
+  if (status === 'loading') {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-background">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-background p-6 space-y-8 animate-in fade-in duration-700">
+        <div className="flex flex-col items-center space-y-4 text-center">
+          <div className="size-16 rounded-2xl bg-primary flex items-center justify-center shadow-2xl shadow-primary/20">
+            <Zap className="size-8 text-primary-foreground" />
+          </div>
+          <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl uppercase italic">INDRA NEXT</h1>
+          <p className="text-muted-foreground max-w-[600px]">
+            La infraestructura soberana para la ingesta y transcodificación de media a escala de Terabytes.
+            Conecta tus silos, automatiza tus flujos.
+          </p>
+        </div>
+        
+        <button
+          onClick={() => signIn('google')}
+          className="group flex items-center gap-3 bg-foreground text-background px-8 py-4 rounded-full font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-xl"
+        >
+          <span>Entrar con Google</span>
+          <ArrowRight className="size-4 group-hover:translate-x-1 transition-transform" />
+        </button>
+
+        <div className="grid grid-cols-3 gap-8 pt-8 border-t border-border w-full max-w-2xl text-center">
+          <div>
+            <p className="text-2xl font-bold">700+</p>
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Integraciones</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold">100%</p>
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Soberano</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold">TB</p>
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Escalabilidad</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleSelect = (source: SourceItem, schema: FieldSchema[]) => {
     if (selecting === 'source') {
@@ -146,8 +198,24 @@ export default function Home() {
         <div className="size-7 rounded-md bg-primary flex items-center justify-center">
           <Zap className="size-4 text-primary-foreground" />
         </div>
-        <h1 className="font-semibold text-foreground">INDRA NEXT</h1>
-        <span className="text-xs text-muted-foreground font-mono">sovereign data infrastructure</span>
+        <h1 className="font-semibold text-foreground flex-1">INDRA NEXT</h1>
+        
+        <div className="flex items-center gap-4">
+          <div className="hidden sm:flex flex-col items-end">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Sovereign Identity</span>
+            <span className="text-[11px] font-medium">{session?.user?.email}</span>
+          </div>
+          {session?.user?.image && (
+            <img src={session.user.image} className="size-8 rounded-full border border-border" alt="" />
+          )}
+          <button 
+            onClick={() => signOut()}
+            className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground"
+            title="Sign out"
+          >
+            <AlertCircle className="size-4" />
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 max-w-7xl mx-auto">

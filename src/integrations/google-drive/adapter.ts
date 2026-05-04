@@ -1,11 +1,9 @@
-import { NangoAuthorizedClient as AuthorizedClient } from '@/lib/authorized-client';
+import { AuthorizedClient, NangoAuthorizedClient } from '@/lib/authorized-client';
 import { nango } from '@/lib/nango';
 import { BaseAdapter } from '../shared/base-adapter';
 import type { 
-  IntegrationRecord, 
   OperationResult, 
   FieldSchema,
-  SiloMetadata 
 } from '@/core/types/integration';
 
 export class GoogleDriveAdapter extends BaseAdapter {
@@ -17,7 +15,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
   constructor(connectionId: string) {
     super();
     this.connectionId = connectionId;
-    this.client = new AuthorizedClient('google-drive', connectionId);
+    this.client = new NangoAuthorizedClient('google-drive', connectionId);
   }
 
   async testConnection(): Promise<OperationResult<boolean>> {
@@ -79,7 +77,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
         currentParentId = searchRes.files[0].id;
       } else {
         // 2. Create it
-        const tokenResponse = await nango.getLatestToken('google-drive', this.connectionId);
+        const tokenResponse = await nango.getToken('google-drive', this.connectionId) as any;
         const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
           method: 'POST',
           headers: {
@@ -113,7 +111,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
   ): Promise<OperationResult<{ resumableUri: string; sessionId: string }>> {
     try {
       // 1. Obtener token fresco de Nango
-      const tokenResponse = await nango.getLatestToken('google-drive', this.connectionId);
+      const tokenResponse = await nango.getToken('google-drive', this.connectionId) as any;
       const token = tokenResponse.access_token;
 
       // 2. Iniciar sesión resumible en Google Drive

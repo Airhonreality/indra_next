@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
+import { auth } from "@/auth";
 
 export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const NANGO_SECRET_KEY = process.env.NANGO_SECRET_KEY;
 
   if (!NANGO_SECRET_KEY) {
@@ -33,6 +39,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const NANGO_SECRET_KEY = process.env.NANGO_SECRET_KEY;
 
   try {

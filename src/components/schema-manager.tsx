@@ -16,7 +16,7 @@ export function SchemaManager({ integrationId, currentSchema, onUpdate }: Schema
 
   const addField = () => {
     const newField: FieldSchema = {
-      name: `field_${Date.now()}`,
+      key: `field_${Date.now()}`,
       type: 'string',
       label: 'New Field',
       required: false
@@ -73,7 +73,7 @@ export function SchemaManager({ integrationId, currentSchema, onUpdate }: Schema
               placeholder="Field Label"
               className="flex-1 bg-muted border border-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
               value={field.label}
-              onChange={e => updateField(index, { label: e.target.value, name: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+              onChange={e => updateField(index, { label: e.target.value, key: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
             />
             <select
               className="bg-muted border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"

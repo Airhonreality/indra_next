@@ -1,21 +1,21 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { integrations } from '@/core/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
+import { auth } from "@/auth";
 
 export async function GET(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
-    const { searchParams } = new URL(req.url);
-    const connectionId = searchParams.get('connectionId');
-
-    let query = db.select().from(integrations);
-    
-    if (connectionId) {
-      // @ts-ignore - drizzle type check
-      query = db.select().from(integrations).where(eq(integrations.connectionId, connectionId));
-    }
-
-    const list = await query;
+    const list = await db
+      .select()
+      .from(integrations)
+      .where(eq(integrations.userId, session.user.id));
+      
     return NextResponse.json({ integrations: list });
   } catch (error) {
     console.error('Fetch Integrations Error:', error);
@@ -24,13 +24,19 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { type, label, connectionId, config } = await req.json();
 
     const result = await db.insert(integrations).values({
+      userId: session.user.id,
       type,
       label,
-      connectionId,
+      connectionId, // Still need the Nango connection ID (which matches userId for now)
       config: config || {},
       isActive: true,
     }).returning();

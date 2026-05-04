@@ -12,17 +12,20 @@
 
 import { NextResponse } from 'next/server';
 import { nango } from '@/lib/nango';
+import { auth } from "@/auth";
 
 export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
-    const { userId, integrationId } = body;
-
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
+    const { integrationId } = body;
+    const userId = session.user.id;
 
     // Crear sesión de conexión en Nango
     // El token dura 30 minutos y es de un solo uso

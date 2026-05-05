@@ -1,11 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Zap, Shield, Link2, Loader2, Database } from 'lucide-react';
+import { Zap, Shield, Link2, Loader2, Database, Key } from 'lucide-react';
 import Nango from '@nangohq/frontend';
 import { cn } from '@/lib/utils';
 import { SchemaManager } from './schema-manager';
 import type { FieldSchema } from '@/core/types/integration';
+import { useSession } from 'next-auth/react';
+import { i18n } from '@/lib/i18n';
+
+const t = i18n.es; // Default language: Spanish Standard
 
 interface NangoConfig {
   unique_key: string;
@@ -26,8 +30,6 @@ interface CatalogItem {
   icon: string;
 }
 
-import { useSession } from 'next-auth/react';
-
 export function IntegrationsManager() {
   const { data: session, status } = useSession();
   const userId = session?.user?.id;
@@ -42,8 +44,6 @@ export function IntegrationsManager() {
   const [newConfig, setNewConfig] = useState({ provider: '', client_id: '', client_secret: '' });
   const [searchTerm, setSearchTerm] = useState('');
 
-  // AXIOMA: Nango nueva API no usa publicKey en el frontend.
-  // El flujo correcto es: backend genera sessionToken → frontend abre ConnectUI con ese token.
   const nango = new Nango();
 
   const fetchData = async () => {
@@ -75,7 +75,7 @@ export function IntegrationsManager() {
 
   const handleProvision = async (provider: string) => {
     if (!newConfig.client_id || !newConfig.client_secret) {
-      alert('Please fill in Client ID and Secret first');
+      alert('Por favor, completa el Client ID y el Secret');
       return;
     }
 
@@ -85,7 +85,7 @@ export function IntegrationsManager() {
         method: 'POST',
         body: JSON.stringify({ ...newConfig, provider })
       });
-      if (!res.ok) throw new Error('Provisioning failed');
+      if (!res.ok) throw new Error('Falló el aprovisionamiento');
       
       setNewConfig({ provider: '', client_id: '', client_secret: '' });
       setShowProvision(false);
@@ -93,7 +93,7 @@ export function IntegrationsManager() {
       await fetchData();
     } catch (err) {
       console.error(err);
-      alert('Failed to provision: ' + (err as Error).message);
+      alert('Error: ' + (err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -103,7 +103,6 @@ export function IntegrationsManager() {
     if (!userId) return;
     setConnecting(provider);
     try {
-      // PASO 1: Backend genera un session token de corta duración (30min)
       const sessionRes = await fetch('/api/nango/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -112,28 +111,24 @@ export function IntegrationsManager() {
       const { sessionToken, error } = await sessionRes.json();
       if (error) throw new Error(error);
 
-      // PASO 2: Frontend abre el Connect UI con el session token
-      // AXIOMA: connectionId = userId (Coherencia de Usuario Soberana)
       await new Promise<void>((resolve, reject) => {
         const connect = nango.openConnectUI({
           onEvent: (event) => {
             if (event.type === 'connect') {
-              // PASO 3: Persiste la integración en la DB de Indra
               fetch('/api/integrations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   type: provider,
-                  label: `${provider.charAt(0).toUpperCase() + provider.slice(1)} Sovereign Silo`,
+                  label: `${provider.charAt(0).toUpperCase() + provider.slice(1)} Connection`,
                   connectionId: userId
                 })
               }).then(() => fetchData()).then(resolve);
             } else if (event.type === 'close') {
-              resolve(); // Usuario cerró sin conectar
+              resolve();
             }
           },
         });
-        // Inyectar el token al UI (muestra spinner hasta recibirlo)
         connect.setSessionToken(sessionToken);
       });
     } catch (err) {
@@ -150,23 +145,23 @@ export function IntegrationsManager() {
 
   if (!isLoaded || (loading && available.length === 0)) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 space-y-4">
+      <div className="flex flex-col items-center justify-center p-12 space-y-4 text-center">
         <Loader2 className="size-6 animate-spin text-primary" />
-        <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Synchronizing Sovereign Identity...</p>
+        <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">{t.common.loading}</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      {/* ── Sovereign Header ── */}
+      {/* ── Standard Header ── */}
       <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-4 border-b border-primary/10 pb-6">
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-primary font-bold text-[10px] uppercase tracking-[0.2em]">
             <Shield className="size-4" />
-            Active Infrastructure Identity
+            {t.auth.identity}
           </div>
-          <h3 className="text-2xl font-bold text-foreground tracking-tighter">Sovereign Profile</h3>
+          <h3 className="text-2xl font-bold text-foreground tracking-tighter">{t.auth.account}</h3>
           <p className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded inline-block">ID: {userId}</p>
         </div>
         
@@ -175,35 +170,35 @@ export function IntegrationsManager() {
             onClick={() => setShowProvision(!showProvision)}
             className="flex items-center gap-2 rounded-xl bg-muted px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:bg-muted/80 transition-all border border-border"
           >
-            {showProvision ? 'Close Portal' : 'Service Provisioning'}
+            {showProvision ? 'Cerrar Panel' : t.connections.provision}
           </button>
         </div>
       </div>
 
       {showProvision && (
-        <div className="bg-card border border-amber-500/30 rounded-2xl p-8 space-y-6 animate-in fade-in slide-in-from-top-4 duration-500 shadow-2xl shadow-amber-500/5">
+        <div className="bg-card border border-primary/30 rounded-2xl p-8 space-y-6 animate-in fade-in slide-in-from-top-4 duration-500 shadow-2xl">
           <div className="space-y-2">
-            <h4 className="text-sm font-bold text-foreground flex items-center gap-2 uppercase tracking-tighter text-amber-600">
-              <Zap className="size-4 fill-amber-500/20" />
-              Advanced: Capacity Injection
+            <h4 className="text-sm font-bold text-foreground flex items-center gap-2 uppercase tracking-tighter text-primary">
+              <Key className="size-4" />
+              {t.connections.credentials}
             </h4>
-            <p className="text-xs text-muted-foreground">Add new service providers by injecting their API secrets into the core. Use this to enable Drive or Notion on your own server.</p>
+            <p className="text-xs text-muted-foreground">Configura las credenciales de tus proveedores para habilitar nuevas conexiones.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Client Credentials</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Client Secrets</label>
                 <input 
                   placeholder="Client ID" 
-                  className="bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all"
+                  className="bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                   value={newConfig.client_id}
                   onChange={e => setNewConfig({ ...newConfig, client_id: e.target.value })}
                 />
                 <input 
                   placeholder="Client Secret" 
                   type="password"
-                  className="bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all"
+                  className="bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                   value={newConfig.client_secret}
                   onChange={e => setNewConfig({ ...newConfig, client_secret: e.target.value })}
                 />
@@ -212,10 +207,10 @@ export function IntegrationsManager() {
 
             <div className="space-y-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Universal Catalog</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Catálogo de Proveedores</label>
                 <input 
-                  placeholder="Filter providers..." 
-                  className="bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all"
+                  placeholder="Buscar proveedor..." 
+                  className="bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                 />
@@ -224,7 +219,7 @@ export function IntegrationsManager() {
                     <button
                       key={item.id}
                       onClick={() => handleProvision(item.id)}
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-amber-500/5 border border-transparent hover:border-amber-500/20 transition-all text-left"
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-primary/5 border border-transparent hover:border-primary/20 transition-all text-left"
                     >
                       <img src={item.icon} alt={item.name} className="size-5 rounded" />
                       <span className="text-[10px] font-bold uppercase tracking-tight">{item.name}</span>
@@ -237,9 +232,9 @@ export function IntegrationsManager() {
         </div>
       )}
 
-        {/* ── Active Silos ── */}
+        {/* ── Connections List ── */}
       <div className="space-y-4">
-        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-50 ml-1">Autonomous Silos</h4>
+        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-50 ml-1">{t.connections.title}</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {available.map((config) => {
             const isConnected = connected.some(c => c.type === config.provider);
@@ -277,7 +272,7 @@ export function IntegrationsManager() {
                       <div className="flex items-center gap-2">
                         <div className={cn("size-1.5 rounded-full", isConnected ? "bg-emerald-500 animate-pulse" : "bg-zinc-600")} />
                         <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                          {isConnected ? 'Active Protocol' : 'Standby'}
+                          {isConnected ? t.common.active : 'Desconectado'}
                         </span>
                       </div>
                     </div>
@@ -298,9 +293,9 @@ export function IntegrationsManager() {
                     {connecting === config.provider ? (
                       <Loader2 className="size-4 animate-spin" />
                     ) : isConnected ? (
-                      'Refresh Connection'
+                      'Actualizar Conexión'
                     ) : (
-                      'Authorize Silo'
+                      t.connections.authorize
                     )}
                   </button>
                   
@@ -310,7 +305,7 @@ export function IntegrationsManager() {
                       className="w-full py-3 flex items-center justify-center gap-2 rounded-2xl bg-primary/5 text-primary border border-primary/20 hover:bg-primary/10 text-[9px] font-bold uppercase tracking-widest transition-all"
                     >
                       <Database className="size-3" />
-                      Manage Schema
+                      Editar Esquema
                     </button>
                   )}
                 </div>
@@ -330,17 +325,21 @@ export function IntegrationsManager() {
 
           {available.length === 0 && (
             <div className="col-span-full rounded-3xl border border-dashed border-border p-16 text-center bg-muted/20">
-              <p className="text-xs text-muted-foreground uppercase font-bold tracking-widest mb-4">No discovered infrastructure</p>
+              <p className="text-xs text-muted-foreground uppercase font-bold tracking-widest mb-4">{t.connections.no_infra}</p>
               <button 
                 onClick={() => setShowProvision(true)}
                 className="text-primary text-[10px] font-black uppercase tracking-[0.2em] hover:underline"
               >
-                Inject First Capacity →
+                {t.connections.provision} →
               </button>
             </div>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+div>
     </div>
   );
 }

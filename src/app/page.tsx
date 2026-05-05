@@ -1,8 +1,9 @@
 'use client';
-// Indra NEXT Sovereign - Production Fix Build
+// Indra NEXT - Standardized Industrial UI
+// Nomenclature: Connections, Portals, Workflows
 
 import { useState, useEffect } from 'react';
-import { ArrowRight, Zap, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowRight, Zap, CheckCircle2, Loader2, AlertCircle, Layout, Share2, Database } from 'lucide-react';
 import { FractalViewer, type IntegrationConfig } from '@/components/fractal-viewer';
 import { WidgetProjector } from '@/components/widget-projector';
 import { IntegrationsManager } from '@/components/integrations-manager';
@@ -11,7 +12,9 @@ import type { SourceItem } from '@/app/actions/pipeline';
 import type { FieldSchema } from '@/core/types/integration';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils';
+import { i18n } from '@/lib/i18n';
 
+const t = i18n.es; // Default language: Spanish Standard
 
 type PipelineStatus = 'idle' | 'pending' | 'dispatched' | 'error';
 
@@ -20,7 +23,7 @@ interface SelectedSource {
   schema: FieldSchema[];
 }
 
-// ── PIPELINE BUILDER ──────────────────────────────────────────────────────────
+// ── WORKFLOW EDITOR ──────────────────────────────────────────────────────────
 
 function PipelineBuilder({ source, target }: { source: SelectedSource; target: SelectedSource }) {
   const [status, setStatus] = useState<PipelineStatus>('idle');
@@ -45,17 +48,20 @@ function PipelineBuilder({ source, target }: { source: SelectedSource; target: S
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-      <h2 className="text-sm font-semibold text-foreground">Pipeline</h2>
+      <div className="flex items-center gap-2">
+        <Share2 className="size-4 text-primary" />
+        <h2 className="text-sm font-semibold text-foreground">{t.workflow.builder}</h2>
+      </div>
 
       <div className="flex items-center gap-3">
         <div className="flex-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Source</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{t.workflow.source}</p>
           <p className="text-sm font-semibold mt-0.5 truncate">{source.source.label}</p>
           <p className="text-xs text-muted-foreground">{source.source.integration}</p>
         </div>
         <ArrowRight className="size-4 text-muted-foreground shrink-0" />
         <div className="flex-1 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Target</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{t.workflow.target}</p>
           <p className="text-sm font-semibold mt-0.5 truncate">{target.source.label}</p>
           <p className="text-xs text-muted-foreground">{target.source.integration}</p>
         </div>
@@ -67,14 +73,14 @@ function PipelineBuilder({ source, target }: { source: SelectedSource; target: S
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Zap className="size-4" />
-          Dispatch Pipeline
+          {t.workflow.deploy}
         </button>
       )}
 
       {status === 'pending' && (
         <div className="flex items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
-          Dispatching to Inngest…
+          {t.common.loading}
         </div>
       )}
 
@@ -82,10 +88,9 @@ function PipelineBuilder({ source, target }: { source: SelectedSource; target: S
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-1">
           <p className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="size-4" />
-            Pipeline dispatched
+            Flujo desplegado con éxito
           </p>
           <p className="text-xs text-muted-foreground font-mono break-all">{jobId}</p>
-          <p className="text-xs text-muted-foreground">Monitor progress in the Inngest dashboard.</p>
         </div>
       )}
 
@@ -106,7 +111,6 @@ function PipelineBuilder({ source, target }: { source: SelectedSource; target: S
 export default function Home() {
   const { data: session, status } = useSession();
   const userId = session?.user?.id;
-  const isLoaded = status !== 'loading';
   
   const [integrations, setIntegrations] = useState<IntegrationConfig[]>([]);
   const [sourceSelection, setSourceSelection] = useState<SelectedSource | null>(null);
@@ -152,8 +156,8 @@ export default function Home() {
           </div>
           <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl uppercase italic">INDRA NEXT</h1>
           <p className="text-muted-foreground max-w-[600px]">
-            La infraestructura soberana para la ingesta y transcodificación de media a escala de Terabytes.
-            Conecta tus silos, automatiza tus flujos.
+            Infraestructura soberana para la gestión de datos a escala industrial.
+            Conecta tus servicios, automatiza tus portales.
           </p>
         </div>
         
@@ -161,24 +165,9 @@ export default function Home() {
           onClick={() => signIn('google')}
           className="group flex items-center gap-3 bg-foreground text-background px-8 py-4 rounded-full font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-xl"
         >
-          <span>Entrar con Google</span>
+          <span>{t.auth.login} con Google</span>
           <ArrowRight className="size-4 group-hover:translate-x-1 transition-transform" />
         </button>
-
-        <div className="grid grid-cols-3 gap-8 pt-8 border-t border-border w-full max-w-2xl text-center">
-          <div>
-            <p className="text-2xl font-bold">700+</p>
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Integraciones</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold">100%</p>
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Soberano</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold">TB</p>
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Escalabilidad</p>
-          </div>
-        </div>
       </div>
     );
   }
@@ -202,7 +191,7 @@ export default function Home() {
         
         <div className="flex items-center gap-4">
           <div className="hidden sm:flex flex-col items-end">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Sovereign Identity</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t.auth.identity}</span>
             <span className="text-[11px] font-medium">{session?.user?.email}</span>
           </div>
           {session?.user?.image && (
@@ -211,7 +200,7 @@ export default function Home() {
           <button 
             onClick={() => signOut()}
             className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground"
-            title="Sign out"
+            title={t.auth.logout}
           >
             <AlertCircle className="size-4" />
           </button>
@@ -220,10 +209,13 @@ export default function Home() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 max-w-7xl mx-auto">
 
-        {/* LEFT: FractalViewer */}
+        {/* LEFT: Connections Explorer */}
         <div className="lg:col-span-1 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Silo Navigator</h2>
+            <div className="flex items-center gap-2">
+              <Database className="size-4 text-primary" />
+              <h2 className="text-sm font-semibold">{t.connections.explore}</h2>
+            </div>
             <div className="flex gap-1.5">
               <button
                 onClick={() => setSelecting('source')}
@@ -232,7 +224,7 @@ export default function Home() {
                   selecting === 'source' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'
                 )}
               >
-                → Source
+                {t.workflow.source}
               </button>
               <button
                 onClick={() => setSelecting('target')}
@@ -241,14 +233,10 @@ export default function Home() {
                   selecting === 'target' ? 'bg-emerald-600 text-white' : 'bg-muted text-muted-foreground hover:bg-accent'
                 )}
               >
-                → Target
+                {t.workflow.target}
               </button>
             </div>
           </div>
-
-          <p className="text-xs text-muted-foreground">
-            Click <strong>{selecting === 'source' ? 'a source' : 'a target'}</strong> to configure the pipeline.
-          </p>
 
           <FractalViewer
             integrations={integrations}
@@ -257,56 +245,54 @@ export default function Home() {
           />
         </div>
 
-        {/* CENTER: Pipeline Builder */}
+        {/* CENTER: Workflow Builder */}
         <div className="lg:col-span-1 space-y-4">
-          <h2 className="text-sm font-semibold">Pipeline Builder</h2>
-
           {sourceSelection && targetSelection ? (
             <PipelineBuilder source={sourceSelection} target={targetSelection} />
           ) : (
-            <div className="rounded-xl border border-dashed border-border p-8 flex flex-col items-center gap-3 text-center text-muted-foreground">
-              <ArrowRight className="size-8 opacity-30" />
-              <p className="text-sm">Select a source and target from the Silo Navigator to build a pipeline.</p>
+            <div className="rounded-xl border border-dashed border-border p-8 flex flex-col items-center gap-3 text-center text-muted-foreground min-h-[200px] justify-center">
+              <Share2 className="size-8 opacity-30" />
+              <p className="text-sm">{t.workflow.subtitle}</p>
             </div>
           )}
 
           {sourceSelection && (
             <div className="rounded-xl border border-border bg-card p-4 space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Source selection</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Origen seleccionado</p>
               <p className="text-sm font-medium">{sourceSelection.source.label}</p>
-              <p className="text-xs text-muted-foreground">{sourceSelection.schema.length} fields detected</p>
+              <p className="text-xs text-muted-foreground">{sourceSelection.schema.length} campos detectados</p>
             </div>
           )}
         </div>
 
-        {/* RIGHT: WidgetProjector */}
+        {/* RIGHT: Portal Schema Preview */}
         <div className="lg:col-span-1 space-y-4">
-          <h2 className="text-sm font-semibold">Schema Preview</h2>
+          <div className="flex items-center gap-2">
+            <Layout className="size-4 text-primary" />
+            <h2 className="text-sm font-semibold">{t.portals.schema}</h2>
+          </div>
 
           {sourceSelection?.schema.length ? (
             <div className="rounded-xl border border-border bg-card p-5">
               <p className="text-xs text-muted-foreground mb-4">
-                Previewing schema from <strong>{sourceSelection.source.label}</strong>
+                Previsualizando portal para <strong>{sourceSelection.source.label}</strong>
               </p>
               <WidgetProjector
                 schema={sourceSelection.schema}
-                onSubmit={(values, errors) => {
-                  if (Object.keys(errors).length === 0) {
-                    console.log('Form values:', values);
-                  }
-                }}
-                submitLabel="Preview Record"
+                onSubmit={(values) => console.log('Portal data:', values)}
+                submitLabel="Probar Portal"
               />
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-border p-8 flex flex-col items-center gap-3 text-center text-muted-foreground">
-              <p className="text-sm">Select a source to preview its schema and test field rendering.</p>
+            <div className="rounded-xl border border-dashed border-border p-8 flex flex-col items-center gap-3 text-center text-muted-foreground min-h-[200px] justify-center">
+              <Layout className="size-8 opacity-30" />
+              <p className="text-sm">Selecciona un origen para previsualizar su portal de datos.</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* BOTTOM: Infrastructure Management */}
+      {/* BOTTOM: Connections Management */}
       <div className="max-w-7xl mx-auto p-6 border-t border-border mt-12">
         <div className="bg-muted/30 rounded-2xl p-8 border border-border">
           <IntegrationsManager />

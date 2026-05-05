@@ -17,6 +17,7 @@ export const i18n = {
     },
     auth: {
       identity: "Identidad",
+      account: "Mi Cuenta",
       login: "Iniciar Sesión",
       logout: "Cerrar Sesión",
       profile: "Perfil de Usuario"
@@ -66,6 +67,7 @@ export const i18n = {
     },
     auth: {
       identity: "Identity",
+      account: "Account",
       login: "Login",
       logout: "Logout",
       profile: "User Profile"

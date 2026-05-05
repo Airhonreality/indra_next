@@ -339,7 +339,3 @@ export function IntegrationsManager() {
     </div>
   );
 }
-div>
-    </div>
-  );
-}

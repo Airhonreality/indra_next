@@ -31,6 +31,7 @@ export default async function DashboardPage() {
     id: c.id,
     label: c.label,
     integration: c.type,
+    type: c.type,
     connectionId: c.connectionId
   }));
 

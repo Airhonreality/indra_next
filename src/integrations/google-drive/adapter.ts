@@ -46,7 +46,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
         params: {
           q: "mimeType = 'application/vnd.google-apps.folder' and trashed = false",
           fields: 'files(id, name)',
-          pageSize: 50
+          pageSize: '50'
         }
       });
 
@@ -116,6 +116,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
     } catch (err) {
       return this.error((err as Error).message);
     }
+  }
   /**
    * RECURSIVE FOLDER ENGINE
    * Ensures a path like "Project A/2026/May" exists in Drive.
@@ -159,5 +160,13 @@ export class GoogleDriveAdapter extends BaseAdapter {
     }
 
     return currentParentId;
+  }
+
+  async getRecords(sourceId: string, options?: any): Promise<OperationResult<any[]>> {
+    return this.error('Not implemented for Drive. Use listSources instead.');
+  }
+
+  async pushRecords(targetId: string, records: any[]): Promise<OperationResult<any>> {
+    return this.error('Not implemented for Drive. Use createResumableSession instead.');
   }
 }

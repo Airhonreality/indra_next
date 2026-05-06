@@ -10,6 +10,7 @@
  * Flow: Backend genera token → Frontend abre ConnectUI → Nango almacena credenciales
  */
 
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { nango } from '@/lib/nango';
 import { auth } from "@/auth";

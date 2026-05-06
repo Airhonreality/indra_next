@@ -6,7 +6,7 @@ import { Nango } from '@nangohq/node';
  * Handles OAuth, Token Refresh, and API Proxying.
  */
 export const nango = new Nango({
-  secretKey: process.env.NANGO_SECRET_KEY!,
+  secretKey: process.env.NANGO_SECRET_KEY || 'DUMMY_KEY_FOR_BUILD',
 });
 
 /**

@@ -116,5 +116,48 @@ export class GoogleDriveAdapter extends BaseAdapter {
     } catch (err) {
       return this.error((err as Error).message);
     }
+  /**
+   * RECURSIVE FOLDER ENGINE
+   * Ensures a path like "Project A/2026/May" exists in Drive.
+   * Returns the final folder ID.
+   */
+  async getOrCreateFolderByPath(path: string, parentId: string = 'root'): Promise<string> {
+    const segments = path.split('/').filter(Boolean);
+    let currentParentId = parentId;
+
+    for (const segment of segments) {
+      // 1. Search if segment exists under current parent
+      const searchRes = await this.client.request({
+        endpoint: '/files',
+        params: {
+          q: `name = '${segment.replace(/'/g, "\\")}' and '${currentParentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+          fields: 'files(id)',
+        },
+      });
+
+      if (searchRes.files && searchRes.files.length > 0) {
+        currentParentId = searchRes.files[0].id;
+      } else {
+        // 2. Create it
+        const tokenResponse = await nango.getToken('google-drive', this.connectionId) as any;
+        const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${tokenResponse.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: segment,
+            parents: [currentParentId],
+            mimeType: 'application/vnd.google-apps.folder',
+          }),
+        });
+        const folder = await createRes.json();
+        if (!folder.id) throw new Error(`Failed to create folder segment: ${segment}`);
+        currentParentId = folder.id;
+      }
+    }
+
+    return currentParentId;
   }
 }

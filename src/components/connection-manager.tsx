@@ -169,7 +169,8 @@ export function ConnectionManager() {
   }
 
   // Basic admin check for the UI (Matches the backend check)
-  const isSystemAdmin = userEmail === 'hgargon@gmail.com' || process.env.NODE_ENV === 'development';
+  // Temporarily allowing all authenticated users to see the panel for MVP
+  const isSystemAdmin = !!userId;
 
   return (
     <div className="space-y-8">

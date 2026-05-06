@@ -46,9 +46,9 @@ export async function GET() {
 export async function POST(req: Request) {
   const session = await auth();
   
-  // SECURITY CHECK: Provisioning is an administrative task
+  // SECURITY CHECK: Temporarily allowing any authenticated user to provision for MVP
   // In production, this should check for an admin role or specific email
-  const isAdmin = session?.user?.email === process.env.ADMIN_EMAIL || process.env.NODE_ENV === 'development';
+  const isAdmin = !!session?.user?.id;
   
   if (!isAdmin) {
     return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });

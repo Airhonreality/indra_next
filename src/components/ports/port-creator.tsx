@@ -54,41 +54,41 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-8 rounded-[2.5rem] bg-white/[0.02] border border-white/5 space-y-6">
+    <form onSubmit={handleSubmit} className="p-8 rounded-xl bg-card border border-border shadow-sm space-y-6">
       <div className="flex items-center gap-4 mb-4">
-        <div className="size-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-          <Globe className="size-4 text-blue-500" />
+        <div className="size-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+          <Globe className="size-4 text-primary" />
         </div>
-        <h3 className="text-lg font-bold text-white tracking-tight uppercase tracking-widest">Configurar Nuevo Portal</h3>
+        <h3 className="text-lg font-bold tracking-tight uppercase tracking-widest">Configurar Nuevo Portal</h3>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Nombre del Portal</Label>
+          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Nombre del Portal</Label>
           <Input 
             placeholder="Ej: Ingesta de Producción" 
             value={formData.label}
             onChange={e => setFormData({ ...formData, label: e.target.value })}
-            className="bg-black/40 border-white/10"
+            className="bg-muted border-border"
             required
           />
         </div>
         <div className="space-y-2">
-          <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Identificador (Slug)</Label>
+          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Identificador (Slug)</Label>
           <Input 
             placeholder="mi-proyecto-2026" 
             value={formData.slug}
             onChange={e => setFormData({ ...formData, slug: e.target.value })}
-            className="bg-black/40 border-white/10"
+            className="bg-muted border-border"
             required
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Conexión de Destino</Label>
+        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Conexión de Destino</Label>
         <select 
-          className="w-full h-10 px-3 rounded-md bg-black/40 border border-white/10 text-sm text-white"
+          className="w-full h-10 px-3 rounded-md bg-muted border border-border text-sm"
           value={formData.integrationId}
           onChange={e => setFormData({ ...formData, integrationId: e.target.value })}
           required
@@ -103,7 +103,7 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
       <Button 
         type="submit" 
         disabled={isPending || isSuccess}
-        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest text-[10px] py-6"
+        className="w-full bg-primary text-primary-foreground hover:opacity-90 font-bold uppercase tracking-widest text-[10px] py-6"
       >
         {isPending ? <Loader2 className="size-4 animate-spin" /> : isSuccess ? <Check className="size-4" /> : 'Activar Portal Público'}
       </Button>

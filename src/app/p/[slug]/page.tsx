@@ -77,7 +77,7 @@ export default function PublicPortalPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="size-8 animate-spin text-primary" />
       </div>
     );
@@ -85,38 +85,38 @@ export default function PublicPortalPage() {
 
   if (!port) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center text-zinc-500 font-bold uppercase tracking-widest">
+      <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground font-bold uppercase tracking-widest">
         404 // Portal no encontrado
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-400 p-6 flex flex-col items-center">
+    <div className="min-h-screen bg-background text-foreground p-6 flex flex-col items-center">
       {/* HEADER DE MARCA BLANCA */}
       <header className="w-full max-w-2xl flex items-center justify-between py-12">
         <div className="flex items-center gap-3">
           <div className="size-10 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-center">
             <ShieldCheck className="size-5 text-primary" />
           </div>
-          <h1 className="text-xl font-black text-white tracking-tighter uppercase">{port.label}</h1>
+          <h1 className="text-xl font-bold tracking-tighter uppercase">{port.label}</h1>
         </div>
-        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">Secure Transfer // Indra NEXT</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Secure Transfer // Indra NEXT</span>
       </header>
 
-      <main className="w-full max-w-2xl bg-white/[0.02] border border-white/5 rounded-[3rem] p-12 space-y-12">
+      <main className="w-full max-w-2xl bg-card border border-border rounded-[2rem] shadow-sm p-12 space-y-12">
         {uploadStatus === 'success' ? (
           <div className="py-20 flex flex-col items-center justify-center text-center space-y-6 animate-in zoom-in-95 duration-500">
             <div className="size-24 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
               <CheckCircle2 className="size-12 text-emerald-500" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-white tracking-tighter">Envío Completado</h2>
-              <p className="text-sm text-zinc-500 italic">El archivo ha sido transferido soberanamente a la infraestructura de destino.</p>
+              <h2 className="text-2xl font-bold tracking-tighter">Envío Completado</h2>
+              <p className="text-sm text-muted-foreground italic">El archivo ha sido transferido soberanamente a la infraestructura de destino.</p>
             </div>
             <button 
               onClick={() => window.location.reload()}
-              className="px-6 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-colors"
+              className="px-6 py-2 rounded-xl bg-muted border border-border text-[10px] font-bold uppercase tracking-widest hover:bg-muted/80 transition-colors"
             >
               Enviar otro archivo
             </button>
@@ -124,11 +124,11 @@ export default function PublicPortalPage() {
         ) : (
           <>
             <div className="space-y-4 text-center">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-black uppercase tracking-widest text-primary">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-bold uppercase tracking-widest text-primary">
                 Portal Activo
               </div>
-              <h2 className="text-3xl font-bold text-white tracking-tighter">Depósito de Activos Digitales</h2>
-              <p className="text-sm text-zinc-500">Completa el esquema de datos y selecciona el archivo para procesar la ingesta.</p>
+              <h2 className="text-3xl font-bold tracking-tighter">Depósito de Activos Digitales</h2>
+              <p className="text-sm text-muted-foreground">Completa el esquema de datos y selecciona el archivo para procesar la ingesta.</p>
             </div>
 
             <DataPortalPreview 
@@ -140,13 +140,13 @@ export default function PublicPortalPage() {
 
             {uploadStatus === 'uploading' && (
               <div className="space-y-4 animate-in fade-in duration-300">
-                <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-primary transition-all duration-1000 ease-out" 
                     style={{ width: `${progress}%` }}
                   />
                 </div>
-                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-zinc-600">
+                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Loader2 className="size-3 animate-spin" />
                     Transfiriendo Datos...
@@ -156,15 +156,15 @@ export default function PublicPortalPage() {
               </div>
             )}
 
-            <div className="pt-8 border-t border-white/5 flex items-center justify-center gap-2">
-              <UploadCloud className="size-4 text-zinc-700" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-zinc-700">Encrypted End-to-End Tunnel</span>
+            <div className="pt-8 border-t border-border flex items-center justify-center gap-2">
+              <UploadCloud className="size-4 text-muted-foreground" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Encrypted End-to-End Tunnel</span>
             </div>
           </>
         )}
       </main>
 
-      <footer className="mt-20 text-[9px] font-black uppercase tracking-[0.4em] text-zinc-700">
+      <footer className="mt-20 text-[9px] font-bold uppercase tracking-[0.4em] text-muted-foreground opacity-50">
         Powered by Indra NEXT Infrastructure // Sovereign Core
       </footer>
     </div>

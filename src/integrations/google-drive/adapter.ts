@@ -6,6 +6,11 @@ import type {
   FieldSchema,
 } from '@/core/types/integration';
 
+/**
+ * GOOGLE DRIVE ADAPTER (PRODUCTION READY)
+ * Implements the ISiloAdapter interface for Google Drive.
+ * Handles real-time resource discovery and resumable uploads.
+ */
 export class GoogleDriveAdapter extends BaseAdapter {
   private client: AuthorizedClient;
   private connectionId: string;
@@ -15,107 +20,74 @@ export class GoogleDriveAdapter extends BaseAdapter {
   constructor(connectionId: string) {
     super();
     this.connectionId = connectionId;
+    // The NangoAuthorizedClient handles automatic token refresh via middleware
     this.client = new NangoAuthorizedClient('google-drive', connectionId);
   }
 
+  /**
+   * Validates if the connection is alive by calling the /about endpoint.
+   */
   async testConnection(): Promise<OperationResult<boolean>> {
     try {
       await this.client.request({ endpoint: '/about', params: { fields: 'user' } });
       return this.result(true);
     } catch (err) {
-      return this.error('Connection failed');
+      return this.error('CONN_ERR: Drive API unreachable or invalid tokens');
     }
   }
 
+  /**
+   * Fetches real folders from the connected Drive account.
+   */
   async listSources(): Promise<OperationResult<any>> {
-    return this.result([{ id: 'root', name: 'My Drive' }]);
+    try {
+      const response = await this.client.request({
+        endpoint: '/files',
+        params: {
+          q: "mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+          fields: 'files(id, name)',
+          pageSize: 50
+        }
+      });
+
+      const folders = response.files.map((f: any) => ({
+        id: f.id,
+        label: f.name,
+        type: 'folder'
+      }));
+
+      return this.result(folders);
+    } catch (err) {
+      return this.error('LIST_ERR: Failed to fetch Drive folders');
+    }
   }
 
+  /**
+   * Returns the dynamic schema for Drive file uploads.
+   */
   async getSchema(sourceId: string): Promise<OperationResult<FieldSchema[]>> {
+    // In Drive, every "source" (folder) accepts the same file contract
     return this.result([
-      { key: 'name', type: 'string', label: 'File Name', required: true },
-      { key: 'mimeType', type: 'string', label: 'MIME Type', required: false },
+      { key: 'name', type: 'string', label: 'Nombre del Archivo', required: true },
+      { key: 'description', type: 'string', label: 'Descripción', required: false },
+      { key: 'category', type: 'select', label: 'Categoría', options: ['Media', 'Documento', 'Otro'], required: true }
     ]);
   }
 
-  async pushRecords(targetId: string, records: any[]): Promise<OperationResult<any>> {
-    return this.error('Direct push not implemented. Use createResumableSession for large files.');
-  }
-
-  async getRecords(sourceId: string, options?: any): Promise<OperationResult<any[]>> {
-    const folderId = sourceId || 'root';
-    const response = await this.client.request({
-      endpoint: '/files',
-      params: {
-        q: `'${folderId}' in parents and trashed = false`,
-        fields: 'files(id, name, mimeType, size, webViewLink, iconLink)',
-      },
-    });
-    return this.result(response.files);
-  }
-
   /**
-   * RECURSIVE FOLDER ENGINE
-   * Ensures a path like "Project A/2026/May" exists in Drive.
-   * Returns the final folder ID.
-   */
-  async getOrCreateFolderByPath(path: string, parentId: string = 'root'): Promise<string> {
-    const segments = path.split('/').filter(Boolean);
-    let currentParentId = parentId;
-
-    for (const segment of segments) {
-      // 1. Search if segment exists under current parent
-      const searchRes = await this.client.request({
-        endpoint: '/files',
-        params: {
-          q: `name = '${segment.replace(/'/g, "\\'")}' and '${currentParentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
-          fields: 'files(id)',
-        },
-      });
-
-      if (searchRes.files && searchRes.files.length > 0) {
-        currentParentId = searchRes.files[0].id;
-      } else {
-        // 2. Create it
-        const tokenResponse = await nango.getToken('google-drive', this.connectionId) as any;
-        const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${tokenResponse.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: segment,
-            parents: [currentParentId],
-            mimeType: 'application/vnd.google-apps.folder',
-          }),
-        });
-        const folder = await createRes.json();
-        if (!folder.id) throw new Error(`Failed to create folder segment: ${segment}`);
-        currentParentId = folder.id;
-      }
-    }
-
-    return currentParentId;
-  }
-
-  /**
-   * IMPLEMENTACIÓN AXIOMÁTICA: Sesión Resumible de Google Drive.
-   * Permite que Indra negocie la subida y el cliente envíe chunks directamente.
+   * Initiates a Google Drive Resumable Upload session.
+   * This is the production way to handle ingestion.
    */
   async createResumableSession(
-    targetId: string,
+    targetFolderId: string,
     fileName: string,
     mimeType: string,
     totalSize: number
   ): Promise<OperationResult<{ resumableUri: string; sessionId: string }>> {
     try {
-      // 1. Obtener token fresco de Nango
       const tokenResponse = await nango.getToken('google-drive', this.connectionId) as any;
       const token = tokenResponse.access_token;
 
-      // 2. Iniciar sesión resumible en Google Drive
-      // POST https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable
       const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
         method: 'POST',
         headers: {
@@ -126,30 +98,23 @@ export class GoogleDriveAdapter extends BaseAdapter {
         },
         body: JSON.stringify({
           name: fileName,
-          parents: [targetId],
+          parents: [targetFolderId],
         }),
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        return { ok: false, error: `Drive Session Error: ${error}`, data: [] as any };
+        throw new Error(`Drive Session Error: ${response.statusText}`);
       }
 
-      // El URI de la sesión está en el header Location
       const resumableUri = response.headers.get('Location');
-      if (!resumableUri) {
-        return { ok: false, error: 'Drive did not return a Resumable URI', data: [] as any };
-      }
+      if (!resumableUri) throw new Error('NO_LOCATION_HEADER');
 
-      return {
-        ok: true,
-        data: {
-          resumableUri,
-          sessionId: `gd-${Date.now()}`, // ID temporal para rastreo
-        }
-      };
-    } catch (error) {
-      return { ok: false, error: (error as Error).message, data: [] as any };
+      return this.result({
+        resumableUri,
+        sessionId: `GD_SESSION_${Date.now()}`,
+      });
+    } catch (err) {
+      return this.error((err as Error).message);
     }
   }
 }

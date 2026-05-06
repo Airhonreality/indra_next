@@ -1,10 +1,10 @@
-// Indra NEXT Internationalization System (i18n)
-// Standardizing nomenclature across the platform
+// Dictionary for standard technical nomenclature
+// Avoids poetic or ambiguous terms
 
 export const i18n = {
   es: {
     common: {
-      account: "Mi Cuenta",
+      account: "Cuenta",
       settings: "Configuración",
       save: "Guardar",
       cancel: "Cancelar",
@@ -16,92 +16,42 @@ export const i18n = {
       inactive: "Inactivo"
     },
     auth: {
-      identity: "Identidad",
-      account: "Mi Cuenta",
-      login: "Iniciar Sesión",
+      identity: "Sesión",
+      account: "Cuenta de Usuario",
+      login: "Ingresar",
       logout: "Cerrar Sesión",
-      profile: "Perfil de Usuario"
+      profile: "Perfil"
     },
     connections: {
       title: "Conexiones de Almacenamiento",
-      subtitle: "Gestiona tus silos de datos y proveedores cloud.",
-      add: "Añadir Conexión",
-      authorize: "Autorizar Conexión",
-      credentials: "Credenciales API",
-      provision: "Configurar Proveedor",
-      explore: "Explorador de Conexiones",
-      discovered: "Infraestructura Descubierta",
-      no_infra: "No hay infraestructura configurada"
+      subtitle: "Configuración de servicios externos y proveedores cloud.",
+      add: "Nueva Conexión",
+      authorize: "Conectar Servicio",
+      credentials: "Credenciales de Aplicación",
+      provision: "Aprovisionar Proveedor",
+      explore: "Explorador de Recursos",
+      discovered: "Servicios Disponibles",
+      no_infra: "No se han detectado proveedores configurados"
     },
     portals: {
       title: "Portales de Datos",
-      subtitle: "Puntos de entrada públicos para recibir información.",
-      create: "Crear Portal",
-      manage: "Gestionar Portal",
-      fields: "Campos del Formulario",
-      slug: "URL del Portal",
-      schema: "Esquema de Datos"
+      subtitle: "Configuración de puntos de entrada para recepción de archivos.",
+      create: "Nuevo Portal",
+      manage: "Administrar Portal",
+      fields: "Esquema de Campos",
+      slug: "Identificador URL",
+      schema: "Definición de Datos"
     },
     workflow: {
-      title: "Editor de Flujos",
-      subtitle: "Conecta tus portales con tus conexiones de almacenamiento.",
+      title: "Gestor de Flujos",
+      subtitle: "Definición de rutas entre origen y destino.",
       builder: "Constructor de Pipeline",
       source: "Origen",
       target: "Destino",
-      deploy: "Desplegar Flujo"
-    }
-  },
-  en: {
-    // Standard terms in English
-    common: {
-      account: "My Account",
-      settings: "Settings",
-      save: "Save",
-      cancel: "Cancel",
-      delete: "Delete",
-      loading: "Loading...",
-      unauthorized: "Unauthorized",
-      status: "Status",
-      active: "Active",
-      inactive: "Inactive"
-    },
-    auth: {
-      identity: "Identity",
-      account: "Account",
-      login: "Login",
-      logout: "Logout",
-      profile: "User Profile"
-    },
-    connections: {
-      title: "Storage Connections",
-      subtitle: "Manage your data silos and cloud providers.",
-      add: "Add Connection",
-      authorize: "Authorize Connection",
-      credentials: "API Credentials",
-      provision: "Configure Provider",
-      explore: "Connections Explorer",
-      discovered: "Discovered Infrastructure",
-      no_infra: "No infrastructure configured"
-    },
-    portals: {
-      title: "Data Portals",
-      subtitle: "Public entry points to receive information.",
-      create: "Create Portal",
-      manage: "Manage Portal",
-      fields: "Form Fields",
-      slug: "Portal URL",
-      schema: "Data Schema"
-    },
-    workflow: {
-      title: "Workflow Editor",
-      subtitle: "Connect your portals with your storage connections.",
-      builder: "Pipeline Builder",
-      source: "Source",
-      target: "Target",
-      deploy: "Deploy Workflow"
+      deploy: "Ejecutar Pipeline"
     }
   }
 };
 
 export type Language = 'es' | 'en';
-export const defaultLang: Language = 'es'; // Por defecto en español como solicitaste
+export const defaultLang: Language = 'es';

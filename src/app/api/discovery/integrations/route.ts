@@ -1,77 +1,91 @@
 import { NextResponse } from 'next/server';
 import { auth } from "@/auth";
 
+/**
+ * API ENDPOINT: DISCOVERY & PROVISIONING
+ * Handles the detection of configured cloud providers in Nango
+ * and allows administrative provisioning of new credentials.
+ */
+
+const NANGO_API_BASE = 'https://api.nango.dev';
+
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const NANGO_SECRET_KEY = process.env.NANGO_SECRET_KEY;
-
-  if (!NANGO_SECRET_KEY) {
-    return NextResponse.json({ error: 'NANGO_SECRET_KEY not configured' }, { status: 500 });
+  const nangoSecret = process.env.NANGO_SECRET_KEY;
+  if (!nangoSecret) {
+    return NextResponse.json({ error: 'NANGO_SECRET_KEY_MISSING' }, { status: 500 });
   }
 
   try {
-    // Consultamos a Nango las integraciones configuradas en el proyecto
-    const response = await fetch('https://api.nango.dev/config', {
-      headers: {
-        'Authorization': `Bearer ${NANGO_SECRET_KEY}`
-      }
+    // Fetch active configurations from Nango (Providers already provisioned with keys)
+    const response = await fetch(`${NANGO_API_BASE}/config`, {
+      headers: { 'Authorization': `Bearer ${nangoSecret}` }
     });
 
     if (!response.ok) {
-      throw new Error(`Nango API responded with ${response.status}`);
+      throw new Error(`Nango API returned status ${response.status}`);
     }
 
     const data = await response.json();
     
-    // Devolvemos la lista de integraciones para que la UI se autoconstruya
-    // Nango devuelve un objeto con 'configs'
+    // Return provisioned configurations
+    // Nango returns an object with a 'configs' array
     return NextResponse.json({ 
-      integrations: data.configs || [] 
+      providers: data.configs || [] 
     });
   } catch (error) {
-    console.error('Discovery Error:', error);
-    return NextResponse.json({ error: 'Failed to discover integrations' }, { status: 500 });
+    console.error('[Discovery API Error]:', error);
+    return NextResponse.json({ error: 'Failed to discover provider configurations' }, { status: 500 });
   }
 }
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  
+  // SECURITY CHECK: Provisioning is an administrative task
+  // In production, this should check for an admin role or specific email
+  const isAdmin = session?.user?.email === process.env.ADMIN_EMAIL || process.env.NODE_ENV === 'development';
+  
+  if (!isAdmin) {
+    return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
   }
 
-  const NANGO_SECRET_KEY = process.env.NANGO_SECRET_KEY;
+  const nangoSecret = process.env.NANGO_SECRET_KEY;
 
   try {
     const { provider, client_id, client_secret } = await req.json();
 
-    // Registramos la configuración directamente en Nango
-    const response = await fetch('https://api.nango.dev/config', {
+    if (!provider || !client_id || !client_secret) {
+      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
+    }
+
+    // Register provider credentials in Nango
+    const response = await fetch(`${NANGO_API_BASE}/config`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${NANGO_SECRET_KEY}`,
+        'Authorization': `Bearer ${nangoSecret}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         provider: provider,
-        unique_key: provider, // Usamos el nombre del proveedor como clave única
+        unique_key: provider, 
         client_id: client_id,
         client_secret: client_secret
       })
     });
 
     if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.message || 'Failed to register in Nango');
+      const errData = await response.json();
+      throw new Error(errData.message || 'Nango registration failed');
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Provisioning Error:', error);
+    console.error('[Provisioning API Error]:', error);
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }

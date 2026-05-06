@@ -36,34 +36,25 @@ export function ConnectionManager() {
   const userEmail = session?.user?.email;
   
   // State management
-  const [availableProviders, setAvailableProviders] = useState<ProviderConfig[]>([]);
+  const [availableProviders, setAvailableProviders] = useState<ProviderConfig[]>([
+    { unique_key: 'google-drive', provider: 'google-drive' }
+  ]);
   const [activeConnections, setActiveConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
-  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [managingSchemaId, setManagingSchemaId] = useState<string | null>(null);
-  
-  // Admin form state
-  const [adminConfig, setAdminConfig] = useState({ provider: '', clientId: '', clientSecret: '' });
 
   const nango = new Nango();
 
   /**
    * REFRESH SYSTEM DATA
-   * Syncs available providers from Nango and user-specific active connections.
+   * Syncs user-specific active connections from our database.
    */
   const refreshData = async () => {
     if (!userId) return;
     try {
-      const [discoveryRes, connectionsRes] = await Promise.all([
-        fetch('/api/discovery/integrations'),
-        fetch(`/api/integrations?userId=${userId}`)
-      ]);
-
-      const discoveryData = await discoveryRes.json();
+      const connectionsRes = await fetch(`/api/integrations?userId=${userId}`);
       const connectionsData = await connectionsRes.json();
-
-      setAvailableProviders(discoveryData.providers || []);
       setActiveConnections(connectionsData.integrations || []);
     } catch (err) {
       console.error('[ConnectionManager]: Initialization failed', err);
@@ -75,42 +66,6 @@ export function ConnectionManager() {
   useEffect(() => {
     if (status === 'authenticated') refreshData();
   }, [status, userId]);
-
-  /**
-   * ADMIN ACTION: Provision new credentials in the core infrastructure
-   */
-  const handleProvisioning = async () => {
-    if (!adminConfig.provider || !adminConfig.clientId || !adminConfig.clientSecret) {
-      alert('Missing credentials parameters');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetch('/api/discovery/integrations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider: adminConfig.provider,
-          client_id: adminConfig.clientId,
-          client_secret: adminConfig.clientSecret
-        })
-      });
-      
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || 'Provisioning failed');
-      }
-      
-      setAdminConfig({ provider: '', clientId: '', clientSecret: '' });
-      setIsAdminPanelOpen(false);
-      await refreshData();
-    } catch (err) {
-      alert(`[Admin Error]: ${(err as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   /**
    * USER ACTION: Authorize access to personal cloud storage
@@ -159,7 +114,7 @@ export function ConnectionManager() {
     }
   };
 
-  if (status === 'loading' || (loading && availableProviders.length === 0)) {
+  if (status === 'loading' || loading) {
     return (
       <div className="flex flex-col items-center justify-center p-12 space-y-4">
         <Loader2 className="size-6 animate-spin text-primary" />
@@ -167,10 +122,6 @@ export function ConnectionManager() {
       </div>
     );
   }
-
-  // Basic admin check for the UI (Matches the backend check)
-  // Temporarily allowing all authenticated users to see the panel for MVP
-  const isSystemAdmin = !!userId;
 
   return (
     <div className="space-y-8">
@@ -184,59 +135,9 @@ export function ConnectionManager() {
           <h3 className="text-2xl font-bold text-foreground tracking-tighter">{t.auth.account}</h3>
           <p className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded inline-block">UID: {userId}</p>
         </div>
-        
-        {isSystemAdmin && (
-          <button 
-            onClick={() => setIsAdminPanelOpen(!isAdminPanelOpen)}
-            className="flex items-center gap-2 rounded-xl bg-muted px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:bg-muted/80 transition-all border border-border"
-          >
-            {isAdminPanelOpen ? t.common.cancel : t.connections.provision}
-          </button>
-        )}
       </div>
 
-      {/* SECTION: Admin Provisioning Panel (Restricted) */}
-      {isAdminPanelOpen && (
-        <div className="bg-card border border-primary/30 rounded-2xl p-8 space-y-6 animate-in fade-in slide-in-from-top-4 duration-500 shadow-xl">
-          <div className="space-y-2">
-            <h4 className="text-sm font-bold text-foreground flex items-center gap-2 uppercase tracking-tighter text-primary">
-              <Key className="size-4" />
-              {t.connections.credentials}
-            </h4>
-            <p className="text-xs text-muted-foreground">Administración: Registro de secretos de aplicación para habilitar nuevos proveedores.</p>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input 
-              placeholder="Provider Key (eg. google-drive)" 
-              className="bg-muted border border-border rounded-xl px-4 py-3 text-sm"
-              value={adminConfig.provider}
-              onChange={e => setAdminConfig({ ...adminConfig, provider: e.target.value })}
-            />
-            <input 
-              placeholder="Client ID" 
-              className="bg-muted border border-border rounded-xl px-4 py-3 text-sm"
-              value={adminConfig.clientId}
-              onChange={e => setAdminConfig({ ...adminConfig, clientId: e.target.value })}
-            />
-            <input 
-              placeholder="Client Secret" 
-              type="password"
-              className="bg-muted border border-border rounded-xl px-4 py-3 text-sm"
-              value={adminConfig.clientSecret}
-              onChange={e => setAdminConfig({ ...adminConfig, clientSecret: e.target.value })}
-            />
-          </div>
-          
-          <button 
-            onClick={handleProvisioning}
-            className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:opacity-90"
-          >
-            <Plus className="size-4" />
-            {t.connections.provision}
-          </button>
-        </div>
-      )}
 
       {/* SECTION: Available Providers and Active Connections */}
       <div className="space-y-4">

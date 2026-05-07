@@ -128,6 +128,7 @@ export function AgnosticConsoleShell() {
                   onSetLocalPath={(path) => actions.setLocalPath(manifest.id, path)}
                   onAuthorize={actions.authorizeOAuth}
                   onMountLocal={actions.mountLocalProvider}
+                  onDisconnect={actions.disconnectIntegration}
                   refreshData={actions.refreshData}
                 />
               );

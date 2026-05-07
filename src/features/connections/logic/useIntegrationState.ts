@@ -95,8 +95,19 @@ export function useIntegrationState() {
         })
       });
       await refreshData();
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  const disconnectIntegration = async (id: string) => {
+    if (!userId) return;
+    setIsProcessing(id);
+    try {
+      await fetch(`/api/integrations/${id}`, { method: 'DELETE' });
+      await refreshData();
     } catch (err) {
-      console.error('[Mount Error]:', err);
+      console.error('[Disconnect Error]:', err);
     } finally {
       setIsProcessing(null);
     }
@@ -125,6 +136,7 @@ export function useIntegrationState() {
       refreshData,
       authorizeOAuth,
       mountLocalProvider,
+      disconnectIntegration,
       setLocalPath: (id: string, path: string) => setLocalPaths(prev => ({ ...prev, [id]: path }))
     },
     state: {

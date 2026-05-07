@@ -29,6 +29,7 @@ interface ProviderEntityRowProps {
   onSetLocalPath: (path: string) => void;
   onAuthorize: (id: string) => void;
   onMountLocal: (id: string, path: string) => void;
+  onDisconnect?: (id: string) => void;
   refreshData: () => void;
 }
 
@@ -52,6 +53,7 @@ export function ProviderEntityRow({
   onSetLocalPath,
   onAuthorize,
   onMountLocal,
+  onDisconnect,
   refreshData
 }: ProviderEntityRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -233,8 +235,28 @@ export function ProviderEntityRow({
                                 {isProcessing ? <Loader2 className="size-4 animate-spin" /> : 'Authorize Connection'}
                               </button>
                             ) : (
-                              <div className="w-full text-center py-3 text-[9px] font-bold uppercase tracking-widest text-emerald-600 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                                Connection Alive
+                              <div className="space-y-4">
+                                <div className="w-full text-center py-3 text-[9px] font-bold uppercase tracking-widest text-emerald-600 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                                  Connection Alive
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                   <button
+                                     onClick={() => onAuthorize(manifest.id)}
+                                     disabled={isProcessing}
+                                     className="flex items-center justify-center gap-2 rounded-lg py-2 text-[8px] font-bold uppercase tracking-widest bg-muted text-foreground border border-border hover:bg-muted/80 transition-all"
+                                   >
+                                     <RefreshCw className={cn("size-3", isProcessing && "animate-spin")} />
+                                     Repair
+                                   </button>
+                                   <button
+                                     onClick={() => onDisconnect && onDisconnect(activeConnection.id)}
+                                     disabled={isProcessing}
+                                     className="flex items-center justify-center gap-2 rounded-lg py-2 text-[8px] font-bold uppercase tracking-widest bg-red-500/10 text-red-600 border border-red-500/20 hover:bg-red-500/20 transition-all"
+                                   >
+                                     <Trash2 className="size-3" />
+                                     Disconnect
+                                   </button>
+                                </div>
                               </div>
                             )}
                           </div>

@@ -137,8 +137,13 @@ export class GoogleDriveAdapter extends BaseAdapter {
       }));
 
       return this.result(items);
-    } catch (err) {
-      return this.error('INVENTORY_ERR: Failed to fetch Drive inventory');
+    } catch (err: any) {
+      console.error('[GoogleDriveAdapter] Inventory Fetch Failed:', {
+        message: err.message,
+        connectionId: this.connectionId,
+        stack: err.stack
+      });
+      return this.error(`INVENTORY_ERR: ${err.message || 'Unknown error'}`);
     }
   }
 

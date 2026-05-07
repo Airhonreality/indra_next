@@ -300,7 +300,7 @@ export function ProviderEntityRow({
                            inventory.map((obj: any) => (
                              <div key={obj.id} className="flex items-center gap-3 p-2 bg-background/50 rounded border border-border/50 hover:border-primary/30 transition-all group/item">
                                 <div className="size-6 rounded bg-muted flex items-center justify-center">
-                                  {obj.mimeType?.includes('folder') ? <Database className="size-3 text-primary/60" /> : <FileJson className="size-3 text-muted-foreground" />}
+                                  {obj.type === 'folder' ? <Database className="size-3 text-primary/60" /> : <FileJson className="size-3 text-muted-foreground" />}
                                 </div>
                                 <div className="flex flex-col overflow-hidden text-left">
                                   <span className="text-[10px] font-medium truncate text-foreground">{obj.name}</span>

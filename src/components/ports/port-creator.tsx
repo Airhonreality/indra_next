@@ -48,8 +48,8 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
       try {
         const res = await fetch(`/api/integrations/${formData.integrationId}/inventory`);
         const data = await res.json();
-        // Filter only folders (MIME type for Google Drive)
-        const folders = (data.objects || []).filter((obj: any) => obj.mimeType?.includes('folder'));
+        // Filter only folders (Agnostic Object Format)
+        const folders = (data.objects || []).filter((obj: any) => obj.type === 'folder');
         setAvailableFolders(folders);
       } catch (err) {
         console.error('Failed to fetch folders', err);

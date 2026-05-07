@@ -62,9 +62,18 @@ export async function GET(
 
       const data = await response.json();
       console.log('[Inventory Debug] Nango Data Received:', data.files?.length || 0, 'files');
-      inventoryData = data.files || [];
-    } else if (integration.type === 'google-sheets') {
-      // Placeholder for sheets inventory
+      
+      // AXIOMATIC TRANSLATION LAYER
+      // Convert provider-specific payload to Indra AgnosticObject format
+      inventoryData = (data.files || []).map((f: any) => ({
+        id: f.id,
+        name: f.name,
+        type: f.mimeType?.includes('folder') ? 'folder' : 'file',
+        rawMimeType: f.mimeType,
+        provider: providerKey
+      }));
+    } else {
+      // Fallback for unimplemented providers
       inventoryData = [];
     }
 

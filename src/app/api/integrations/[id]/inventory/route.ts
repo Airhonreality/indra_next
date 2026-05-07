@@ -36,15 +36,32 @@ export async function GET(
     // For MVP, we use the Nango Proxy for Google Drive / Sheets
     let inventoryData = [];
 
-    if (integration.type === 'google-drive') {
-      const response = await fetch(`${NANGO_API_BASE}/proxy/drive/v3/files?pageSize=10`, {
+    const providerKey = integration.type; // Dynamically use the registered type
+
+    if (providerKey === 'google-drive' || providerKey === 'google-sheets') {
+      const nangoUrl = `${NANGO_API_BASE}/proxy/drive/v3/files?pageSize=20&q='root' in parents and trashed = false`;
+      console.log(`[Inventory Debug] Fetching from Nango (${providerKey}):`, {
+        url: nangoUrl,
+        connectionId: session.user.id,
+        providerConfigKey: providerKey
+      });
+
+      const response = await fetch(nangoUrl, {
         headers: {
           'Authorization': `Bearer ${nangoSecret}`,
-          'Provider-Config-Key': 'google-drive',
-          'Connection-Id': session.user.id // In our setup, ConnectionId = UserId
+          'Provider-Config-Key': providerKey,
+          'Connection-Id': session.user.id
         }
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Inventory Debug] Nango Proxy Error:', response.status, errorText);
+        throw new Error(`Nango Proxy Error: ${response.status}`);
+      }
+
       const data = await response.json();
+      console.log('[Inventory Debug] Nango Data Received:', data.files?.length || 0, 'files');
       inventoryData = data.files || [];
     } else if (integration.type === 'google-sheets') {
       // Placeholder for sheets inventory

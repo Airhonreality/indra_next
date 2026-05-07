@@ -24,6 +24,9 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
   const [isSuccess, setIsSuccess] = useState(false);
   const [showPublicLink, setShowPublicLink] = useState<string | null>(null);
   
+  const [availableFolders, setAvailableFolders] = useState<any[]>([]);
+  const [isLoadingFolders, setIsLoadingFolders] = useState(false);
+  
   const [formData, setFormData] = useState({
     label: '',
     slug: '',
@@ -31,6 +34,32 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
     targetPath: 'root',
     pattern: '/{year}/{month}/{project}' // Routing Engine Template
   });
+
+  const [schemaFields, setSchemaFields] = useState<any[]>([
+    { key: 'project', type: 'string', label: 'Nombre del Proyecto', required: true }
+  ]);
+
+  // FETCH FOLDERS WHEN CONNECTION CHANGES
+  useEffect(() => {
+    if (!formData.integrationId) return;
+    
+    const fetchFolders = async () => {
+      setIsLoadingFolders(true);
+      try {
+        const res = await fetch(`/api/integrations/${formData.integrationId}/inventory`);
+        const data = await res.json();
+        // Filter only folders (MIME type for Google Drive)
+        const folders = (data.objects || []).filter((obj: any) => obj.mimeType?.includes('folder'));
+        setAvailableFolders(folders);
+      } catch (err) {
+        console.error('Failed to fetch folders', err);
+      } finally {
+        setIsLoadingFolders(false);
+      }
+    };
+    
+    fetchFolders();
+  }, [formData.integrationId]);
 
   // AUTO-SLUG GENERATION
   const handleNameChange = (val: string) => {
@@ -51,9 +80,7 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
         config: {
           pattern: formData.pattern
         },
-        schema: [
-          { key: 'project', type: 'string', label: 'Nombre del Proyecto', required: true }
-        ]
+        schema: schemaFields
       });
       
       const publicUrl = `${window.location.origin}/p/${formData.slug}`;
@@ -122,6 +149,25 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
                   ))}
                 </select>
               </div>
+
+              {formData.integrationId && (
+                <div className="space-y-2 animate-in slide-in-from-top-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Carpeta de Destino (Root)</Label>
+                  <select 
+                    className="w-full h-10 px-3 rounded-md bg-muted/30 border border-dashed border-border text-xs"
+                    value={formData.targetPath}
+                    onChange={e => setFormData({ ...formData, targetPath: e.target.value })}
+                    required
+                  >
+                    <option value="root">/ (Directorio Raíz)</option>
+                    {availableFolders.map(f => (
+                      <option key={f.id} value={f.id}>/{f.name}</option>
+                    ))}
+                  </select>
+                  {isLoadingFolders && <p className="text-[8px] animate-pulse uppercase font-bold text-primary">Descubriendo directorios...</p>}
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                   <FolderTree className="size-3" />
@@ -135,6 +181,57 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
                   required
                 />
               </div>
+          </div>
+        </div>
+
+        {/* SCHEMA DESIGNER SECTION */}
+        <div className="space-y-4 pt-4 border-t border-border/50">
+          <div className="flex items-center justify-between">
+             <Label className="text-[10px] font-bold uppercase tracking-widest text-primary">Esquema de Datos (Formulario Público)</Label>
+             <button 
+              type="button"
+              onClick={() => setSchemaFields([...schemaFields, { key: `field_${Date.now()}`, type: 'string', label: 'Nuevo Campo', required: true }])}
+              className="text-[9px] font-bold uppercase tracking-widest px-3 py-1 bg-primary/10 text-primary rounded-full hover:bg-primary/20 transition-all"
+             >
+               + Añadir Campo
+             </button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+             {schemaFields.map((field, idx) => (
+               <div key={idx} className="flex items-center gap-2 p-2 bg-muted/20 border border-border rounded-lg group">
+                  <Input 
+                    value={field.label}
+                    onChange={e => {
+                      const newFields = [...schemaFields];
+                      newFields[idx].label = e.target.value;
+                      newFields[idx].key = e.target.value.toLowerCase().replace(/\s+/g, '_');
+                      setSchemaFields(newFields);
+                    }}
+                    className="h-8 text-[10px] bg-background"
+                  />
+                  <select 
+                    value={field.type}
+                    onChange={e => {
+                      const newFields = [...schemaFields];
+                      newFields[idx].type = e.target.value;
+                      setSchemaFields(newFields);
+                    }}
+                    className="h-8 text-[10px] bg-background border border-border rounded-md px-1"
+                  >
+                    <option value="string">Texto</option>
+                    <option value="date">Fecha</option>
+                    <option value="select">Lista</option>
+                  </select>
+                  <button 
+                    type="button"
+                    onClick={() => setSchemaFields(schemaFields.filter((_, i) => i !== idx))}
+                    className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+               </div>
+             ))}
           </div>
         </div>
 

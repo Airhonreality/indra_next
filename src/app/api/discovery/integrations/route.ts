@@ -22,7 +22,7 @@ export async function GET() {
 
   try {
     // Fetch active configurations from Nango (Providers already provisioned with keys)
-    const response = await fetch(`${NANGO_API_BASE}/config`, {
+    const response = await fetch(`${NANGO_API_BASE}/integrations`, {
       headers: { 'Authorization': `Bearer ${nangoSecret}` }
     });
 
@@ -33,9 +33,9 @@ export async function GET() {
     const data = await response.json();
     
     // Return provisioned configurations
-    // Nango returns an object with a 'configs' array
+    // Nango returns an object with a 'data' array in /integrations
     return NextResponse.json({ 
-      providers: data.configs || [] 
+      providers: data.data || [] 
     });
   } catch (error) {
     console.error('[Discovery API Error]:', error);
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     }
 
     // Register provider credentials in Nango
-    const response = await fetch(`${NANGO_API_BASE}/config`, {
+    const response = await fetch(`${NANGO_API_BASE}/integrations`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${nangoSecret}`,

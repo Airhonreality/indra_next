@@ -27,14 +27,22 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { integrationId } = body;
     const userId = session.user.id;
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID missing in session' }, { status: 400 });
+    }
 
-    const payload = {
+    const payload: any = {
+      // Intentamos con camelCase primero
       connectionId: userId,
+      // Metadata para trazabilidad
       tags: {
-        end_user_id: userId,
-      },
-      ...(integrationId ? { allowed_integrations: [integrationId] } : {}),
+        indra_user_id: userId,
+      }
     };
+
+    if (integrationId) {
+      payload.allowed_integrations = [integrationId];
+    }
     
     console.log('[Nango Session Request]:', JSON.stringify(payload, null, 2));
 

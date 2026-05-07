@@ -1,0 +1,316 @@
+import { useState } from 'react';
+import { 
+  ChevronDown, 
+  Link2, 
+  Loader2, 
+  Key, 
+  Database, 
+  HardDrive, 
+  FileJson, 
+  Cloud, 
+  Activity, 
+  Terminal,
+  Eye,
+  Settings2,
+  Trash2,
+  RefreshCw,
+  LayoutGrid
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { ProviderManifest, Connection } from '../integration_types';
+import { SchemaManager } from '@/components/schema-manager';
+
+interface ProviderEntityRowProps {
+  manifest: ProviderManifest;
+  isNangoConfigured: boolean;
+  activeConnection?: Connection;
+  isProcessing: boolean;
+  localPathValue: string;
+  onSetLocalPath: (path: string) => void;
+  onAuthorize: (id: string) => void;
+  onMountLocal: (id: string, path: string) => void;
+  refreshData: () => void;
+}
+
+const getIcon = (iconName: string) => {
+  switch (iconName) {
+    case 'Cloud': return <Cloud className="size-5" />;
+    case 'Database': return <Database className="size-5" />;
+    case 'Table': return <Database className="size-5" />;
+    case 'HardDrive': return <HardDrive className="size-5" />;
+    case 'FileJson': return <FileJson className="size-5" />;
+    default: return <Link2 className="size-5" />;
+  }
+};
+
+export function ProviderEntityRow({
+  manifest,
+  isNangoConfigured,
+  activeConnection,
+  isProcessing,
+  localPathValue,
+  onSetLocalPath,
+  onAuthorize,
+  onMountLocal,
+  refreshData
+}: ProviderEntityRowProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<'auth' | 'view' | 'execute'>('auth');
+  const isActive = !!activeConnection;
+
+  return (
+    <div className={cn(
+      "group relative flex flex-col rounded-xl border transition-all duration-300",
+      isExpanded ? "bg-card border-primary/40 shadow-sm" : "bg-card/40 border-border hover:border-border-strong",
+      isActive && !isExpanded && "border-emerald-500/20"
+    )}>
+      
+      {/* ROW HEADER: MINIMAL STATE */}
+      <div 
+        className="flex items-center justify-between px-6 py-4 cursor-pointer select-none"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center gap-6">
+          <div className={cn(
+            "size-10 rounded-lg flex items-center justify-center border transition-colors",
+            isActive ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600" : "bg-muted border-border text-muted-foreground"
+          )}>
+            {getIcon(manifest.icon)}
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xs font-bold tracking-tight text-foreground uppercase flex items-center gap-2">
+              {manifest.label}
+              {isActive && <span className="text-[10px] lowercase font-mono text-emerald-500 bg-emerald-500/5 px-1.5 py-0.5 rounded border border-emerald-500/10">Active</span>}
+            </span>
+            <span className="text-[9px] text-muted-foreground uppercase tracking-widest opacity-50">{manifest.id}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-6">
+          <div className="hidden md:flex gap-4">
+             {manifest.capabilities.map(cap => (
+                <span key={cap} className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground/60 border-l border-border pl-3">
+                  {cap.replace('_', ' ')}
+                </span>
+              ))}
+          </div>
+          <ChevronDown className={cn(
+            "size-4 text-muted-foreground transition-transform duration-300",
+            isExpanded ? "rotate-180" : ""
+          )} />
+        </div>
+      </div>
+
+      {/* EXPANDABLE BODY: THE MICRO-OPERATOR */}
+      <div className={cn(
+        "overflow-hidden transition-all duration-300",
+        isExpanded ? "max-h-[1200px] opacity-100" : "max-h-0 opacity-0"
+      )}>
+        <div className="px-6 pb-6 pt-2 border-t border-border/50">
+          
+          {/* SUB-TABS (Fichas A, B, C) */}
+          <div className="flex gap-6 border-b border-border mb-6">
+            <button 
+              onClick={() => setActiveSubTab('auth')}
+              className={cn(
+                "pb-3 text-[9px] font-bold uppercase tracking-widest border-b-2 transition-all",
+                activeSubTab === 'auth' ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              [A] Configuration
+            </button>
+            <button 
+              onClick={() => setActiveSubTab('view')}
+              className={cn(
+                "pb-3 text-[9px] font-bold uppercase tracking-widest border-b-2 transition-all",
+                activeSubTab === 'view' ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              [B] Projection & Schema
+            </button>
+            <button 
+              onClick={() => setActiveSubTab('execute')}
+              className={cn(
+                "pb-3 text-[9px] font-bold uppercase tracking-widest border-b-2 transition-all",
+                activeSubTab === 'execute' ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              [C] Execution Terminal
+            </button>
+          </div>
+
+          <div className="animate-in fade-in slide-in-from-top-1 duration-300">
+            
+            {/* FICHA A: CONFIGURATION / AUTH */}
+            {activeSubTab === 'auth' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-4">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Key className="size-3 text-primary" />
+                    <h5 className="text-[10px] font-bold uppercase tracking-widest">Credentials Binding</h5>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {manifest.description}
+                  </p>
+                  <div className="flex gap-2">
+                    {manifest.capabilities.map(cap => (
+                      <span key={cap} className="px-1.5 py-0.5 bg-muted rounded text-[8px] font-mono border border-border">
+                        {cap}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-muted/30 p-5 rounded-xl border border-border space-y-4">
+                   {manifest.configType === 'oauth' ? (
+                      <div className="space-y-4">
+                        {!isNangoConfigured ? (
+                          <div className="space-y-3">
+                            <p className="text-[10px] text-muted-foreground italic">Client ID missing in sovereign bouncer (Nango).</p>
+                            <button
+                              onClick={() => window.open('https://app.nango.dev', '_blank')}
+                              className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-[9px] font-bold uppercase tracking-widest bg-muted text-foreground border border-border hover:bg-muted/80 transition-all"
+                            >
+                              Configure OAuth Client (Nango)
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <p className="text-[10px] text-emerald-600/80 font-bold uppercase tracking-widest">✓ Infrastructure Provisioned</p>
+                            {!isActive ? (
+                              <button
+                                onClick={() => onAuthorize(manifest.id)}
+                                disabled={isProcessing}
+                                className="w-full flex items-center justify-center gap-2 rounded-lg py-3 text-[9px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:opacity-90 transition-all"
+                              >
+                                {isProcessing ? <Loader2 className="size-4 animate-spin" /> : 'Authorize Connection'}
+                              </button>
+                            ) : (
+                              <div className="w-full text-center py-3 text-[9px] font-bold uppercase tracking-widest text-emerald-600 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                                Connection Alive
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                   ) : (
+                      <div className="space-y-4">
+                         <p className="text-[10px] text-muted-foreground">Define absolute host directory for volume mounting.</p>
+                         <input 
+                            type="text" 
+                            placeholder="/mnt/indra/data/vault" 
+                            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono"
+                            value={isActive ? '/var/lib/indra/data' : localPathValue}
+                            onChange={(e) => onSetLocalPath(e.target.value)}
+                            disabled={isActive || isProcessing}
+                          />
+                          <button
+                            onClick={() => onMountLocal(manifest.id, localPathValue)}
+                            disabled={isActive || isProcessing || !localPathValue}
+                            className="w-full flex items-center justify-center gap-2 rounded-lg py-3 text-[9px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:opacity-90 transition-all disabled:opacity-50"
+                          >
+                            {isProcessing ? <Loader2 className="size-4 animate-spin" /> : isActive ? 'Volume Mounted' : 'Mount Storage Volume'}
+                          </button>
+                      </div>
+                   )}
+                </div>
+              </div>
+            )}
+
+            {/* FICHA B: PROJECTION & SCHEMA */}
+            {activeSubTab === 'view' && (
+              <div className="space-y-6 py-4">
+                {!isActive ? (
+                  <div className="flex flex-col items-center justify-center p-12 bg-muted/20 rounded-xl border border-dashed border-border text-muted-foreground">
+                    <Eye className="size-6 mb-2 opacity-20" />
+                    <p className="text-[10px] font-bold uppercase tracking-widest">Connect provider to project capabilities</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* MINI PROJECTION (Visualizer) */}
+                    <div className="md:col-span-1 space-y-4">
+                      <div className="flex items-center gap-2">
+                        <LayoutGrid className="size-3 text-primary" />
+                        <h5 className="text-[10px] font-bold uppercase tracking-widest">Inventory Projection</h5>
+                      </div>
+                      <div className="aspect-square rounded-xl bg-muted/40 border border-border flex flex-col items-center justify-center">
+                         <Database className="size-10 text-muted-foreground opacity-10 mb-2" />
+                         <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground">Awaiting Object List</p>
+                      </div>
+                    </div>
+                    
+                    {/* SCHEMA MANAGER */}
+                    <div className="md:col-span-2 space-y-4">
+                      <div className="flex items-center gap-2">
+                        <Settings2 className="size-3 text-primary" />
+                        <h5 className="text-[10px] font-bold uppercase tracking-widest">Data Schema Blueprint</h5>
+                      </div>
+                      <div className="bg-muted/10 p-4 rounded-xl border border-border">
+                        <SchemaManager 
+                          integrationId={activeConnection.id}
+                          currentSchema={activeConnection.dynamicSchema || []}
+                          onUpdate={refreshData}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* FICHA C: EXECUTION TERMINAL */}
+            {activeSubTab === 'execute' && (
+              <div className="space-y-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Terminal className="size-3 text-primary" />
+                    <h5 className="text-[10px] font-bold uppercase tracking-widest">Method Executor</h5>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[9px] font-mono text-muted-foreground uppercase">Runtime Ready</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Action Bento Box */}
+                  <button className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl bg-muted/20 border border-border hover:bg-muted/40 hover:border-primary/20 transition-all group">
+                    <Activity className="size-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                    <span className="text-[9px] font-bold uppercase tracking-widest">Health Check</span>
+                  </button>
+                  
+                  <button className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl bg-muted/20 border border-border hover:bg-muted/40 hover:border-primary/20 transition-all group">
+                    <RefreshCw className="size-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                    <span className="text-[9px] font-bold uppercase tracking-widest">Force Sync</span>
+                  </button>
+
+                  <button className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl bg-muted/20 border border-border hover:bg-muted/40 hover:border-primary/20 transition-all group opacity-50 grayscale cursor-not-allowed">
+                    <Database className="size-5 text-muted-foreground" />
+                    <span className="text-[9px] font-bold uppercase tracking-widest">Wipe Data</span>
+                  </button>
+
+                  <button className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl bg-muted/20 border border-border hover:bg-muted/40 hover:border-primary/20 transition-all group">
+                    <Trash2 className="size-5 text-muted-foreground group-hover:text-destructive transition-colors" />
+                    <span className="text-[9px] font-bold uppercase tracking-widest">Purge Cache</span>
+                  </button>
+                </div>
+
+                {/* Output Console simulation */}
+                <div className="bg-zinc-950 rounded-lg p-4 font-mono text-[10px] text-emerald-500 overflow-hidden border border-border shadow-inner">
+                   <p className="opacity-50"># Indra Runtime Environment</p>
+                   <p className="">[SYSTEM] Node {manifest.id} initialized.</p>
+                   {isActive && <p className="">[SUCCESS] Connection established via {manifest.configType.toUpperCase()}.</p>}
+                   <div className="flex gap-1 animate-pulse mt-1">
+                      <span className="w-2 h-4 bg-emerald-500" />
+                   </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { IntegrationOrchestrator } from '@/features/connections/ui/IntegrationOrchestrator';
+import { AgnosticConsoleShell } from '@/features/connections/ui/AgnosticConsoleShell';
 import { PortCreator } from '@/components/ports/port-creator';
 import { ResourceExplorer } from '@/components/resource-explorer';
 import { i18n } from '@/lib/i18n';
@@ -69,7 +69,7 @@ export default async function DashboardPage() {
               <h2 className="text-xl font-bold tracking-widest uppercase">{t.connections.title}</h2>
             </div>
             <Suspense fallback={<div className="h-64 bg-muted animate-pulse rounded-xl" />}>
-              <IntegrationOrchestrator />
+              <AgnosticConsoleShell />
             </Suspense>
           </section>
 

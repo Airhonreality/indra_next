@@ -32,6 +32,8 @@ export async function POST(
       return NextResponse.json({ error: 'PORT_NOT_FOUND_OR_INACTIVE' }, { status: 404 });
     }
 
+    const { fileName, mimeType, fileSize, variables } = await req.json();
+
     // 2. ROUTING ENGINE: RESOLVE DYNAMIC DESTINATION PATH
     // -------------------------------------------------------------------------
     // This engine resolves the final destination path within the storage provider

@@ -8,8 +8,9 @@ const NANGO_API_BASE = 'https://api.nango.dev';
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -25,7 +26,7 @@ export async function GET(
     const [integration] = await db
       .select()
       .from(integrations)
-      .where(eq(integrations.id, params.id));
+      .where(eq(integrations.id, id));
 
     if (!integration) {
       return NextResponse.json({ error: 'Integration not found' }, { status: 404 });

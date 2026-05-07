@@ -32,12 +32,8 @@ export async function POST(req: Request) {
     }
 
     const payload: any = {
-      // Intentamos con camelCase primero
       connectionId: userId,
-      // Metadata para trazabilidad
-      tags: {
-        indra_user_id: userId,
-      }
+      tags: { indra_user_id: userId }
     };
 
     if (integrationId) {
@@ -46,18 +42,31 @@ export async function POST(req: Request) {
     
     console.log('[Nango Session Request]:', JSON.stringify(payload, null, 2));
 
-    // Crear sesión de conexión en Nango
-    const { data } = await (nango as any).createConnectSession(payload);
-
-    return NextResponse.json({ sessionToken: data.token });
-  } catch (err: any) {
-    console.error('[Nango Session Error Detail]:', {
-      message: err.message,
-      stack: err.stack,
-      response: err.response?.data || 'No response data'
+    // Bypass SDK and call Nango API directly for transparency
+    const nangoRes = await fetch('https://api.nango.dev/connect/session', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.NANGO_SECRET_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
     });
+
+    const nangoData = await nangoRes.json();
+
+    if (!nangoRes.ok) {
+      console.error('[Nango API Error]:', nangoData);
+      return NextResponse.json({ 
+        error: 'Nango API Failure', 
+        nangoDetail: nangoData 
+      }, { status: nangoRes.status });
+    }
+
+    return NextResponse.json({ sessionToken: nangoData.token });
+  } catch (err: any) {
+    console.error('[Nango Session Bridge Error]:', err);
     return NextResponse.json(
-      { error: `Nango Error: ${err.message || 'Unknown'}` },
+      { error: `Bridge Error: ${err.message}` },
       { status: 500 }
     );
   }

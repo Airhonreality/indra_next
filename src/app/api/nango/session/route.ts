@@ -28,17 +28,18 @@ export async function POST(req: Request) {
     const { integrationId } = body;
     const userId = session.user.id;
 
-    // Crear sesión de conexión en Nango
-    // Forzamos que el connectionId sea el userId de Indra para mantener la soberanía
-    const { data } = await (nango as any).createConnectSession({
+    const payload = {
       connectionId: userId,
-      // Tags vinculan la conexión al usuario soberano de Indra
       tags: {
         end_user_id: userId,
       },
-      // Si se especifica una integración, el UI va directo a ese flujo
       ...(integrationId ? { allowed_integrations: [integrationId] } : {}),
-    });
+    };
+    
+    console.log('[Nango Session Request]:', JSON.stringify(payload, null, 2));
+
+    // Crear sesión de conexión en Nango
+    const { data } = await (nango as any).createConnectSession(payload);
 
     return NextResponse.json({ sessionToken: data.token });
   } catch (err: any) {

@@ -55,7 +55,7 @@ export function useIntegrationState() {
 
       await new Promise<void>((resolve) => {
         const connect = nango.openConnectUI({
-          onEvent: (event) => {
+          onEvent: (event: any) => {
             if (event.type === 'connect') {
               fetch('/api/integrations', {
                 method: 'POST',
@@ -63,7 +63,7 @@ export function useIntegrationState() {
                 body: JSON.stringify({
                   type: provider,
                   label: `${provider.charAt(0).toUpperCase() + provider.slice(1)} Connection`,
-                  connectionId: userId
+                  connectionId: event.connectionId || userId
                 })
               }).then(() => refreshData()).then(resolve);
             } else if (event.type === 'close') {

@@ -29,8 +29,9 @@ export async function POST(req: Request) {
     const userId = session.user.id;
 
     // Crear sesión de conexión en Nango
-    // El token dura 30 minutos y es de un solo uso
-    const { data } = await nango.createConnectSession({
+    // Forzamos que el connectionId sea el userId de Indra para mantener la soberanía
+    const { data } = await (nango as any).createConnectSession({
+      connectionId: userId,
       // Tags vinculan la conexión al usuario soberano de Indra
       tags: {
         end_user_id: userId,

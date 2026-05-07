@@ -42,7 +42,7 @@ export async function GET(
       const nangoUrl = `${NANGO_API_BASE}/proxy/drive/v3/files?pageSize=20&q='root' in parents and trashed = false`;
       console.log(`[Inventory Debug] Fetching from Nango (${providerKey}):`, {
         url: nangoUrl,
-        connectionId: session.user.id,
+        connectionId: integration.connectionId, // USE THE STORED ID
         providerConfigKey: providerKey
       });
 
@@ -50,7 +50,7 @@ export async function GET(
         headers: {
           'Authorization': `Bearer ${nangoSecret}`,
           'Provider-Config-Key': providerKey,
-          'Connection-Id': session.user.id
+          'Connection-Id': integration.connectionId // USE THE STORED ID
         }
       });
 

@@ -41,10 +41,14 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ sessionToken: data.token });
-  } catch (err) {
-    console.error('[Nango] Failed to create session token:', err);
+  } catch (err: any) {
+    console.error('[Nango Session Error Detail]:', {
+      message: err.message,
+      stack: err.stack,
+      response: err.response?.data || 'No response data'
+    });
     return NextResponse.json(
-      { error: 'Failed to create Nango session' },
+      { error: `Nango Error: ${err.message || 'Unknown'}` },
       { status: 500 }
     );
   }

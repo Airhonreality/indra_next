@@ -50,7 +50,8 @@ export default function PublicPortalPage() {
         body: JSON.stringify({
           fileName: file.name,
           mimeType: file.type,
-          fileSize: file.size
+          fileSize: file.size,
+          variables: formData // These are the dynamic fields from the form
         })
       });
       const { uploadUrl, error } = await negRes.json();

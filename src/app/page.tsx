@@ -78,28 +78,7 @@ export default async function DashboardPage() {
           </aside>
         </div>
 
-        {/* ROW 2: PORTALS & WORKFLOWS */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 pt-12 border-t border-border">
-          <section className="space-y-8">
-            <div className="flex items-center gap-4">
-              <Globe className="size-5 text-primary" />
-              <h2 className="text-xl font-bold tracking-widest uppercase">{t.portals.title}</h2>
-            </div>
-            <PortCreator connections={connectionConfigs} />
-          </section>
-
-          <section className="space-y-8 p-8 rounded-xl bg-muted/30 border border-border opacity-60">
-            <div className="flex items-center gap-4">
-              <Workflow className="size-5 text-muted-foreground" />
-              <h2 className="text-xl font-bold tracking-widest uppercase text-muted-foreground">Workflow Engine</h2>
-            </div>
-            <div className="aspect-square flex flex-col items-center justify-center border border-dashed border-border rounded-full bg-background">
-              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Phase 4 // Inngest Worker</p>
-              <p className="text-[8px] italic text-muted-foreground mt-2">Coming after port validation</p>
-            </div>
-          </section>
-        </div>
-
+        {/* END OF MAIN CONTENT */}
       </div>
     </main>
   );

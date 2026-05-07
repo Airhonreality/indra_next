@@ -32,20 +32,50 @@ export async function POST(
       return NextResponse.json({ error: 'PORT_NOT_FOUND_OR_INACTIVE' }, { status: 404 });
     }
 
-    const { fileName, mimeType, fileSize } = await req.json();
+    // 2. ROUTING ENGINE: RESOLVE DYNAMIC DESTINATION PATH
+    // -------------------------------------------------------------------------
+    // This engine resolves the final destination path within the storage provider
+    // by combining the static targetPath with a dynamic pattern.
+    // Placeholders like {year}, {month}, {day} are system-provided.
+    // Custom placeholders are resolved from the 'variables' object (form data).
+    
+    let baseDirectory = port.port.targetPath; // Root directory defined at port level
+    const routingPattern = (port.port.config as any)?.pattern || '/{year}/{month}';
+    
+    const timestamp = new Date();
+    const runtimeContext: Record<string, string> = {
+      year: timestamp.getFullYear().toString(),
+      month: (timestamp.getMonth() + 1).toString().padStart(2, '0'),
+      day: timestamp.getDate().toString().padStart(2, '0'),
+      filename: fileName.split('.')[0],
+      ext: fileName.split('.').pop() || '',
+    };
 
-    // 2. Resolve the Adapter and create a session
-    // Axiom: The motor doesn't know it's Drive. It just calls the common interface.
+    // Merge runtime context with user-submitted form variables
+    const resolutionContext = { ...runtimeContext, ...variables };
+    
+    // Resolve placeholders in the pattern
+    let resolvedSubPath = routingPattern;
+    Object.entries(resolutionContext).forEach(([variableName, value]) => {
+      const placeholder = `\\{${variableName}\\}`;
+      resolvedSubPath = resolvedSubPath.replace(new RegExp(placeholder, 'g'), String(value));
+    });
+
+    // Construct final normalized absolute path (removing redundant slashes)
+    const absoluteDestinationPath = `${baseDirectory}/${resolvedSubPath}`.replace(/\/+/g, '/');
+
+    // 3. ADAPTER RESOLUTION & SESSION NEGOTIATION
+    // -------------------------------------------------------------------------
     const adapter = registry.resolve(port.integration.type, {
       connectionId: port.integration.connectionId
     }) as GoogleDriveAdapter;
 
     if (!adapter.createResumableSession) {
-      return NextResponse.json({ error: 'ADAPTER_DOES_NOT_SUPPORT_RESUMABLE_UPLOAD' }, { status: 501 });
+      return NextResponse.json({ error: 'ADAPTER_CAPABILITY_MISSING:RESUMABLE_UPLOAD' }, { status: 501 });
     }
 
     const sessionResult = await adapter.createResumableSession(
-      port.port.targetPath,
+      absoluteDestinationPath,
       fileName,
       mimeType,
       fileSize
@@ -55,10 +85,11 @@ export async function POST(
       return NextResponse.json({ error: sessionResult.error }, { status: 500 });
     }
 
-    // 3. Return the session URI so the client can upload chunks directly to the silo
+    // 4. RETURN NEGOTIATED SESSION METADATA
     return NextResponse.json({ 
       uploadUrl: sessionResult.data.resumableUri,
-      sessionId: sessionResult.data.sessionId
+      sessionId: sessionResult.data.sessionId,
+      resolvedPath: absoluteDestinationPath
     });
 
   } catch (err) {

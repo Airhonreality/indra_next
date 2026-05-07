@@ -11,7 +11,7 @@ import { createIngestionPort } from '@/app/actions/ports';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Globe, Loader2, Check, ArrowRight, FolderTree, UploadCloud, Link, Copy } from 'lucide-react';
+import { Globe, Loader2, Check, ArrowRight, FolderTree, UploadCloud, Link, Copy, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface PortCreatorProps {

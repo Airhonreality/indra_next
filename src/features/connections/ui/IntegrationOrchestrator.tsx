@@ -18,9 +18,10 @@ export function IntegrationOrchestrator() {
     isProcessing, 
     availableProviders, 
     activeConnections, 
-    INDRA_ADAPTERS, 
+    INDRA_ADAPTERS,
     metrics, 
-    actions 
+    actions,
+    state
   } = useIntegrationState();
 
   const [managingSchemaId, setManagingSchemaId] = useState<string | null>(null);
@@ -70,7 +71,10 @@ export function IntegrationOrchestrator() {
                   isNangoConfigured={isNangoConfigured}
                   activeConnection={activeConnection}
                   isProcessing={isProcessing === manifest.id}
+                  localPathValue={state.localPaths[manifest.id] || ''}
+                  onSetLocalPath={(path) => actions.setLocalPath(manifest.id, path)}
                   onAuthorize={actions.authorizeOAuth}
+                  onMountLocal={actions.mountLocalProvider}
                   onOpenSchemaManager={(id) => setManagingSchemaId(managingSchemaId === id ? null : id)}
                   isSchemaManagerOpen={managingSchemaId === activeConnection?.id}
                 />

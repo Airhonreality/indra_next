@@ -8,7 +8,10 @@ interface ProviderEntityCardProps {
   isNangoConfigured: boolean;
   activeConnection?: Connection;
   isProcessing: boolean;
+  localPathValue: string;
+  onSetLocalPath: (path: string) => void;
   onAuthorize: (id: string) => void;
+  onMountLocal: (id: string, path: string) => void;
   onOpenSchemaManager: (id: string) => void;
   isSchemaManagerOpen: boolean;
 }
@@ -29,7 +32,10 @@ export function ProviderEntityCard({
   isNangoConfigured,
   activeConnection,
   isProcessing,
+  localPathValue,
+  onSetLocalPath,
   onAuthorize,
+  onMountLocal,
   onOpenSchemaManager,
   isSchemaManagerOpen
 }: ProviderEntityCardProps) {
@@ -65,7 +71,7 @@ export function ProviderEntityCard({
               </span>
               {manifest.configType === 'oauth' && (
                 <span className={cn("text-[8px] font-bold uppercase tracking-widest", isNangoConfigured ? "text-blue-500" : "text-zinc-500")}>
-                  {isNangoConfigured ? '✓ Configurado' : '✗ Sin Configurar'}
+                  {isNangoConfigured ? '✓ OAuth Configured' : '✗ Missing OAuth Config'}
                 </span>
               )}
             </div>
@@ -89,7 +95,7 @@ export function ProviderEntityCard({
           
           {/* Affordances / Capacidades */}
           <div className="space-y-2">
-            <h5 className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Affordances (Capacidades)</h5>
+            <h5 className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Provider Capabilities</h5>
             <p className="text-xs text-muted-foreground">{manifest.description}</p>
             <div className="flex gap-2 mt-2">
               {manifest.capabilities.map(cap => (
@@ -104,7 +110,7 @@ export function ProviderEntityCard({
           <div className="space-y-2 bg-muted/30 p-4 rounded-xl border border-border">
             <h5 className="text-[9px] font-bold uppercase tracking-[0.2em] text-foreground flex items-center gap-2 mb-4">
               <Key className="size-3" />
-              Configuración de la Entidad
+              Provider Configuration
             </h5>
 
             {/* RUTAS LÓGICAS SEGÚN TIPO DE CONFIGURACIÓN */}
@@ -114,12 +120,12 @@ export function ProviderEntityCard({
               <div className="space-y-3">
                 {!isNangoConfigured && (
                   <div className="flex flex-col gap-2">
-                    <p className="text-[10px] text-muted-foreground">Este proveedor requiere que un Administrador aprovisione sus llaves API primero.</p>
+                    <p className="text-[10px] text-muted-foreground">This provider requires OAuth client credentials to be provisioned.</p>
                     <button
                       onClick={() => window.open('https://app.nango.dev', '_blank')}
                       className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-[9px] font-bold uppercase tracking-widest bg-muted text-foreground border border-border hover:bg-muted/80 transition-all"
                     >
-                      Aprovisionar en Nango
+                      Configure OAuth Client (Nango Console)
                     </button>
                   </div>
                 )}
@@ -130,13 +136,13 @@ export function ProviderEntityCard({
                     disabled={isProcessing}
                     className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-[9px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:opacity-90 transition-all"
                   >
-                    {isProcessing ? <Loader2 className="size-4 animate-spin" /> : 'Autorizar Conexión (OAuth)'}
+                    {isProcessing ? <Loader2 className="size-4 animate-spin" /> : 'Authenticate Request (OAuth)'}
                   </button>
                 )}
 
                 {isActive && (
                   <div className="w-full text-center py-3 text-[9px] font-bold uppercase tracking-widest text-emerald-600 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-                    Conexión OAuth Activa y Persistente
+                    Active OAuth Connection
                   </div>
                 )}
               </div>
@@ -145,17 +151,21 @@ export function ProviderEntityCard({
             {/* 2. LOCAL PATH (STORAGE / JSON) */}
             {manifest.configType === 'local_path' && (
               <div className="space-y-3">
-                <p className="text-[10px] text-muted-foreground">Este es un nodo local. Proporciona una ruta absoluta segura dentro de la infraestructura soberana.</p>
+                <p className="text-[10px] text-muted-foreground">Local node requires an absolute host path for volume mounting.</p>
                 <input 
                   type="text" 
-                  placeholder="Ej: /mnt/data/vault/ o C:/storage/" 
+                  placeholder="e.g. /mnt/data/vault/ or C:/storage/" 
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono"
-                  defaultValue={isActive ? '/var/lib/indra/data' : ''}
+                  value={isActive ? '/var/lib/indra/data' : localPathValue}
+                  onChange={(e) => onSetLocalPath(e.target.value)}
+                  disabled={isActive || isProcessing}
                 />
                 <button
-                  className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-[9px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:opacity-90 transition-all"
+                  onClick={() => onMountLocal(manifest.id, localPathValue)}
+                  disabled={isActive || isProcessing || !localPathValue}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-[9px] font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:opacity-90 transition-all disabled:opacity-50"
                 >
-                  {isActive ? 'Actualizar Ruta Local' : 'Activar Nodo Local'}
+                  {isProcessing ? <Loader2 className="size-4 animate-spin" /> : isActive ? 'Volume Mounted' : 'Mount Storage Volume'}
                 </button>
               </div>
             )}
@@ -168,7 +178,7 @@ export function ProviderEntityCard({
                   className="w-full py-2 flex items-center justify-center gap-2 rounded-xl bg-transparent text-primary border border-primary/20 hover:bg-primary/5 text-[9px] font-bold uppercase tracking-widest transition-all"
                 >
                   <Database className="size-3" />
-                  {isSchemaManagerOpen ? 'Cerrar Esquema' : 'Gestionar Esquema de Datos'}
+                  {isSchemaManagerOpen ? 'Close Schema' : 'Manage Data Schema'}
                 </button>
               </div>
             )}

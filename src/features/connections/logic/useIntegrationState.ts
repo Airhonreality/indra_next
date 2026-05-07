@@ -11,6 +11,7 @@ export function useIntegrationState() {
   const [activeConnections, setActiveConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [localPaths, setLocalPaths] = useState<Record<string, string>>({});
 
   const nango = new Nango();
 
@@ -79,6 +80,28 @@ export function useIntegrationState() {
     }
   };
 
+  const mountLocalProvider = async (providerId: string, path: string) => {
+    if (!userId || !path) return;
+    setIsProcessing(providerId);
+
+    try {
+      await fetch('/api/integrations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: providerId,
+          label: `${providerId.toUpperCase()} [${path}]`,
+          connectionId: 'local_volume'
+        })
+      });
+      await refreshData();
+    } catch (err) {
+      console.error('[Mount Error]:', err);
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
   // KPI Calculations
   const translatedNangoProviders = availableProviders.filter(p => INDRA_ADAPTERS.some(a => a.id === p.provider));
   const translationKPI = availableProviders.length > 0 
@@ -100,7 +123,12 @@ export function useIntegrationState() {
     },
     actions: {
       refreshData,
-      authorizeOAuth
+      authorizeOAuth,
+      mountLocalProvider,
+      setLocalPath: (id: string, path: string) => setLocalPaths(prev => ({ ...prev, [id]: path }))
+    },
+    state: {
+      localPaths
     }
   };
 }

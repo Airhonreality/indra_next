@@ -95,6 +95,25 @@ export class NotionAdapter extends BaseAdapter {
     }
   }
 
+  async listInventory(): Promise<OperationResult<any[]>> {
+    try {
+      // In Notion, inventory = Databases or Pages the user has shared with the integration
+      const sources = await this.listSources();
+      if (!sources.ok) return sources;
+      
+      const items = sources.data.map(s => ({
+        id: s.id,
+        name: s.label,
+        type: 'table' as const,
+        provider: 'notion'
+      }));
+      
+      return this.result(items);
+    } catch (e) {
+      return this.error(`listInventory failed: ${(e as Error).message}`);
+    }
+  }
+
   async pushRecords(targetId: string, records: IndraRecord[]): Promise<OperationResult<{ created: number; updated: number; failed: number }>> {
     try {
       const dbMeta = await this.client.get(`/databases/${targetId}`);

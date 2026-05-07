@@ -32,53 +32,24 @@ export async function GET(
       return NextResponse.json({ error: 'Integration not found' }, { status: 404 });
     }
 
-    // 2. Fetch inventory based on provider type
-    // For MVP, we use the Nango Proxy for Google Drive / Sheets
-    let inventoryData = [];
-
-    const providerKey = integration.type; // Dynamically use the registered type
-
-    if (providerKey === 'google-drive' || providerKey === 'google-sheets') {
-      const nangoUrl = `${NANGO_API_BASE}/proxy/drive/v3/files?pageSize=20&q='root' in parents and trashed = false`;
-      console.log(`[Inventory Debug] Fetching from Nango (${providerKey}):`, {
-        url: nangoUrl,
-        connectionId: integration.connectionId, // USE THE STORED ID
-        providerConfigKey: providerKey
-      });
-
-      const response = await fetch(nangoUrl, {
-        headers: {
-          'Authorization': `Bearer ${nangoSecret}`,
-          'Provider-Config-Key': providerKey,
-          'Connection-Id': integration.connectionId // USE THE STORED ID
-        }
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[Inventory Debug] Nango Proxy Error:', response.status, errorText);
-        throw new Error(`Nango Proxy Error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('[Inventory Debug] Nango Data Received:', data.files?.length || 0, 'files');
-      
-      // AXIOMATIC TRANSLATION LAYER
-      // Convert provider-specific payload to Indra AgnosticObject format
-      inventoryData = (data.files || []).map((f: any) => ({
-        id: f.id,
-        name: f.name,
-        type: f.mimeType?.includes('folder') ? 'folder' : 'file',
-        rawMimeType: f.mimeType,
-        provider: providerKey
-      }));
-    } else {
-      // Fallback for unimplemented providers
-      inventoryData = [];
+    // 2. RESOLVE ADAPTER & FETCH AGNOSTIC INVENTORY
+    // -------------------------------------------------------------------------
+    // RADICAL AGNOSTICISM: Ensure all adapters are registered
+    await import('@/integrations/register-all');
+    
+    const { registry } = await import('@/core/registry');
+    
+    // Resolve adapter with the stored connectionId
+    const adapter = registry.resolve(integration.type, integration.connectionId);
+    
+    const result = await adapter.listInventory();
+    
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
     return NextResponse.json({ 
-      objects: inventoryData,
+      objects: result.data,
       provider: integration.type 
     });
   } catch (error) {

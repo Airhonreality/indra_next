@@ -2,7 +2,9 @@ import { registry } from '@/core/registry';
 import { SheetsAdapter } from './adapter';
 import { makeSheetsClient } from '@/lib/authorized-client';
 
-registry.register('google-sheets', (context: { connectionId: string; sheetName?: string }) => {
-  const client = makeSheetsClient(context.connectionId);
-  return new SheetsAdapter(client, context.sheetName);
+registry.register('google-sheets', (context: any) => {
+  const connectionId = typeof context === 'string' ? context : context.connectionId;
+  const sheetName = typeof context === 'string' ? undefined : context.sheetName;
+  const client = makeSheetsClient(connectionId);
+  return new SheetsAdapter(client, sheetName);
 });

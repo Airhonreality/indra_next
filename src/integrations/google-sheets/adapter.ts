@@ -95,6 +95,16 @@ export class SheetsAdapter extends BaseAdapter {
     }
   }
 
+  async listInventory(): Promise<OperationResult<any[]>> {
+    try {
+      // In Sheets, inventory = Worksheets within the spreadsheet
+      // Note: We need a spreadsheet ID, which usually comes from sourceId or the context
+      return this.result([]); // Placeholder for now, requires a target spreadsheet context
+    } catch (e) {
+      return this.error(`listInventory failed: ${(e as Error).message}`);
+    }
+  }
+
   async pushRecords(targetId: string, records: IndraRecord[]): Promise<OperationResult<{ created: number; updated: number; failed: number }>> {
     try {
       const headerRow = await this.getHeaderRow(targetId, this.defaultSheetName);

@@ -117,6 +117,8 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Nombre Principal del Portal</Label>
               <Input 
+                id="portal-label"
+                name="portal-label"
                 placeholder="Ej: Ingesta Producción" 
                 value={formData.label}
                 onChange={e => handleNameChange(e.target.value)}
@@ -138,6 +140,8 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
              <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Conexión de Destino (Silo)</Label>
                 <select 
+                  id="target-integration"
+                  name="target-integration"
                   className="w-full h-10 px-3 rounded-md bg-muted border border-border text-sm"
                   value={formData.integrationId}
                   onChange={e => setFormData({ ...formData, integrationId: e.target.value })}
@@ -154,6 +158,8 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
                 <div className="space-y-2 animate-in slide-in-from-top-2">
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Carpeta de Destino (Root)</Label>
                   <select 
+                    id="target-folder"
+                    name="target-folder"
                     className="w-full h-10 px-3 rounded-md bg-muted/30 border border-dashed border-border text-xs"
                     value={formData.targetPath}
                     onChange={e => setFormData({ ...formData, targetPath: e.target.value })}

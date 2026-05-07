@@ -109,6 +109,14 @@ export interface IntegrationAdapter {
     type: 'database' | 'spreadsheet' | 'file' | 'folder';
   }[]>>;
 
+  /** List objects/inventory within the silo (real-time projection) */
+  listInventory(): Promise<OperationResult<{
+    id: string;
+    name: string;
+    type: 'folder' | 'file' | 'page' | 'table';
+    rawMimeType?: string;
+  }[]>>;
+
   /** 
    * NEW: Support for native resumable uploads (Sovereign Ingestion).
    * If implemented, allows direct-to-vault streaming bypass.

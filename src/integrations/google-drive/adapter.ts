@@ -117,6 +117,31 @@ export class GoogleDriveAdapter extends BaseAdapter {
       return this.error((err as Error).message);
     }
   }
+  async listInventory(): Promise<OperationResult<any[]>> {
+    try {
+      const response = await this.client.request({
+        endpoint: '/files',
+        params: {
+          q: "'root' in parents and trashed = false",
+          fields: 'files(id, name, mimeType)',
+          pageSize: '50'
+        }
+      });
+
+      const items = (response.files || []).map((f: any) => ({
+        id: f.id,
+        name: f.name,
+        type: f.mimeType?.includes('folder') ? 'folder' : 'file',
+        rawMimeType: f.mimeType,
+        provider: 'google-drive'
+      }));
+
+      return this.result(items);
+    } catch (err) {
+      return this.error('INVENTORY_ERR: Failed to fetch Drive inventory');
+    }
+  }
+
   /**
    * RECURSIVE FOLDER ENGINE
    * Ensures a path like "Project A/2026/May" exists in Drive.

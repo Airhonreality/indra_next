@@ -82,6 +82,25 @@ export class StorageAdapter extends BaseAdapter {
     }
   }
 
+  async listInventory(): Promise<OperationResult<any[]>> {
+    try {
+      // In local storage, inventory = Files in the directory
+      const sources = await this.listSources();
+      if (!sources.ok) return sources;
+      
+      const items = sources.data.map(s => ({
+        id: s.id,
+        name: s.label,
+        type: 'file' as const,
+        provider: 'storage'
+      }));
+      
+      return this.result(items);
+    } catch (e) {
+      return this.error(`listInventory failed: ${(e as Error).message}`);
+    }
+  }
+
   async pushRecords(targetId: string, records: IndraRecord[]): Promise<OperationResult<{ created: number; updated: number; failed: number }>> {
     try {
       const filePath = join(this.basePath, targetId);

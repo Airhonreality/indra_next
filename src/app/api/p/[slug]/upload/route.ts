@@ -68,9 +68,11 @@ export async function POST(
 
     // 3. ADAPTER RESOLUTION & SESSION NEGOTIATION
     // -------------------------------------------------------------------------
-    const adapter = registry.resolve(port.integration.type, {
-      connectionId: port.integration.connectionId
-    }) as GoogleDriveAdapter;
+    // RADICAL AGNOSTICISM: Ensure all adapters are registered
+    await import('@/integrations/register-all');
+    const { registry } = await import('@/core/registry');
+
+    const adapter = registry.resolve(port.integration.type, port.integration.connectionId) as GoogleDriveAdapter;
 
     if (!adapter.createResumableSession) {
       return NextResponse.json({ error: 'ADAPTER_CAPABILITY_MISSING:RESUMABLE_UPLOAD' }, { status: 501 });

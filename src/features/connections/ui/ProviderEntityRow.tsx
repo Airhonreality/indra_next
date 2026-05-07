@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   ChevronDown, 
   Link2, 
@@ -56,7 +56,54 @@ export function ProviderEntityRow({
 }: ProviderEntityRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'auth' | 'view' | 'execute'>('auth');
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [isHydrating, setIsHydrating] = useState(false);
+  const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
+  const [isExecuting, setIsExecuting] = useState(false);
   const isActive = !!activeConnection;
+
+  const addLog = (msg: string) => {
+    setTerminalLogs(prev => [...prev.slice(-4), `[${new Date().toLocaleTimeString()}] ${msg}`]);
+  };
+
+  const executeAction = async (action: string) => {
+    if (!activeConnection || isExecuting) return;
+    setIsExecuting(true);
+    addLog(`Executing ${action.toUpperCase()}...`);
+    try {
+      const res = await fetch(`/api/integrations/${activeConnection.id}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      });
+      const data = await res.json();
+      addLog(data.message || data.error);
+    } catch (err) {
+      addLog(`Error: Action failed.`);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  const hydrateInventory = async () => {
+    if (!activeConnection || isHydrating) return;
+    setIsHydrating(true);
+    try {
+      const res = await fetch(`/api/integrations/${activeConnection.id}/inventory`);
+      const data = await res.json();
+      setInventory(data.objects || []);
+    } catch (err) {
+      console.error('Hydration failed', err);
+    } finally {
+      setIsHydrating(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSubTab === 'view' && isActive && inventory.length === 0) {
+      hydrateInventory();
+    }
+  }, [activeSubTab, isActive]);
 
   return (
     <div className={cn(
@@ -229,13 +276,50 @@ export function ProviderEntityRow({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* MINI PROJECTION (Visualizer) */}
                     <div className="md:col-span-1 space-y-4">
-                      <div className="flex items-center gap-2">
-                        <LayoutGrid className="size-3 text-primary" />
-                        <h5 className="text-[10px] font-bold uppercase tracking-widest">Inventory Projection</h5>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <LayoutGrid className="size-3 text-primary" />
+                          <h5 className="text-[10px] font-bold uppercase tracking-widest">Inventory Projection</h5>
+                        </div>
+                        <button 
+                          onClick={hydrateInventory}
+                          className="p-1 hover:bg-muted rounded transition-colors"
+                          title="Refresh Inventory"
+                        >
+                          <RefreshCw className={cn("size-3 text-muted-foreground", isHydrating && "animate-spin")} />
+                        </button>
                       </div>
-                      <div className="aspect-square rounded-xl bg-muted/40 border border-border flex flex-col items-center justify-center">
-                         <Database className="size-10 text-muted-foreground opacity-10 mb-2" />
-                         <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground">Awaiting Object List</p>
+                      
+                      <div className="min-h-[200px] rounded-xl bg-muted/40 border border-border overflow-y-auto p-3 space-y-2">
+                         {isHydrating ? (
+                           <div className="flex flex-col items-center justify-center h-full gap-2 opacity-40 py-10">
+                              <Loader2 className="size-4 animate-spin" />
+                              <span className="text-[8px] uppercase tracking-widest">Hydrating Silo...</span>
+                           </div>
+                         ) : inventory.length > 0 ? (
+                           inventory.map((obj: any) => (
+                             <div key={obj.id} className="flex items-center gap-3 p-2 bg-background/50 rounded border border-border/50 hover:border-primary/30 transition-all group/item">
+                                <div className="size-6 rounded bg-muted flex items-center justify-center">
+                                  {obj.mimeType?.includes('folder') ? <Database className="size-3 text-primary/60" /> : <FileJson className="size-3 text-muted-foreground" />}
+                                </div>
+                                <div className="flex flex-col overflow-hidden text-left">
+                                  <span className="text-[10px] font-medium truncate text-foreground">{obj.name}</span>
+                                  <span className="text-[8px] font-mono opacity-40 truncate">{obj.id}</span>
+                                </div>
+                             </div>
+                           ))
+                         ) : (
+                           <div className="flex flex-col items-center justify-center h-full opacity-20 py-10">
+                              <Database className="size-8 mb-2" />
+                              <p className="text-[9px] uppercase tracking-widest font-bold">Awaiting Object List</p>
+                              <button 
+                                onClick={hydrateInventory}
+                                className="mt-4 px-4 py-2 bg-primary/10 text-primary text-[8px] uppercase font-bold tracking-widest rounded border border-primary/20 hover:bg-primary/20 transition-all"
+                              >
+                                Trigger Manual Fetch
+                              </button>
+                           </div>
+                         )}
                       </div>
                     </div>
                     
@@ -274,12 +358,20 @@ export function ProviderEntityRow({
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {/* Action Bento Box */}
-                  <button className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl bg-muted/20 border border-border hover:bg-muted/40 hover:border-primary/20 transition-all group">
+                  <button 
+                    onClick={() => executeAction('health_check')}
+                    disabled={isExecuting || !isActive}
+                    className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl bg-muted/20 border border-border hover:bg-muted/40 hover:border-primary/20 transition-all group disabled:opacity-50"
+                  >
                     <Activity className="size-5 text-muted-foreground group-hover:text-primary transition-colors" />
                     <span className="text-[9px] font-bold uppercase tracking-widest">Health Check</span>
                   </button>
                   
-                  <button className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl bg-muted/20 border border-border hover:bg-muted/40 hover:border-primary/20 transition-all group">
+                  <button 
+                    onClick={() => executeAction('force_sync')}
+                    disabled={isExecuting || !isActive}
+                    className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl bg-muted/20 border border-border hover:bg-muted/40 hover:border-primary/20 transition-all group disabled:opacity-50"
+                  >
                     <RefreshCw className="size-5 text-muted-foreground group-hover:text-primary transition-colors" />
                     <span className="text-[9px] font-bold uppercase tracking-widest">Force Sync</span>
                   </button>
@@ -289,20 +381,28 @@ export function ProviderEntityRow({
                     <span className="text-[9px] font-bold uppercase tracking-widest">Wipe Data</span>
                   </button>
 
-                  <button className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl bg-muted/20 border border-border hover:bg-muted/40 hover:border-primary/20 transition-all group">
+                  <button 
+                    onClick={() => executeAction('purge_cache')}
+                    disabled={isExecuting || !isActive}
+                    className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl bg-muted/20 border border-border hover:bg-muted/40 hover:border-destructive transition-all group disabled:opacity-50"
+                  >
                     <Trash2 className="size-5 text-muted-foreground group-hover:text-destructive transition-colors" />
                     <span className="text-[9px] font-bold uppercase tracking-widest">Purge Cache</span>
                   </button>
                 </div>
 
                 {/* Output Console simulation */}
-                <div className="bg-zinc-950 rounded-lg p-4 font-mono text-[10px] text-emerald-500 overflow-hidden border border-border shadow-inner">
-                   <p className="opacity-50"># Indra Runtime Environment</p>
-                   <p className="">[SYSTEM] Node {manifest.id} initialized.</p>
-                   {isActive && <p className="">[SUCCESS] Connection established via {manifest.configType.toUpperCase()}.</p>}
-                   <div className="flex gap-1 animate-pulse mt-1">
-                      <span className="w-2 h-4 bg-emerald-500" />
-                   </div>
+                <div className="bg-zinc-950 rounded-lg p-4 font-mono text-[10px] text-emerald-500 overflow-hidden border border-border shadow-inner min-h-[100px]">
+                   <p className="opacity-50 mb-1"># Indra Runtime Environment - {manifest.id}</p>
+                   {terminalLogs.length === 0 && <p className="opacity-30">Waiting for instructions...</p>}
+                   {terminalLogs.map((log, i) => (
+                     <p key={i} className="animate-in slide-in-from-left-1 duration-200">{log}</p>
+                   ))}
+                   {isExecuting && (
+                     <div className="flex gap-1 animate-pulse mt-1">
+                        <span className="w-2 h-4 bg-emerald-500" />
+                     </div>
+                   )}
                 </div>
               </div>
             )}

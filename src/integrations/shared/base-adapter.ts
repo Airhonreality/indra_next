@@ -37,4 +37,5 @@ export abstract class BaseAdapter implements IntegrationAdapter {
   abstract getRecords(sourceId: string, options?: any): Promise<OperationResult<Record[]>>;
   abstract pushRecords(targetId: string, records: Record[]): Promise<OperationResult<any>>;
   abstract listSources(): Promise<OperationResult<any>>;
+  abstract listInventory(): Promise<OperationResult<any[]>>;
 }

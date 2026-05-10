@@ -25,6 +25,8 @@
  */
 
 import { pgTable, text, timestamp, jsonb, uuid, boolean, primaryKey, integer } from "drizzle-orm/pg-core";
+import { FieldSchema } from "@/core/types/integration";
+import type { AdapterAccount } from "@auth/core/adapters";
 export const integrations = pgTable("integrations", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

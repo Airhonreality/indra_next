@@ -1,9 +1,30 @@
-import { nango } from '@/lib/nango';
-
 /**
- * Generic HTTP client interface.
- * Adapters depend on this — not on Nango or any specific auth mechanism.
+ * 🗝️ ARTEFACTO: authorized-client.ts
+ * ────────────
+ * CAPA: Lib / Security (The Sovereign Gate)
+ * VERSIÓN: 1.1.0-Auth
+ * COMMIT: P2-M2.3-ADR-CLEAN-HTTP-BRIDGE
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Abstracción de peticiones HTTP autorizadas mediante Nango Proxy o Fetch Directo.
+ * - Desacoplamiento de la lógica del adaptador de la infraestructura de transporte.
+ * - Inyección de cabeceras de seguridad y versiones de API por integración.
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Ser agnóstico a la API final; el cliente solo entiende 'endpoint' y 'data'.
+ * - NEVER: Hardcodear cabeceras específicas de proveedor (ej. 'Notion-Version') dentro de la clase genérica. Usar fábricas.
+ * - NEVER: Exponer o loguear el 'Nango-Secret-Key' en ninguna capa del cliente.
+ * - ALWAYS: Retornar errores tipados que el Core pueda interpretar sin conocer el código HTTP.
+ * 
+ * 📜 ADR: [2026-05-08] UNIFIED_AUTHORIZED_TRANSPORT
+ * - DECISIÓN: Implementar una interfaz común para Nango Proxy y Fetch para permitir testing y mocks.
+ * - IMPACTO: Facilidad de migración entre proveedores de OAuth sin tocar lógica de adaptadores.
+ * 
+ * 🔑 KEYWORDS: #AuthorizedClient #NangoProxy #DependencyInversion #SecurityGate
+ * 🔗 RELATIONSHIPS: [IntegrationAdapter, NangoLib, API_Vault]
  */
+
+import { nango } from '@/lib/nango';
 export interface RequestConfig {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
   endpoint: string;

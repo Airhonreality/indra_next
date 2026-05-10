@@ -1,10 +1,27 @@
 /**
- * MEDIA ENGINE — SOVEREIGN ORCHESTRATOR (Singleton)
- *
- * The single entry point for the SME. Coordinates:
- *   IntegrityEngine → WorkerBridge → SovereignPipeline → adapter
- *
- * BROWSER-ONLY. Throws immediately if instantiated in a server context.
+ * 🏛️ ARTEFACTO: SovereignMediaEngine.ts
+ * ────────────
+ * CAPA: Core / Engines (Browser Runtime)
+ * VERSIÓN: 1.2.0-Sovereign
+ * COMMIT: P2-M1.4-ADR-MEDIA-ORCHESTRATION
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Orquestación de túneles de datos (Stream-Through) hacia silos externos.
+ * - Garantía de integridad binaria mediante hashing SHA-256 concurrente.
+ * - Gestión de reanudación inteligente (Smart Match Resume) basada en identidad binaria.
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Procesar archivos >1GB sin consumir más de 100MB de RAM (Uso estricto de Streams/Slices).
+ * - NEVER: Importar módulos de Node.js ('fs', 'path', 'crypto') o usar 'Buffer'. Solo APIs Web.
+ * - NEVER: Instanciar fuera del contexto del navegador (Browser-Only Singleton).
+ * - NEVER: Almacenar fragmentos de archivos en memoria persistente del cliente (usar OPFS si es necesario).
+ * 
+ * 📜 ADR: [2026-05-09] BROWSER_ONLY_MEDIA_PIPELINE
+ * - DECISIÓN: El SME debe ejecutarse 100% en el cliente para descargar al servidor de tareas de CPU (Hashing).
+ * - IMPACTO: Escalabilidad infinita de ingesta; el servidor solo negocia URIs firmadas.
+ * 
+ * 🔑 KEYWORDS: #SME #BinaryIntegrity #StreamThrough #BrowserRuntime #SHA256
+ * 🔗 RELATIONSHIPS: [IntegrityEngine, SovereignPipeline, WorkerBridge]
  */
 
 import { IntegrityEngine } from './integrity';

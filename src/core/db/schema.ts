@@ -1,11 +1,30 @@
-import { pgTable, text, timestamp, jsonb, uuid, boolean, primaryKey, integer } from "drizzle-orm/pg-core";
-import type { AdapterAccount } from "next-auth/adapters";
-import type { FieldSchema } from "@/core/types/integration";
-
 /**
- * INTEGRATIONS TABLE
- * Stores the connections to external silos (Notion, Sheets, etc.)
+ * 🧮 ARTEFACTO: schema.ts
+ * ────────────
+ * CAPA: Core / Persistence (Universal Contract)
+ * VERSIÓN: 2.1.0-Agnostic
+ * COMMIT: P2-M1.1-SCHEMA-UNIVERSAL-ATOM
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Definición de la ontología del sistema (Records, Integrations, Ports).
+ * - Implementación del "Átomo Universal NEXT" para interoperabilidad total.
+ * - Esquema de persistencia para flujos de autenticación y sincronización (Auth.js).
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Mantener la tabla 'records' como un almacén agnóstico (Uso estricto de JSONB 'data').
+ * - NEVER: Añadir columnas específicas para propiedades de integraciones externas (ej. 'notion_id').
+ * - NEVER: Cambiar tipos de ID fuera de UUID v4 para mantener la unicidad global.
+ * - ALWAYS: Garantizar que cada registro tenga un 'integrationId' válido para trazabilidad.
+ * 
+ * 📜 ADR: [2026-05-05] AGNOSTIC_DATA_PERSISTENCE
+ * - DECISIÓN: Utilizar JSONB para campos dinámicos para evitar migraciones costosas al añadir adaptadores.
+ * - IMPACTO: Flexibilidad absoluta en el esquema de datos de terceros.
+ * 
+ * 🔑 KEYWORDS: #AgnosticRecord #UniversalAtom #DrizzleORM #SovereignStorage #JSONB
+ * 🔗 RELATIONSHIPS: [IntegrationAdapter, InngestJobs, PortDesigner]
  */
+
+import { pgTable, text, timestamp, jsonb, uuid, boolean, primaryKey, integer } from "drizzle-orm/pg-core";
 export const integrations = pgTable("integrations", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

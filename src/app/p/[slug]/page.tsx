@@ -1,10 +1,27 @@
-'use client';
-
 /**
- * PUBLIC INGESTION PORTAL PAGE
- * Accessible via /p/[slug].
- * Renders a dynamic form and handles multi-part uploads to the target silo.
+ * 🚪 ARTEFACTO: page.tsx (PublicPortalPage)
+ * ────────────
+ * CAPA: UI / Public (Ingestion Gateway)
+ * VERSIÓN: 1.1.0
+ * COMMIT: P2-M4.3-UI-INGESTION-PORTAL
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Punto de entrada público/privado para la ingesta de datos y archivos (SME).
+ * - Renderizado dinámico de formularios basados en el 'Schema' definido en el Port.
+ * - Túnel de subida directo hacia silos de almacenamiento (Google Drive, S3, etc.).
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Funcionar en modo "Zero-Auth" para terceros mediante tokens de Port.
+ * - NEVER: Duplicar lógica de subida; debe usar el 'MediaEngine' (SME) por contrato.
+ * - ALWAYS: Validar el 'slug' contra la base de datos de 'ingestion_ports' antes de renderizar.
+ * 
+ * 📜 USABILITY: Este artefacto es dual. Se expone como link público o se anida en widgets internos para subidas propias.
+ * 
+ * 🔑 KEYWORDS: #PublicPortal #IngestionGateway #SME #DynamicForm #ZeroAuth
+ * 🔗 RELATIONSHIPS: [MediaEngine, ingestionPortsSchema, DataPortalPreview]
  */
+
+'use client';
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';

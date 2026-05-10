@@ -1,3 +1,27 @@
+/**
+ * 🗂️ ARTEFACTO: ProviderEntityRow.tsx
+ * ────────────
+ * CAPA: UI / Widgets (Capability Projector)
+ * VERSIÓN: 1.5.0
+ * COMMIT: P2-M4.2-UI-DYNAMIC-CAPABILITIES
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Proyectar visualmente las capacidades de un nodo de infraestructura (Storage, DB, API).
+ * - Proveer interfaces de operación: [Auth, Exploración de Inventario, Ejecución de Métodos].
+ * - Gestionar el ciclo de vida visual de una conexión (Conectar, Reparar, Desconectar).
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Descubrir y mostrar UI basada estrictamente en 'manifest.capabilities'.
+ * - NEVER: Hardcodear inputs manuales (ej. rutas fijas) que no sean proyectados dinámicamente.
+ * - NEVER: Mezclar lógica de transporte; usar los métodos del hook de acciones suministrado.
+ * - ALWAYS: Proyectar el "Inventory Projection" solo si el nodo tiene capacidad de lectura.
+ * 
+ * 📜 ENTROPY_ALERT: Evitar el uso de inputs de texto plano para rutas de archivos; el widget debe evolucionar hacia un File Explorer agnóstico.
+ * 
+ * 🔑 KEYWORDS: #CapabilityProjector #InfrastructureNode #DynamicUI #AgnosticForm
+ * 🔗 RELATIONSHIPS: [AgnosticConsoleShell, SchemaManager, IntegrationAdapter]
+ */
+
 import { useState, useEffect } from 'react';
 import { 
   ChevronDown, 

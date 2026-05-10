@@ -1,3 +1,27 @@
+/**
+ * ⚙️ ARTEFACTO: ConfigManager.tsx (formerly SchemaManager)
+ * ────────────
+ * CAPA: UI / Components (System Configuration)
+ * VERSIÓN: 2.0.0
+ * COMMIT: P1-M1.1-NAMING-STANDARDIZATION
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Gestión centralizada de definiciones de esquemas dinámicos (Config Manager).
+ * - Interfaz de edición para la ontología de campos del sistema.
+ * - Persistencia de contratos de datos hacia el Kernel de Indra.
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Garantizar que cada campo tenga una 'key' única y normalizada (snake_case).
+ * - NEVER: Permitir tipos de datos volátiles que no sean procesables por el Integrity Checker.
+ * - NEVER: Almacenar lógica de validación específica de negocio; usar validación por tipo atómico.
+ * - ALWAYS: Notificar al sistema de un cambio en la configuración para disparar la validación atómica.
+ * 
+ * 📜 PHASE_1_NAMING: Reemplaza todas las menciones a "Schema Architect" para alinearse con los estándares de Configuración de Sistema.
+ * 
+ * 🔑 KEYWORDS: #ConfigManager #SystemSettings #AtomicConfig #SchemaDefinitions
+ * 🔗 RELATIONSHIPS: [IntegrityChecker, ProviderEntityRow, ingestion_ports]
+ */
+
 'use client';
 
 import { useState } from 'react';

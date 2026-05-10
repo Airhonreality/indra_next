@@ -1,10 +1,27 @@
-'use client';
-
 /**
- * RESOURCE EXPLORER COMPONENT
- * Standard interface for navigating and discovering schemas within cloud storage providers.
- * Handles recursive listing and dynamic field schema extraction.
+ * 📂 ARTEFACTO: index.tsx (Unified Asset Explorer)
+ * ────────────
+ * CAPA: UI / Components (Resource Navigation)
+ * VERSIÓN: 1.2.0
+ * COMMIT: P2-M5.1-UI-UNIFIED-EXPLORER
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Navegador universal de activos y esquemas entre múltiples silos (Notion, Drive, etc.).
+ * - Descubrimiento dinámico de estructuras de datos (Recursive Listing).
+ * - Proyección de metadatos normalizados para selección y mapeo.
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Normalizar metadatos heterogéneos de proveedores a una interfaz de objeto común.
+ * - NEVER: Implementar vistas específicas por proveedor; la navegación debe ser estructuralmente idéntica.
+ * - ALWAYS: Utilizar 'listSources' y 'getSourceSchema' como únicos puntos de verdad de datos remotos.
+ * 
+ * 📜 ANTI_ENTROPY: Evitar la fragmentación visual; si un proveedor es 'Storage', se proyecta como árbol; si es 'DB', como tabla.
+ * 
+ * 🔑 KEYWORDS: #UnifiedExplorer #AssetDiscovery #MetadataNormalization #ResourceTree
+ * 🔗 RELATIONSHIPS: [listSources, getSourceSchema, AgnosticConsoleShell]
  */
+
+'use client';
 
 import { useState, useTransition } from 'react';
 import {

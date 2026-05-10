@@ -1,12 +1,28 @@
-'use client';
-
 /**
- * DATA PORTAL PREVIEW COMPONENT
- * Dynamic form engine that renders a UI based on an Agnostic Field Schema.
- * Used to preview how a public Ingestion Port will appear to external users.
+ * 📝 ARTEFACTO: index.tsx (Dynamic Form Renderer)
+ * ────────────
+ * CAPA: UI / Components (Form Projection)
+ * VERSIÓN: 1.3.0
+ * COMMIT: P2-M5.2-UI-DYNAMIC-RENDERER
  * 
- * Axiom: The UI does not know the destination; it only knows the data contract (Schema).
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Motor de renderizado dinámico basado en esquemas agnósticos.
+ * - Validación generativa de datos mediante Zod (Generative Validation Logic).
+ * - Previsualización y ejecución de formularios de ingesta (Dual Use: Admin/Public).
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Ser un componente puramente funcional basado en la prop 'schema'.
+ * - NEVER: Almacenar estado persistente o lógica de envío final (delegar vía 'onValidate').
+ * - NEVER: Añadir componentes visuales "parche" para clientes específicos.
+ * - ALWAYS: Mantener el aislamiento entre la definición del dato y su representación visual.
+ * 
+ * 📜 USABILITY: La UI no conoce el destino del dato (Agnosticismo Total), solo cumple el contrato del esquema.
+ * 
+ * 🔑 KEYWORDS: #FormRenderer #DynamicUI #ZodValidation #AgnosticForm
+ * 🔗 RELATIONSHIPS: [PublicPortalPage, PortDesigner, FieldSchema]
  */
+
+'use client';
 
 import { useState, useCallback, useId } from 'react';
 import { z } from 'zod';

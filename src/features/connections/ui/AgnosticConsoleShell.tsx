@@ -1,3 +1,24 @@
+/**
+ * 🏛️ ARTEFACTO: AgnosticConsoleShell.tsx
+ * ────────────
+ * CAPA: UI / Shell (Functional Projector)
+ * VERSIÓN: 1.2.0
+ * COMMIT: P2-M4.1-UI-WIDGET-SHELL
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Contenedor principal para la proyección de micro-apps (widgets funcionales) de Indra.
+ * - Gestión de navegación entre contextos: [Infraestructura, Ingestión, Workflows].
+ * - Orquestación de estados globales de sincronización del Kernel.
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Ser un contenedor puro; la lógica de negocio debe vivir en los widgets proyectados o hooks.
+ * - NEVER: Acoplarse a un proveedor específico. Su función es proyectar lo que el Kernel expone.
+ * - ALWAYS: Mantener la estética "esquemática/diario" (colores crema, tipografía técnica).
+ * 
+ * 🔑 KEYWORDS: #WidgetProjector #MicroApps #DashboardShell #AgnosticUI
+ * 🔗 RELATIONSHIPS: [ProviderEntityRow, PortCreator, useIntegrationState]
+ */
+
 'use client';
 
 import { useState } from 'react';

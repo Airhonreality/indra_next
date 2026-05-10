@@ -1,3 +1,25 @@
+/**
+ * 📊 ARTEFACTO: IntegrationMetricsGrid.tsx (System Health Dashboard)
+ * ────────────
+ * CAPA: UI / Features (Health & Status)
+ * VERSIÓN: 1.0.0
+ * COMMIT: P1-M4.1-UI-HEALTH-DASHBOARD
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Proyección visual del estado de salud y cobertura del sistema (KPIs).
+ * - Dashboard de monitorización de nodos de infraestructura y aprovisionamiento.
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Reflejar pasivamente los datos entregados por el Kernel/Hook.
+ * - NEVER: Calcular métricas o salud del sistema dentro del componente (Solo lectura).
+ * - ALWAYS: Mostrar affordances visuales claros basados en los resultados del Integrity Checker.
+ * 
+ * 📜 PHASE_4_HEALTH: Actúa como la interfaz de usuario para el reporte del Integrity Checker global.
+ * 
+ * 🔑 KEYWORDS: #HealthDashboard #SystemMetrics #InfrastructureKPI #IntegrityMonitoring
+ * 🔗 RELATIONSHIPS: [IntegrityChecker, AgnosticConsoleShell, useIntegrationState]
+ */
+
 interface IntegrationMetricsGridProps {
   totalAdapters: number;
   configuredNango: number;

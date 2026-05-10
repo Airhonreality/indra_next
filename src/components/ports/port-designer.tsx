@@ -1,3 +1,26 @@
+/**
+ * 📐 ARTEFACTO: port-designer.tsx
+ * ────────────
+ * CAPA: UI / Components (Logic Configuration)
+ * VERSIÓN: 1.0.0
+ * COMMIT: P2-M4.4-UI-PORT-DESIGNER
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Módulo de configuración para diseñar la lógica de un "Puerto de Ingesta".
+ * - Definición visual de esquemas de datos (campos, tipos, validaciones).
+ * - Mapeo de campos de formulario hacia metadatos del motor de medios (SME).
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Generar un objeto 'schema' compatible con el renderizador dinámico del portal.
+ * - NEVER: Permitir la creación de puertos sin un destino de infraestructura válido.
+ * - ALWAYS: Validar que los slugs de los campos no colisionen con palabras reservadas del sistema.
+ * 
+ * 📜 CONTEXTO: Este no es un widget de consumo, es el "Constructor" anidado dentro del widget de Ingestión.
+ * 
+ * 🔑 KEYWORDS: #PortDesigner #SchemaEditor #IngestionConfig #AdminUI
+ * 🔗 RELATIONSHIPS: [PortCreator, PublicPortalPage, ingestionPortsTable]
+ */
+
 'use client';
 
 import React, { useState } from 'react';

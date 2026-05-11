@@ -36,6 +36,7 @@ export async function POST(req: Request) {
     }
 
     const payload: any = {
+      connection_id: userId,
       tags: { indra_user_id: userId }
     };
 

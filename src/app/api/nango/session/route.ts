@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     }
 
     const payload: any = {
-      tags: { indra_user_id: userId }
+      tags: { end_user_id: userId }
     };
 
     if (integrationId) {

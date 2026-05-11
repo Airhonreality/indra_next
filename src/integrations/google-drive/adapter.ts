@@ -53,7 +53,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
    */
   async testConnection(): Promise<OperationResult<boolean>> {
     try {
-      await this.client.request({ endpoint: '/about', params: { fields: 'user' } });
+      await this.client.request({ endpoint: '/drive/v3/about', params: { fields: 'user' } });
       return this.result(true);
     } catch (err) {
       return this.error('CONN_ERR: Drive API unreachable or invalid tokens');
@@ -66,7 +66,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
   async listSources(): Promise<OperationResult<any>> {
     try {
       const response = await this.client.request({
-        endpoint: '/files',
+        endpoint: '/drive/v3/files',
         params: {
           q: "mimeType = 'application/vnd.google-apps.folder' and trashed = false",
           fields: 'files(id, name)',
@@ -144,7 +144,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
   async listInventory(): Promise<OperationResult<any[]>> {
     try {
       const response = await this.client.request({
-        endpoint: '/files',
+        endpoint: '/drive/v3/files',
         params: {
           q: "'root' in parents and trashed = false",
           fields: 'files(id, name, mimeType)',
@@ -183,7 +183,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
     for (const segment of segments) {
       // 1. Search if segment exists under current parent
       const searchRes = await this.client.request({
-        endpoint: '/files',
+        endpoint: '/drive/v3/files',
         params: {
           q: `name = '${segment.replace(/'/g, "\\")}' and '${currentParentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
           fields: 'files(id)',

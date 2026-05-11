@@ -49,14 +49,24 @@ export class NangoAuthorizedClient implements AuthorizedClient {
   ) {}
 
   async request(config: RequestConfig): Promise<any> {
+    // 🛠️ CANONICAL V2 PROXY ENFORCEMENT
+    // Remove leading slash if present to avoid double slashes in https://api.nango.dev/proxy/{endpoint}
+    const cleanEndpoint = config.endpoint.startsWith('/') 
+      ? config.endpoint.slice(1) 
+      : config.endpoint;
+
     const response = await nango.proxy({
       method: config.method || 'GET',
-      endpoint: config.endpoint,
+      endpoint: cleanEndpoint,
       providerConfigKey: this.providerConfigKey,
       connectionId: this.connectionId,
       data: config.data,
       params: config.params,
-      headers: { ...this.extraHeaders, ...config.headers },
+      // 🛡️ Ensure standard headers as per manual
+      headers: { 
+        ...this.extraHeaders, 
+        ...config.headers
+      },
     });
     return response.data;
   }

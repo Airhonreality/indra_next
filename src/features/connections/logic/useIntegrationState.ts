@@ -79,6 +79,7 @@ export function useIntegrationState() {
 
       await new Promise<void>((resolve) => {
         const connect = nango.openConnectUI({
+          connectionId: userId,
           onEvent: (event: any) => {
             if (event.type === 'connect') {
               fetch('/api/integrations', {

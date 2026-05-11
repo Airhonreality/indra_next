@@ -47,10 +47,10 @@ export async function POST(req: Request) {
     if (!secretKey) {
       return NextResponse.json({ error: 'NANGO_SECRET_KEY is not defined in environment' }, { status: 500 });
     }
-    const nangoRes = await fetch('https://api.nango.dev/connect/session', {
+    const nangoRes = await fetch('https://api.nango.dev/connect/sessions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.NANGO_SECRET_KEY}`,
+        'Authorization': `Bearer ${secretKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)

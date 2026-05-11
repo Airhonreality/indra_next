@@ -1,12 +1,25 @@
 /**
- * SOVEREIGN PIPELINE — PERISTALTIC UPLOAD PROTOCOL (PUP)
- *
- * Axioms:
- * - 1 concurrent chunk upload (semáforo de cortesía)
- * - Exponential backoff: 1s × 2^n + jitter, max 5 retries
- * - Circuit breaker: CLOSED → OPEN after 3 consecutive failures, 30s cooldown
- * - OPFS staging buffer: each chunk is persisted locally before transmission
- * - Idempotency: chunks keyed by `${sessionId}-${chunkIndex}-${hash}`
+ * 🌊 ARTEFACTO: SovereignPipeline.ts
+ * ────────────
+ * CAPA: Core / Media (Sovereign Transport)
+ * VERSIÓN: 2.5.0
+ * COMMIT: P3-M1.6-PERISTALTIC-PUP
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Orquestación de transmisión binaria mediante el Protocolo de Carga Peristáltica (PUP).
+ * - Gestión de resiliencia mediante Disyuntores (Circuit Breakers) y Reintentos Exponenciales.
+ * - Persistencia temporal de fragmentos en OPFS (Origin Private File System) para garantizar la soberanía del buffer.
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Mantener un flujo estrictamente secuencial (1 solo fragmento concurrente) para evitar congestión de red.
+ * - MUST: Utilizar el Disyuntor para detener el Pipeline tras 3 fallos consecutivos, protegiendo recursos del servidor.
+ * - NEVER: Iniciar una transmisión sin haber persistido previamente el fragmento en el staging de OPFS.
+ * - NEVER: Permitir fugas de memoria; cada fragmento debe ser liberado del buffer inmediatamente tras la confirmación del servidor.
+ * 
+ * 📜 ARCH_DECISION: Se elige OPFS sobre IndexedDB para el staging de fragmentos por su superior rendimiento en operaciones de lectura/escritura de grandes bloques binarios y su menor sobrecarga de serialización.
+ * 
+ * 🔑 KEYWORDS: #SovereignPipeline #PeristalticUpload #CircuitBreaker #OPFS #ResilientTransport
+ * 🔗 RELATIONSHIPS: [IntegrityEngine, PipelineUploadAdapter, IngestionClient]
  */
 
 import type {

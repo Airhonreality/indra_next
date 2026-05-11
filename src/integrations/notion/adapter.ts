@@ -1,3 +1,27 @@
+/**
+ * 📝 ARTEFACTO: NotionAdapter.ts
+ * ────────────
+ * CAPA: Integrations / Adapters (Structured Data Graph)
+ * VERSIÓN: 2.3.0
+ * COMMIT: P3-M1.2-NOTION-ONTOLOGY-MAPPING
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Adaptador de normalización ontológica para el ecosistema de Notion.
+ * - Traducción de esquemas complejos (Databases/Properties) al Átomo Universal de Indra.
+ * - Motor de resolución de referencias cruzadas (Relation Resolution Engine).
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Aplanar (flatten) todas las propiedades ricas de Notion a tipos primitivos compatibles con el Kernel.
+ * - NEVER: Permitir fugas de tipos complejos (RichText, Rollup, Formula) hacia el estado global.
+ * - NEVER: Exceder los límites de rate limit de la API; implementar paginación determinista (máx 10k registros).
+ * - ALWAYS: Resolver los nombres de las relaciones para garantizar la legibilidad en la proyección de la UI.
+ * 
+ * 📜 ARCH_DECISION: Se implementa un caché local de resolución de nombres en 'resolveRelationNames' para mitigar el impacto de peticiones N+1 durante la hidratación de registros vinculados.
+ * 
+ * 🔑 KEYWORDS: #NotionAdapter #OntologyMapping #DataNormalization #ReferenceResolution
+ * 🔗 RELATIONSHIPS: [AuthorizedClient, UniversalAtom, SchemaManager]
+ */
+
 import { BaseAdapter } from '@/integrations/shared/base-adapter';
 import type { AuthorizedClient } from '@/lib/authorized-client';
 import type { FieldSchema, OperationResult } from '@/core/types/integration';

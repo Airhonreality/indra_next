@@ -40,9 +40,13 @@ export async function POST(req: Request) {
       payload.allowed_integrations = [integrationId];
     }
     
+    const secretKey = process.env.NANGO_SECRET_KEY;
     console.log('[Nango Session Request]:', JSON.stringify(payload, null, 2));
+    console.log('[Nango Auth Check]:', secretKey ? `Key present (starts with ${secretKey.substring(0, 4)}...)` : 'KEY MISSING');
 
-    // Bypass SDK and call Nango API directly for transparency
+    if (!secretKey) {
+      return NextResponse.json({ error: 'NANGO_SECRET_KEY is not defined in environment' }, { status: 500 });
+    }
     const nangoRes = await fetch('https://api.nango.dev/connect/session', {
       method: 'POST',
       headers: {
@@ -52,7 +56,19 @@ export async function POST(req: Request) {
       body: JSON.stringify(payload)
     });
 
-    const nangoData = await nangoRes.json();
+    const responseText = await nangoRes.text();
+    let nangoData;
+    
+    try {
+      nangoData = JSON.parse(responseText);
+    } catch (e) {
+      console.error('[Nango API Non-JSON Response]:', responseText);
+      return NextResponse.json({ 
+        error: 'Nango API returned non-JSON response (HTML Error)', 
+        status: nangoRes.status,
+        bodyPreview: responseText.substring(0, 200)
+      }, { status: 500 });
+    }
 
     if (!nangoRes.ok) {
       console.error('[Nango API Error]:', nangoData);

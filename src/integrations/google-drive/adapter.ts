@@ -1,3 +1,27 @@
+/**
+ * 📂 ARTEFACTO: GoogleDriveAdapter.ts
+ * ────────────
+ * CAPA: Integrations / Adapters (Storage Silo)
+ * VERSIÓN: 2.1.0
+ * COMMIT: P3-M1.1-DRIVE-RESUMABLE-FLOW
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Adaptador especializado para el Silo de Almacenamiento de Google Drive.
+ * - Orquestación de subidas binarias mediante el protocolo 'Resumable Upload' de Google.
+ * - Motor de organización jerárquica (Recursive Folder Creation) basado en paths dinámicos.
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Utilizar sesiones resumibles para garantizar la integridad de archivos de gran tamaño.
+ * - NEVER: Almacenar tokens de acceso en el estado de la clase; solicitar vía Nango per-request.
+ * - NEVER: Hardcodear IDs de carpetas; deben ser inyectados vía 'targetFolderId' o resueltos por path.
+ * - ALWAYS: Sanitizar los nombres de archivos y carpetas antes de enviarlos a la API de Google.
+ * 
+ * 📜 ARCH_DECISION: Se utiliza 'nango.getToken' directamente en subidas resumibles porque el Proxy de Nango no soporta el handshake de redirección de Google para sesiones binarias.
+ * 
+ * 🔑 KEYWORDS: #GoogleDriveAdapter #ResumableUpload #StorageSilo #HierarchicalStorage
+ * 🔗 RELATIONSHIPS: [AuthorizedClient, SovereignPipeline, MediaEngine]
+ */
+
 import { AuthorizedClient, NangoAuthorizedClient } from '@/lib/authorized-client';
 import { nango } from '@/lib/nango';
 import { BaseAdapter } from '../shared/base-adapter';

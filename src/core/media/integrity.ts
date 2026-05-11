@@ -1,8 +1,25 @@
 /**
- * INTEGRITY ENGINE
- * Chunked SHA-256 hashing with a Merkle-root global hash.
- * Max RAM usage = 1 chunk at a time + O(n) hash strings.
- * For a 30 GB file at 4 MB chunks: ~7680 × 64 bytes ≈ 480 KB overhead.
+ * 🛡️ ARTEFACTO: IntegrityEngine.ts
+ * ────────────
+ * CAPA: Core / Media (Sovereign Security)
+ * VERSIÓN: 3.1.0
+ * COMMIT: P3-M1.5-MERKLE-INTEGRITY
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Certificación de identidad binaria de archivos mediante hashing fragmentado (SHA-256).
+ * - Generación de Manifiestos de Integridad para el protocolo de Smart-Match.
+ * - Validación de consistencia global mediante raíces de Merkle (Global Hash).
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Garantizar que el uso de RAM sea constante (O(1)) independientemente del tamaño del archivo.
+ * - MUST: Nunca cargar más de un fragmento (chunk) simultáneo en memoria (Aislamiento de Buffer).
+ * - NEVER: Permitir la modificación de un Manifiesto una vez que el Global Hash ha sido emitido.
+ * - NEVER: Realizar operaciones de hashing en el Main Thread si el archivo excede los 50MB.
+ * 
+ * 📜 ARCH_DECISION: Se utiliza SHA-256 sobre algoritmos más rápidos (como MD5) para garantizar la colisión-cero en el sistema de deduplicación soberana, priorizando la integridad sobre la velocidad pura.
+ * 
+ * 🔑 KEYWORDS: #IntegrityEngine #MerkleRoot #SHA256 #BinaryIdentity #SovereignManifest
+ * 🔗 RELATIONSHIPS: [SovereignPipeline, MediaEngine, IngestionClient]
  */
 
 import type {

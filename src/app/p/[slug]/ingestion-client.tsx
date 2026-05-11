@@ -1,17 +1,28 @@
 'use client';
 
 /**
- * REACTOR UI — Public Ingestion Client
- *
- * Implements the full IPW spec:
- *  - Drag & drop Reactor zone with perimetral pulse animation
- *  - Sovereign Cards (per-file) with chunk-level progress
- *  - Smart-Match via IndexedDB (resume interrupted sessions)
- *  - Screen Wake Lock API (prevents display sleep during upload)
- *  - Tab Visibility detection (Reactor Alert state on focus loss)
- *  - Sequential peristaltic upload via SME SovereignPipeline
- *  - Dynamic form from port schema (Zero-hardcoding)
- *  - Cognitive alerts: volume warnings, night mode suggestion
+ * ⚛️ ARTEFACTO: IngestionClient.tsx
+ * ────────────
+ * CAPA: Features / Ingestion (Reactor UI)
+ * VERSIÓN: 4.2.0
+ * COMMIT: P4-M1.1-REACTOR-UI-STABILITY
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Reactor principal de ingesta soberana para usuarios externos (Third-party Ingestion).
+ * - Orquestación visual de procesos de integridad binaria y transmisión peristáltica.
+ * - Gestión de persistencia de sesión local (Smart-Match) vía IndexedDB para resiliencia total.
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Implementar el 'Reactor State Machine' (Idle, Active, Alert, Complete) para feedback visual inmediato.
+ * - MUST: Utilizar 'Wake Lock API' para prevenir la suspensión del dispositivo durante transmisiones activas.
+ * - NEVER: Almacenar buffers binarios en el estado de React; delegar la persistencia al motor de OPFS/Pipeline.
+ * - NEVER: Permitir fugas de memoria por blobs; invocar 'URL.revokeObjectURL' al desmontar componentes de miniaturas.
+ * - ALWAYS: Utilizar Refs para el acceso a datos en callbacks asíncronos para evitar 'Stale Closures'.
+ * 
+ * 📜 ADR: Se opta por una arquitectura de 'Heavy Client' donde el grueso de la computación (hashing/segmentación) ocurre en el cliente para garantizar la soberanía y reducir el costo computacional del servidor.
+ * 
+ * 🔑 KEYWORDS: #IngestionReactor #ReactorUI #SmartMatch #WakeLock #SovereignClient
+ * 🔗 RELATIONSHIPS: [SovereignPipeline, IntegrityEngine, PortFieldSchema]
  */
 
 import { useReducer, useCallback, useEffect, useRef, useState, DragEvent } from 'react';

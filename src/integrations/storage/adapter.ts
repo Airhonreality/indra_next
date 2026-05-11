@@ -1,3 +1,27 @@
+/**
+ * 💾 ARTEFACTO: StorageAdapter.ts
+ * ────────────
+ * CAPA: Integrations / Adapters (Local Persistence Silo)
+ * VERSIÓN: 1.2.0
+ * COMMIT: P3-M1.3-STORAGE-PATH-SECURITY
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Adaptador de persistencia para el sistema de archivos local (Indra Vault / Volumes).
+ * - Motor de inferencia dinámica de esquemas para formatos planos (.json, .csv).
+ * - Sincronización bidireccional entre archivos de disco y el Átomo Universal.
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Sanitizar todos los 'sourceId' y 'targetId' para evitar ataques de Path Traversal (Jail Security).
+ * - NEVER: Cargar archivos de más de 50MB directamente en memoria; delegar a flujos de streaming.
+ * - NEVER: Realizar escrituras concurrentes sin bloqueo; el adaptador debe garantizar la integridad del archivo.
+ * - ALWAYS: Verificar permisos de lectura/escritura en el 'basePath' antes de iniciar cualquier operación.
+ * 
+ * 📜 ARCH_DECISION: Se opta por una estrategia de 'Inferencia en Muestra' (Sampling Inference) donde el esquema se deriva de los primeros registros del archivo para evitar el procesamiento total de silos masivos.
+ * 
+ * 🔑 KEYWORDS: #StorageAdapter #LocalSilo #PathSecurity #SchemaInference #FileSystem
+ * 🔗 RELATIONSHIPS: [BaseAdapter, UniversalAtom, IntegrityEngine]
+ */
+
 import { promises as fs } from 'node:fs';
 import { join, extname, basename } from 'node:path';
 import { BaseAdapter } from '@/integrations/shared/base-adapter';

@@ -1,3 +1,27 @@
+/**
+ * 🧠 ARTEFACTO: useIntegrationState.ts
+ * ────────────
+ * CAPA: Features / Connections (State Logic)
+ * VERSIÓN: 1.5.0
+ * COMMIT: P3-M1.4-STATE-ORCHESTRATION-STABILITY
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - Orquestador central del estado de la Shell de Infraestructura.
+ * - Gestión del ciclo de vida de conexiones (Discovery -> Auth -> Hydration).
+ * - Cálculo de KPIs de cobertura de adaptadores (Indra vs. Nango Catalog).
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Garantizar la atomicidad en la actualización de 'activeConnections' tras cambios en el Backend.
+ * - NEVER: Realizar lógica de negocio específica de un proveedor; delegar a los adaptadores del Kernel.
+ * - NEVER: Silenciar errores de red; deben ser proyectados al estado para visibilidad del usuario.
+ * - ALWAYS: Utilizar el 'connectionId' persistido para evitar la duplicidad de sesiones en Nango.
+ * 
+ * 📜 ARCH_DECISION: Se mantiene el estado de 'isProcessing' a nivel de ID de proveedor para evitar colisiones visuales durante operaciones asíncronas concurrentes.
+ * 
+ * 🔑 KEYWORDS: #StateOrchestrator #IntegrationLogic #OAuthFlow #CoverageMetrics
+ * 🔗 RELATIONSHIPS: [AgnosticConsoleShell, ProviderEntityRow, AuthorizedClient]
+ */
+
 import { useState, useEffect } from 'react';
 import Nango from '@nangohq/frontend';
 import { ProviderConfig, Connection, INDRA_ADAPTERS } from '../integration_types';

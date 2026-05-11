@@ -82,14 +82,21 @@ export function useIntegrationState() {
           onEvent: (event: any) => {
             console.log("📡 Nango Event:", event);
             if (event.type === 'connect') {
-              console.log("✅ Connection ID from Nango:", event.connectionId);
+              const cId = event.connectionId || event.payload?.connectionId;
+              console.log("✅ Connection ID captured:", cId);
+              
+              if (!cId) {
+                console.error("❌ Critical: Nango returned no Connection ID!", event);
+                return;
+              }
+
               fetch('/api/integrations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   type: provider,
                   label: `${provider.charAt(0).toUpperCase() + provider.slice(1)} Connection`,
-                  connectionId: event.connectionId
+                  connectionId: cId
                 })
               }).then(() => refreshData()).then(resolve);
             } else if (event.type === 'close') {

@@ -12,18 +12,14 @@
  * 
  * 🛡️ AXIOMATIC_CONTRACT:
  * - MUST: Sanitizar todos los 'sourceId' y 'targetId' para evitar ataques de Path Traversal (Jail Security).
- * - NEVER: Cargar archivos de más de 50MB directamente en memoria; SIEMPRE delegar a flujos de streaming.
+ * - NEVER: Cargar archivos de más de 50MB directamente en memoria; delegar a flujos de streaming.
  * - NEVER: Realizar escrituras concurrentes sin bloqueo; el adaptador debe garantizar la integridad del archivo.
  * - ALWAYS: Verificar permisos de lectura/escritura en el 'basePath' antes de iniciar cualquier operación.
  * 
  * 📜 ARCH_DECISION: Se opta por una estrategia de 'Inferencia en Muestra' (Sampling Inference) donde el esquema se deriva de los primeros registros del archivo para evitar el procesamiento total de silos masivos.
- * 📜 ADR [2026-05-10]: INFRASTRUCTURE-PROXY-RESILIENCE
- * - CONTEXTO: Fallo en el handshake de Nango por cambios de ruptura en su API v2 (pluralización de endpoints y snake_case).
- * - DECISIÓN: Implementar normalización de payloads y extracción de tokens de profundidad variable (data.token) en el Kernel.
- * - APRENDIZAJE: Los adaptadores deben ser agnósticos incluso a las versiones menores de las APIs externas.
  * 
- * 🔑 KEYWORDS: #StorageAdapter #LocalSilo #PathSecurity #SchemaInference #NangoResilience
- * 🔗 RELATIONSHIPS: [BaseAdapter, UniversalAtom, NangoSessionBridge]
+ * 🔑 KEYWORDS: #StorageAdapter #LocalSilo #PathSecurity #SchemaInference #FileSystem
+ * 🔗 RELATIONSHIPS: [BaseAdapter, UniversalAtom, IntegrityEngine]
  */
 
 import { promises as fs } from 'node:fs';
@@ -115,14 +111,14 @@ export class StorageAdapter extends BaseAdapter {
       // In local storage, inventory = Files in the directory
       const sources = await this.listSources();
       if (!sources.ok) return sources;
-
+      
       const items = sources.data.map(s => ({
         id: s.id,
         name: s.label,
         type: 'file' as const,
         provider: 'storage'
       }));
-
+      
       return this.result(items);
     } catch (e) {
       return this.error(`listInventory failed: ${(e as Error).message}`);
@@ -136,7 +132,7 @@ export class StorageAdapter extends BaseAdapter {
       try {
         const raw = await fs.readFile(filePath, 'utf-8');
         existing = this.normalizeToArray(JSON.parse(raw));
-      } catch { } // file doesn't exist yet — start fresh
+      } catch {} // file doesn't exist yet — start fresh
 
       const existingMap = new Map(existing.map(r => [r.id, r]));
       let created = 0, updated = 0;
@@ -148,7 +144,7 @@ export class StorageAdapter extends BaseAdapter {
       }
 
       const merged = [...existingMap.values()];
-      await fs.mkdir(join(this.basePath, '..'), { recursive: true }).catch(() => { });
+      await fs.mkdir(join(this.basePath, '..'), { recursive: true }).catch(() => {});
       await fs.writeFile(filePath, JSON.stringify(merged, null, 2), 'utf-8');
 
       return this.result({ created, updated, failed: 0 });

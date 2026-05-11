@@ -8,6 +8,10 @@
  *
  * Docs: https://docs.nango.dev/guides/auth/auth-guide
  * Flow: Backend genera token → Frontend abre ConnectUI → Nango almacena credenciales
+ * 
+ * 🩹 POST-MORTEM [2026-05-10]: NANGO-V2-HANDSHAKE-FIX
+ * - ERROR: 404/400/200-undefined por cambios de ruptura en Nango API v2.
+ * - FIX: Endpoint pluralizado (/sessions), llaves snake_case (connection_id), y extracción profunda (data.token).
  */
 
 export const dynamic = 'force-dynamic';

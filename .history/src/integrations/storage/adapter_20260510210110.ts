@@ -17,13 +17,9 @@
  * - ALWAYS: Verificar permisos de lectura/escritura en el 'basePath' antes de iniciar cualquier operación.
  * 
  * 📜 ARCH_DECISION: Se opta por una estrategia de 'Inferencia en Muestra' (Sampling Inference) donde el esquema se deriva de los primeros registros del archivo para evitar el procesamiento total de silos masivos.
- * 📜 ADR [2026-05-10]: INFRASTRUCTURE-PROXY-RESILIENCE
- * - CONTEXTO: Fallo en el handshake de Nango por cambios de ruptura en su API v2 (pluralización de endpoints y snake_case).
- * - DECISIÓN: Implementar normalización de payloads y extracción de tokens de profundidad variable (data.token) en el Kernel.
- * - APRENDIZAJE: Los adaptadores deben ser agnósticos incluso a las versiones menores de las APIs externas.
  * 
- * 🔑 KEYWORDS: #StorageAdapter #LocalSilo #PathSecurity #SchemaInference #NangoResilience
- * 🔗 RELATIONSHIPS: [BaseAdapter, UniversalAtom, NangoSessionBridge]
+ * 🔑 KEYWORDS: #StorageAdapter #LocalSilo #PathSecurity #SchemaInference #FileSystem
+ * 🔗 RELATIONSHIPS: [BaseAdapter, UniversalAtom, IntegrityEngine]
  */
 
 import { promises as fs } from 'node:fs';

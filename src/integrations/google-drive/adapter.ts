@@ -68,7 +68,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
       const response = await this.client.request({
         endpoint: '/files',
         params: {
-          q: "mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+          q: encodeURIComponent("mimeType = 'application/vnd.google-apps.folder' and trashed = false"),
           fields: 'files(id, name)',
           pageSize: '50'
         }
@@ -146,7 +146,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
       const response = await this.client.request({
         endpoint: '/files',
         params: {
-          q: "'root' in parents and trashed = false",
+          q: encodeURIComponent("'root' in parents and trashed = false"),
           fields: 'files(id, name, mimeType)',
           pageSize: '50'
         }

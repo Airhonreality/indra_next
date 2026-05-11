@@ -77,7 +77,10 @@ export async function POST(req: Request) {
       }, { status: nangoRes.status });
     }
 
-    return NextResponse.json({ sessionToken: nangoData.token });
+    return NextResponse.json({ 
+      sessionToken: nangoData.token || nangoData.session_token || nangoData.sessionToken,
+      _fullResponse: nangoData 
+    });
   } catch (err: any) {
     console.error('[Nango Session Bridge Error]:', err);
     return NextResponse.json(

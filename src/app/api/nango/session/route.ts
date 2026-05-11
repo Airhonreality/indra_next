@@ -78,7 +78,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ 
-      sessionToken: nangoData.token || nangoData.session_token || nangoData.sessionToken,
+      sessionToken: nangoData.data?.token || nangoData.token || nangoData.session_token,
       _fullResponse: nangoData 
     });
   } catch (err: any) {

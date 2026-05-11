@@ -32,12 +32,11 @@ export async function POST(req: Request) {
     }
 
     const payload: any = {
-      connection_id: userId,
       tags: { indra_user_id: userId }
     };
 
     if (integrationId) {
-      payload.allowed_configs = [integrationId];
+      payload.allowed_integrations = [integrationId];
     }
     
     const secretKey = process.env.NANGO_SECRET_KEY;

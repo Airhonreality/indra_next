@@ -22,6 +22,7 @@
 'use client';
 
 import { useState } from 'react';
+import { signOut } from 'next-auth/react';
 import { 
   Shield, 
   Loader2, 
@@ -37,7 +38,6 @@ import {
   ChevronRight,
   LogOut
 } from 'lucide-react';
-import { logout } from '@/app/actions/auth';
 import { i18n } from '@/lib/i18n';
 import { useIntegrationState } from '../logic/useIntegrationState';
 import { ProviderEntityRow } from './ProviderEntityRow';
@@ -71,7 +71,7 @@ export function AgnosticConsoleShell() {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center space-y-4 bg-background z-50">
         <Loader2 className="size-8 animate-spin text-primary opacity-20" />
-        <p className="text-[10px] uppercase font-bold tracking-[0.4em] text-muted-foreground animate-pulse">Synchronizing Kernel...</p>
+        <p className="text-[10px] uppercase font-bold tracking-[0.4em] text-muted-foreground animate-pulse">Sincronizando Kernel...</p>
       </div>
     );
   }
@@ -93,7 +93,7 @@ export function AgnosticConsoleShell() {
   return (
     <div className="fixed inset-0 flex bg-background overflow-hidden animate-in fade-in duration-700">
       
-      {/* ── SIDEBAR (Nango Inspired) ── */}
+      {/* ── SIDEBAR (Control Soberano) ── */}
       <aside className="w-64 border-r border-border bg-card/50 flex flex-col">
         {/* Branding */}
         <div className="p-6 border-b border-border flex items-center gap-3">
@@ -106,54 +106,54 @@ export function AgnosticConsoleShell() {
           </div>
         </div>
 
-        {/* Navigation Groups */}
+        {/* Grupos de Navegación */}
         <nav className="flex-1 p-4 space-y-8 overflow-y-auto">
           <div className="space-y-1">
-            <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Control Plane</p>
+            <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Plano de Control</p>
             <SidebarItem 
               active={activeTab === 'nodes'} 
               onClick={() => setActiveTab('nodes')}
               icon={<Database className="size-4" />}
-              label="Nodes & Adapters"
+              label={t.connections.title}
               badge={activeConnections.length.toString()}
             />
           </div>
 
           <div className="space-y-1">
-            <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Operations</p>
+            <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Operaciones</p>
             <SidebarItem 
               active={activeTab === 'ingestion'} 
               onClick={() => setActiveTab('ingestion')}
               icon={<Zap className="size-4" />}
-              label="Ingestion Hub"
+              label={t.portals.title}
             />
             <SidebarItem 
               active={activeTab === 'explorer'} 
               onClick={() => setActiveTab('explorer')}
               icon={<Layers className="size-4" />}
-              label="Silo Explorer"
+              label={t.connections.explore}
             />
             <SidebarItem 
               active={activeTab === 'workflows'} 
               onClick={() => setActiveTab('workflows')}
               icon={<Terminal className="size-4" />}
-              label="Workflows"
+              label={t.workflow.title}
               disabled
             />
           </div>
 
           <div className="space-y-1">
-            <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">System</p>
+            <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Sistema</p>
             <SidebarItem 
               active={activeTab === 'settings'} 
               onClick={() => setActiveTab('settings')}
               icon={<Settings className="size-4" />}
-              label="Environment Settings"
+              label={t.common.settings}
             />
           </div>
         </nav>
 
-        {/* User Profile / Identity (Bottom Left) */}
+        {/* Perfil de Usuario (Identidad Soberana) */}
         <div className="p-4 border-t border-border bg-muted/20">
           <div className="group relative flex items-center justify-between p-3 rounded-xl bg-card border border-border shadow-sm hover:border-primary/50 transition-all">
             <div className="flex items-center gap-3">
@@ -167,9 +167,9 @@ export function AgnosticConsoleShell() {
             </div>
             
             <button 
-              onClick={() => logout()}
+              onClick={() => signOut({ callbackUrl: '/' })}
               className="p-1.5 hover:bg-destructive/10 text-destructive rounded-md opacity-0 group-hover:opacity-100 transition-all"
-              title="Cerrar Sesión"
+              title={t.auth.logout}
             >
               <LogOut className="size-3" />
             </button>
@@ -177,33 +177,23 @@ export function AgnosticConsoleShell() {
         </div>
       </aside>
 
-      {/* ── MAIN VIEWPORT ── */}
+      {/* ── VIEWPORT PRINCIPAL ── */}
       <main className="flex-1 flex flex-col overflow-hidden bg-background">
-        {/* Top Header Context */}
+        {/* Header de Contexto */}
         <header className="h-16 border-b border-border flex items-center justify-between px-8 bg-card/20 backdrop-blur-sm">
           <div className="flex items-center gap-4">
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              {activeTab === 'nodes' && 'Infrastructure / Nodes'}
-              {activeTab === 'ingestion' && 'Operations / Ingestion Hub'}
-              {activeTab === 'explorer' && 'Operations / Silo Explorer'}
-              {activeTab === 'workflows' && 'Operations / Workflows'}
-              {activeTab === 'settings' && 'System / Settings'}
+              {activeTab === 'nodes' && `Infraestructura / ${t.connections.title}`}
+              {activeTab === 'ingestion' && `Operaciones / ${t.portals.title}`}
+              {activeTab === 'explorer' && `Operaciones / ${t.connections.explore}`}
+              {activeTab === 'workflows' && `Operaciones / ${t.workflow.title}`}
+              {activeTab === 'settings' && `Sistema / ${t.common.settings}`}
             </h2>
           </div>
           
           <div className="flex items-center gap-6">
-            <div className="flex gap-4 border-r border-border pr-6">
-              <div className="text-right">
-                <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Coverage</p>
-                <p className="text-xs font-black text-emerald-500">{metrics.coverage}%</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Health</p>
-                <p className="text-xs font-black text-primary">Axiomatic</p>
-              </div>
-            </div>
             <button className="text-[9px] font-bold uppercase tracking-widest flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors">
-              Docs <ExternalLink className="size-3" />
+              Documentación <ExternalLink className="size-3" />
             </button>
           </div>
         </header>

@@ -61,9 +61,9 @@ export default async function DashboardPage() {
           </div>
         </header>
 
-        {/* ROW 1: CONNECTIONS & DISCOVERY */}
+        {/* ROW 1: CONNECTIONS & DISCOVERY (FULL WIDTH) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-          <section className="lg:col-span-2 space-y-8">
+          <section className="lg:col-span-3 space-y-8">
              <div className="flex items-center gap-4">
               <Database className="size-5 text-primary" />
               <h2 className="text-xl font-bold tracking-widest uppercase">{t.connections.title}</h2>
@@ -72,8 +72,15 @@ export default async function DashboardPage() {
               <AgnosticConsoleShell />
             </Suspense>
           </section>
+        </div>
 
-          <aside className="space-y-8">
+        {/* ROW 2: SIDEBAR RESOURCES (MOVED BELOW OR AS SUB-SECTION) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+          <aside className="lg:col-span-3 space-y-8 border-t border-border pt-12">
+            <div className="flex items-center gap-4">
+              <Activity className="size-5 text-primary" />
+              <h2 className="text-xl font-bold tracking-widest uppercase">Infrastructure Nodes</h2>
+            </div>
             <ResourceExplorer connections={connectionConfigs} />
           </aside>
         </div>

@@ -1,9 +1,27 @@
 'use client';
 
 /**
- * PORT CREATOR & INGESTION OPERATOR
- * Administrative UI for generating public Ingestion Ports and executing immediate uploads.
- * Implements auto-slug generation, dynamic path templates, and embedded admin ingestion.
+ * 🌐 ARTEFACTO: port-creator.tsx
+ * ────────────
+ * CAPA: UI / Components (Ingestion Operator)
+ * VERSIÓN: 2.2.0
+ * COMMIT: P3-M2.2-PORT-CREATOR-REFACTOR
+ * 
+ * 🎯 FUNCTIONAL_SCOPE:
+ * - UI Administrativa para la generación de Portales de Ingesta Públicos (Funnels).
+ * - Generación automática de Slugs, plantillas dinámicas de rutas y operador de carga inmediata.
+ * - Sincronización con el sistema de descubrimiento de infraestructura (Silos).
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Filtrar las conexiones de forma agnóstica para proyectar solo nodos con Identidad Soberana.
+ * - NEVER: Exponer credenciales o IDs internos en el slug público generado (Privacy Guard).
+ * - NEVER: Permitir la creación de portales sin un 'targetIntegration' válido y sincronizado.
+ * - ALWAYS: Validar la existencia de carpetas destino mediante el hook de inventario centralizado.
+ * 
+ * 📜 ARCH_DECISION: Se delega el descubrimiento de directorios al hook 'useInventory' para asegurar que el diseñador de portales vea los mismos recursos compartidos que la consola principal.
+ * 
+ * 🔑 KEYWORDS: #PortCreator #IngestionFunnel #AgnosticUI #SovereignOperator
+ * 🔗 RELATIONSHIPS: [useInventory, AgnosticConsoleShell, IngestionAction]
  */
 
 import { useState, useEffect } from 'react';
@@ -13,6 +31,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Globe, Loader2, Check, ArrowRight, FolderTree, UploadCloud, Link, Copy, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useInventory } from '@/hooks/use-inventory';
+import { AgnosticTree } from '@/components/ui/agnostic-tree';
 
 interface PortCreatorProps {
   connections: Array<{ id: string; label: string; type: string }>;
@@ -24,8 +44,7 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
   const [isSuccess, setIsSuccess] = useState(false);
   const [showPublicLink, setShowPublicLink] = useState<string | null>(null);
   
-  const [availableFolders, setAvailableFolders] = useState<any[]>([]);
-  const [isLoadingFolders, setIsLoadingFolders] = useState(false);
+  const { folders: availableFolders, isLoading: isLoadingFolders } = useInventory(formData.integrationId || undefined);
   
   const [formData, setFormData] = useState({
     label: '',
@@ -38,28 +57,6 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
   const [schemaFields, setSchemaFields] = useState<any[]>([
     { key: 'project', type: 'string', label: 'Nombre del Proyecto', required: true }
   ]);
-
-  // FETCH FOLDERS WHEN CONNECTION CHANGES
-  useEffect(() => {
-    if (!formData.integrationId) return;
-    
-    const fetchFolders = async () => {
-      setIsLoadingFolders(true);
-      try {
-        const res = await fetch(`/api/integrations/${formData.integrationId}/inventory`);
-        const data = await res.json();
-        // Filter only folders (Agnostic Object Format)
-        const folders = (data.objects || []).filter((obj: any) => obj.type === 'folder');
-        setAvailableFolders(folders);
-      } catch (err) {
-        console.error('Failed to fetch folders', err);
-      } finally {
-        setIsLoadingFolders(false);
-      }
-    };
-    
-    fetchFolders();
-  }, [formData.integrationId]);
 
   // AUTO-SLUG GENERATION
   const handleNameChange = (val: string) => {
@@ -149,7 +146,16 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
                 >
                   <option value="">-- Seleccionar Nodo --</option>
                   {connections
-                    .filter((c: any) => c.connectionId) // Agnostic Sovereignty Filter
+                    .filter((c: any) => c.connectionId) // Must have a real connection
+                    .filter((c: any, index: number, self: any[]) => {
+                      // If there are multiple nodes for the same type, only show the 'Synced' one if it exists
+                      const sameType = self.filter(item => item.type === c.type);
+                      if (sameType.length > 1) {
+                        const hasSynced = sameType.some(item => item.label.toLowerCase().includes('synced'));
+                        if (hasSynced) return c.label.toLowerCase().includes('synced');
+                      }
+                      return true;
+                    })
                     .map(c => (
                     <option key={c.id} value={c.id}>{c.label} ({c.type})</option>
                   ))}
@@ -157,22 +163,21 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
               </div>
 
               {formData.integrationId && (
-                <div className="space-y-2 animate-in slide-in-from-top-2">
-                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Carpeta de Destino (Root)</Label>
-                  <select 
-                    id="target-folder"
-                    name="target-folder"
-                    className="w-full h-10 px-3 rounded-md bg-muted/30 border border-dashed border-border text-xs"
-                    value={formData.targetPath}
-                    onChange={e => setFormData({ ...formData, targetPath: e.target.value })}
-                    required
-                  >
-                    <option value="root">/ (Directorio Raíz)</option>
-                    {availableFolders.map(f => (
-                      <option key={f.id} value={f.id}>/{f.name}</option>
-                    ))}
-                  </select>
-                  {isLoadingFolders && <p className="text-[8px] animate-pulse uppercase font-bold text-primary">Descubriendo directorios...</p>}
+                <div className="space-y-4 animate-in slide-in-from-top-2 md:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] font-bold uppercase tracking-widest text-primary">Carpeta de Destino (Fractal Explorer)</Label>
+                    <span className="text-[9px] font-mono opacity-50">Selected ID: {formData.targetPath}</span>
+                  </div>
+                  
+                  <AgnosticTree 
+                    integrationId={formData.integrationId}
+                    onSelect={(atom) => setFormData({ ...formData, targetPath: atom.id })}
+                    className="h-[300px]"
+                  />
+                  
+                  <p className="text-[8px] text-muted-foreground uppercase font-bold italic">
+                    💡 Tip: Navega hasta la carpeta deseada y selecciónala para fijar el punto de inyección.
+                  </p>
                 </div>
               )}
 

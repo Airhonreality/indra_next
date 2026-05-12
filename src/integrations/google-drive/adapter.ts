@@ -2,8 +2,8 @@
  * 📂 ARTEFACTO: GoogleDriveAdapter.ts
  * ────────────
  * CAPA: Integrations / Adapters (Storage Silo)
- * VERSIÓN: 2.1.0
- * COMMIT: P3-M1.1-DRIVE-RESUMABLE-FLOW
+ * VERSIÓN: 2.2.0
+ * COMMIT: P3-M4.3-DRIVE-AGNOSTIC-QUERY-UPGRADE
  * 
  * 🎯 FUNCTIONAL_SCOPE:
  * - Adaptador especializado para el Silo de Almacenamiento de Google Drive.
@@ -18,13 +18,14 @@
  * 
  * 📜 ARCH_DECISION: Se utiliza 'nango.getToken' directamente en subidas resumibles porque el Proxy de Nango no soporta el handshake de redirección de Google para sesiones binarias.
  * 
- * 🔑 KEYWORDS: #GoogleDriveAdapter #ResumableUpload #StorageSilo #HierarchicalStorage
- * 🔗 RELATIONSHIPS: [AuthorizedClient, SovereignPipeline, MediaEngine]
+ * 🔑 KEYWORDS: #GoogleDriveAdapter #ResumableUpload #StorageSilo #AgnosticQuery
+ * 🔗 RELATIONSHIPS: [AuthorizedClient, BaseAdapter, AgnosticQuery, useInventory]
  */
 
 import { AuthorizedClient, NangoAuthorizedClient } from '@/lib/authorized-client';
 import { nango } from '@/lib/nango';
 import { BaseAdapter } from '../shared/base-adapter';
+import { AgnosticQuery, AgnosticInventoryItem } from '@/core/inventory/types';
 import type { 
   OperationResult, 
   FieldSchema,
@@ -69,14 +70,16 @@ export class GoogleDriveAdapter extends BaseAdapter {
         endpoint: '/drive/v3/files',
         params: {
           q: "mimeType = 'application/vnd.google-apps.folder' and trashed = false",
-          fields: 'files(id, name)',
-          pageSize: '50'
+          fields: 'files(id, name, shared)',
+          pageSize: '50',
+          supportsAllDrives: 'true',
+          includeItemsFromAllDrives: 'true'
         }
       });
 
       const folders = response.files.map((f: any) => ({
         id: f.id,
-        label: f.name,
+        label: f.shared ? `👥 ${f.name} (Shared)` : f.name,
         type: 'folder'
       }));
 
@@ -141,32 +144,55 @@ export class GoogleDriveAdapter extends BaseAdapter {
       return this.error((err as Error).message);
     }
   }
-  async listInventory(): Promise<OperationResult<any[]>> {
+  /**
+   * 🔍 IMPLEMENTACIÓN CANÓNICA: listInventory
+   * Traduce AgnosticQuery a parámetros nativos de Google Drive v3.
+   */
+  async listInventory(query?: AgnosticQuery): Promise<OperationResult<AgnosticInventoryItem[]>> {
     try {
+      const parentId = query?.parentId || 'root';
+      const isRoot = parentId === 'root';
+      
+      // Construcción del Query DSL de Google Drive
+      let q = `('${parentId}' in parents ${isRoot ? 'or sharedWithMe = true' : ''}) and trashed = false`;
+      
+      if (query?.search) {
+        q += ` and name contains '${query.search}'`;
+      }
+      
+      if (query?.type === 'folder') {
+        q += ` and mimeType = 'application/vnd.google-apps.folder'`;
+      } else if (query?.type === 'file') {
+        q += ` and mimeType != 'application/vnd.google-apps.folder'`;
+      }
+
       const response = await this.client.request({
         endpoint: '/drive/v3/files',
         params: {
-          q: "'root' in parents and trashed = false",
-          fields: 'files(id, name, mimeType)',
-          pageSize: '50'
+          q,
+          fields: 'files(id, name, mimeType, shared, size, modifiedTime)',
+          pageSize: query?.limit?.toString() || '50',
+          pageToken: query?.cursor,
+          supportsAllDrives: 'true',
+          includeItemsFromAllDrives: 'true'
         }
       });
 
       const items = (response.files || []).map((f: any) => ({
         id: f.id,
-        name: f.name,
+        name: f.shared ? `👥 ${f.name}` : f.name,
         type: f.mimeType?.includes('folder') ? 'folder' : 'file',
         rawMimeType: f.mimeType,
-        provider: 'google-drive'
+        size: f.size ? parseInt(f.size) : undefined,
+        updatedAt: f.modifiedTime,
+        provider: 'google-drive',
+        isShared: f.shared,
+        parentId: parentId
       }));
 
       return this.result(items);
     } catch (err: any) {
-      console.error('[GoogleDriveAdapter] Inventory Fetch Failed:', {
-        message: err.message,
-        connectionId: this.connectionId,
-        stack: err.stack
-      });
+      console.error('[GoogleDriveAdapter] listInventory failed:', err);
       return this.error(`INVENTORY_ERR: ${err.message || 'Unknown error'}`);
     }
   }
@@ -187,6 +213,8 @@ export class GoogleDriveAdapter extends BaseAdapter {
         params: {
           q: `name = '${segment.replace(/'/g, "\\")}' and '${currentParentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
           fields: 'files(id)',
+          supportsAllDrives: 'true',
+          includeItemsFromAllDrives: 'true'
         },
       });
 

@@ -38,11 +38,24 @@ export async function GET(
     await import('@/integrations/register-all');
     
     const { registry } = await import('@/core/registry');
+    const { AgnosticQuerySchema } = await import('@/core/inventory/types');
     
     // Resolve adapter with the stored connectionId
     const adapter = registry.resolve(integration.type, integration.connectionId);
     
-    const result = await adapter.listInventory();
+    // 3. PARSE & VALIDATE AGNOSTIC QUERY
+    const { searchParams } = new URL(req.url);
+    const queryParams = Object.fromEntries(searchParams.entries());
+    
+    // Convert string numeric values to numbers for Zod
+    if (queryParams.limit) queryParams.limit = parseInt(queryParams.limit as string) as any;
+    if (queryParams.depth) queryParams.depth = parseInt(queryParams.depth as string) as any;
+
+    const validatedQuery = AgnosticQuerySchema.parse(queryParams);
+    
+    const startTime = Date.now();
+    const result = await adapter.listInventory(validatedQuery);
+    const latencyMs = Date.now() - startTime;
     
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 500 });
@@ -50,7 +63,11 @@ export async function GET(
 
     return NextResponse.json({ 
       objects: result.data,
-      provider: integration.type 
+      provider: integration.type,
+      diagnostics: {
+        latencyMs,
+        totalCount: result.data.length
+      }
     });
   } catch (error) {
     console.error('[Inventory API Error]:', error);

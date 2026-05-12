@@ -2,13 +2,24 @@
  * 🗂️ ARTEFACTO: ProviderEntityRow.tsx
  * ────────────
  * CAPA: UI / Widgets (Capability Projector)
- * VERSIÓN: 1.6.0
- * COMMIT: P2-M4.3-UI-AGNOSTIC-SEARCH-SCROLL
+ * VERSIÓN: 1.7.0
+ * COMMIT: P3-M2.3-UI-WIDGET-REFAC-HOOK
  * 
  * 🎯 FUNCTIONAL_SCOPE:
  * - Proyectar visualmente las capacidades de un nodo de infraestructura (Storage, DB, API).
  * - Proveer interfaces de operación: [Auth, Exploración de Inventario, Ejecución de Métodos].
  * - Gestionar el ciclo de vida visual de una conexión (Conectar, Reparar, Desconectar).
+ * 
+ * 🛡️ AXIOMATIC_CONTRACT:
+ * - MUST: Descubrir y mostrar UI basada estrictamente en 'manifest.capabilities'.
+ * - NEVER: Gestionar lógica de fetch local para el inventario; delegar SIEMPRE al hook 'useInventory'.
+ * - NEVER: Mezclar lógica de transporte; usar los métodos del hook de acciones suministrado.
+ * - ALWAYS: Proyectar el 'Inventory Operator' (Upload) si el nodo tiene capacidad de inyección.
+ * 
+ * 📜 ARCH_DECISION: Se transiciona de un modelo híbrido a uno de 'Consumo Puro' donde el widget es solo una shell visual que reacciona al estado del hook de inventario global.
+ * 
+ * 🔑 KEYWORDS: #CapabilityProjector #InfrastructureNode #DynamicUI #AgnosticForm
+ * 🔗 RELATIONSHIPS: [AgnosticConsoleShell, useInventory, SchemaManager, PortCreator]
  */
 
 import { useState, useEffect } from 'react';
@@ -34,6 +45,8 @@ import {
 import { cn } from '@/lib/utils';
 import { ProviderManifest, Connection } from '../integration_types';
 import { SchemaManager } from '@/components/schema-manager';
+import { useInventory } from '@/hooks/use-inventory';
+import { AgnosticTree } from '@/components/ui/agnostic-tree';
 
 interface ProviderEntityRowProps {
   manifest: ProviderManifest;
@@ -73,12 +86,17 @@ export function ProviderEntityRow({
 }: ProviderEntityRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'auth' | 'view' | 'execute'>('auth');
-  const [inventory, setInventory] = useState<any[]>([]);
-  const [isHydrating, setIsHydrating] = useState(false);
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const isActive = !!activeConnection;
+
+  const { 
+    items: filteredInventory, 
+    isLoading: isHydrating, 
+    refresh: hydrateInventory,
+    searchQuery,
+    setSearchQuery
+  } = useInventory(isActive ? activeConnection.id : undefined);
 
   const addLog = (msg: string) => {
     setTerminalLogs(prev => [...prev.slice(-4), `[${new Date().toLocaleTimeString()}] ${msg}`]);
@@ -103,30 +121,8 @@ export function ProviderEntityRow({
     }
   };
 
-  const hydrateInventory = async () => {
-    if (!activeConnection || isHydrating) return;
-    setIsHydrating(true);
-    try {
-      const res = await fetch(`/api/integrations/${activeConnection.id}/inventory`);
-      const data = await res.json();
-      setInventory(data.objects || []);
-    } catch (err) {
-      console.error('Hydration failed', err);
-    } finally {
-      setIsHydrating(false);
-    }
-  };
 
-  useEffect(() => {
-    if (activeSubTab === 'view' && isActive && inventory.length === 0) {
-      hydrateInventory();
-    }
-  }, [activeSubTab, isActive]);
 
-  const filteredInventory = inventory.filter(obj => 
-    obj.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    obj.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <div className={cn(
@@ -318,73 +314,31 @@ export function ProviderEntityRow({
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     {/* AGNOSTIC INVENTORY PROJECTION */}
-                    <div className="md:col-span-1 flex flex-col gap-4">
+                    <div className="md:col-span-3 space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <LayoutGrid className="size-3 text-primary" />
-                          <h5 className="text-[10px] font-bold uppercase tracking-widest">Inventory Projection</h5>
+                          <h5 className="text-[10px] font-bold uppercase tracking-widest text-primary">Infrastructure Discovery (Fractal)</h5>
                         </div>
                         <button 
-                          onClick={hydrateInventory}
-                          className="p-1.5 hover:bg-muted rounded-md transition-colors"
-                          title="Refresh Inventory"
+                          onClick={() => hydrateInventory()} 
+                          className="p-1 hover:bg-muted rounded-md transition-colors"
                         >
-                          <RefreshCw className={cn("size-3.5 text-muted-foreground", isHydrating && "animate-spin")} />
+                          <RefreshCw className={cn("size-3", isHydrating && "animate-spin")} />
                         </button>
                       </div>
 
-                      {/* Agnostic Search Bar */}
-                      <div className="relative group">
-                        <input 
-                          type="text"
-                          placeholder="Search infrastructure atoms..."
-                          className="w-full bg-muted/40 border border-border rounded-lg pl-9 pr-4 py-2.5 text-[10px] font-mono focus:outline-none focus:ring-1 focus:ring-primary/30 transition-all"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                        <Search className="absolute left-3 top-3 size-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                      </div>
                       
-                      {/* High-Density Scrollable Container */}
-                      <div className="h-[500px] rounded-xl bg-muted/10 border border-border/50 overflow-y-auto p-2 space-y-2 custom-scrollbar">
-                         {isHydrating ? (
-                           <div className="flex flex-col items-center justify-center h-full gap-3 opacity-40 py-20">
-                              <Loader2 className="size-5 animate-spin" />
-                              <span className="text-[9px] uppercase tracking-widest font-bold">Hydrating Silo...</span>
-                           </div>
-                         ) : filteredInventory.length > 0 ? (
-                           filteredInventory.map((obj: any) => (
-                             <div key={obj.id} className="flex items-center gap-3 p-3 bg-card/40 rounded-lg border border-border/40 hover:border-primary/40 hover:bg-card transition-all group/item shadow-sm">
-                                <div className="size-8 rounded-md bg-muted/60 flex items-center justify-center border border-border/20 group-hover/item:bg-primary/5 transition-colors">
-                                  {obj.type === 'folder' ? <Database className="size-4 text-primary/60" /> : <FileJson className="size-4 text-muted-foreground/60" />}
-                                </div>
-                                <div className="flex flex-col overflow-hidden text-left flex-1">
-                                  <span className="text-[10px] font-bold truncate text-foreground/90 group-hover/item:text-primary transition-colors">{obj.name}</span>
-                                  <div className="flex items-center gap-2">
-                                     <span className="text-[8px] font-mono opacity-30 truncate uppercase tracking-tighter">{obj.id}</span>
-                                     {obj.rawMimeType && (
-                                       <span className="text-[7px] px-1 bg-muted rounded border border-border/10 text-muted-foreground uppercase">{obj.rawMimeType.split('.').pop() || obj.rawMimeType.split('/').pop()}</span>
-                                     )}
-                                  </div>
-                                </div>
-                             </div>
-                           ))
-                         ) : (
-                           <div className="flex flex-col items-center justify-center h-full opacity-20 py-20">
-                              <Database className="size-10 mb-4 text-muted-foreground/30" />
-                              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground/40 text-center">
-                                {searchQuery ? 'No atoms match criteria' : 'Awaiting Object List'}
-                              </p>
-                              {!searchQuery && (
-                                <button 
-                                  onClick={hydrateInventory}
-                                  className="mt-6 px-6 py-2.5 bg-primary text-primary-foreground text-[9px] uppercase font-bold tracking-widest rounded-lg shadow-lg hover:opacity-90 transition-all"
-                                >
-                                  Trigger Manual Fetch
-                                </button>
-                              )}
-                           </div>
-                         )}
+
+                      <AgnosticTree 
+                        integrationId={activeConnection.id}
+                        onSelect={(atom) => addLog(`Selected: ${atom.name} (${atom.id})`)}
+                        className="h-[500px]"
+                      />
+
+                      <div className="flex items-center gap-4 px-3 py-2 bg-muted/20 border border-border rounded-lg">
+                        <span className="text-[8px] font-bold uppercase tracking-widest opacity-40">Status:</span>
+                        <span className="text-[8px] font-mono text-primary animate-pulse">Fractal Bridge Active</span>
                       </div>
                     </div>
                     

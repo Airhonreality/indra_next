@@ -50,6 +50,32 @@
     from { transform: translateX(-100%); }
     to { transform: translateX(100%); }
   }
+
+  /* Custom UI Tokens */
+  --color-border-strong: oklch(1 0 0 / 20%);
+  --color-glass: oklch(1 0 0 / 5%);
+}
+
+@layer utilities {
+  .custom-scrollbar {
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: var(--color-border);
+      border-radius: 10px;
+    }
+    &::-webkit-scrollbar-thumb:hover {
+      background: var(--color-primary);
+    }
+  }
+
+  .glass-card {
+    @apply bg-card/40 backdrop-blur-md border border-white/10 shadow-xl;
+  }
 }
 
 :root {

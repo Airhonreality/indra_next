@@ -36,15 +36,13 @@ import {
   User,
   ExternalLink,
   ChevronRight,
-  LogOut,
-  RefreshCw
+  LogOut
 } from 'lucide-react';
 import { i18n } from '@/lib/i18n';
 import { useIntegrationState } from '../logic/useIntegrationState';
 import { ProviderEntityRow } from './ProviderEntityRow';
 import { IntegrationMetricsGrid } from './IntegrationMetricsGrid';
 import { PortCreator } from '@/components/ports/port-creator';
-import { rescueGhostProjects } from '@/app/actions/ports';
 import { IngestionPortList } from './IngestionPortList';
 import { ResourceExplorer } from '@/components/resource-explorer';
 import { cn } from '@/lib/utils';
@@ -304,22 +302,6 @@ export function AgnosticConsoleShell() {
                   <p className="text-sm text-muted-foreground">System metrics, webhooks, and core axiomatic configuration.</p>
                 </div>
                 <IntegrationMetricsGrid {...metrics} />
-
-                <div className="mt-8 p-6 border border-primary/10 bg-primary/5 rounded-2xl">
-                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2">Herramientas de Soberanía</h4>
-                  <p className="text-[10px] text-muted-foreground mb-4">Si tienes proyectos creados en sesiones anteriores que no puedes borrar, usa esta herramienta para vincularlos a tu identidad actual.</p>
-                  <button 
-                    onClick={async () => {
-                      const count = await rescueGhostProjects();
-                      alert(`Se han rescatado ${count} proyectos. Refrescando...`);
-                      window.location.reload();
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest rounded-lg hover:shadow-lg hover:shadow-primary/20 transition-all"
-                  >
-                    <RefreshCw className="size-3" />
-                    Rescatar Proyectos Huérfanos
-                  </button>
-                </div>
               </div>
             )}
 

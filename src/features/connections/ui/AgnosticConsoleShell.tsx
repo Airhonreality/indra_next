@@ -67,6 +67,12 @@ export function AgnosticConsoleShell() {
   } = useIntegrationState();
 
   const [activeTab, setActiveTab] = useState<ConsoleTab>('ingestion');
+  const [selectedPort, setSelectedPort] = useState<any>(null);
+
+  const handlePortCreated = () => {
+    actions.refreshData();
+    setSelectedPort(null);
+  };
 
   if (status === 'loading' || loading) {
     return (
@@ -263,7 +269,10 @@ export function AgnosticConsoleShell() {
                         </div>
                         <h3 className="text-xl font-black tracking-tighter uppercase leading-none">Túneles de Ingesta</h3>
                       </div>
-                      <IngestionPortList className="p-4 bg-card border border-border rounded-xl shadow-sm" />
+                      <IngestionPortList 
+                        onSelect={setSelectedPort}
+                        className="p-4 bg-card border border-border rounded-xl shadow-sm" 
+                      />
                       
                       <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl border-dashed">
                         <h6 className="text-[8px] font-bold uppercase tracking-widest text-primary mb-1 flex items-center gap-2">
@@ -283,6 +292,8 @@ export function AgnosticConsoleShell() {
                         </div>
                         <h5 className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary mb-6">Funnel Architect</h5>
                         <PortCreator 
+                          initialData={selectedPort}
+                          onReset={() => setSelectedPort(null)}
                           connections={activeConnections.map(c => ({
                             id: c.id,
                             label: c.label,
@@ -290,6 +301,7 @@ export function AgnosticConsoleShell() {
                             type: c.type,
                             connectionId: c.id
                           }))} 
+                          onCreated={handlePortCreated}
                         />
                       </div>
                    </div>

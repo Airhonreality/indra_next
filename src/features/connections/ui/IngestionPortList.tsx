@@ -17,9 +17,10 @@ import { useIngestionPorts } from '@/hooks/use-ingestion-ports';
 interface IngestionPortListProps {
   connectionId?: string;
   className?: string;
+  onSelect?: (port: any) => void;
 }
 
-export function IngestionPortList({ connectionId, className }: IngestionPortListProps) {
+export function IngestionPortList({ connectionId, className, onSelect }: IngestionPortListProps) {
   const { ports, isLoading, removePort } = useIngestionPorts(connectionId);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
 
@@ -76,7 +77,11 @@ export function IngestionPortList({ connectionId, className }: IngestionPortList
               >
                 <Trash2 className="size-3" />
               </button>
-              <button className="p-1.5 hover:bg-background rounded-md border border-transparent hover:border-border transition-all opacity-10 cursor-not-allowed">
+              <button 
+                onClick={() => onSelect?.(port)}
+                className="p-1.5 hover:bg-background rounded-md border border-transparent hover:border-border transition-all text-primary"
+                title="Editar Configuración"
+              >
                 <Settings2 className="size-3" />
               </button>
             </div>

@@ -28,6 +28,7 @@ import { useIntegrationState } from '../logic/useIntegrationState';
 import { ProviderEntityRow } from './ProviderEntityRow';
 import { IntegrationMetricsGrid } from './IntegrationMetricsGrid';
 import { PortCreator } from '@/components/ports/port-creator';
+import { IngestionPortList } from './IngestionPortList';
 import { cn } from '@/lib/utils';
 
 const t = i18n.es;
@@ -162,21 +163,36 @@ export function AgnosticConsoleShell() {
       {activeTab === 'ingestion' && (
         <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
           <div className="flex flex-col gap-1 ml-1">
-            <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary">Ingestion Funnel Designer</h4>
-            <p className="text-xs text-muted-foreground">Map active infrastructure nodes to public data entry points.</p>
+            <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary">Ingestion Hub</h4>
+            <p className="text-xs text-muted-foreground">Manage existing project tunnels or design new entry points.</p>
           </div>
           
-          <div className="bg-card border border-border p-8 rounded-2xl">
-            {/* Reuse PortCreator but we can wrap it or specialize it later */}
-            <PortCreator 
-              connections={activeConnections.map(c => ({
-                id: c.id,
-                label: c.label,
-                integration: c.type,
-                type: c.type,
-                connectionId: c.id
-              }))} 
-            />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            {/* GLOBAL INVENTORY (Memory) */}
+            <div className="lg:col-span-1 space-y-4">
+              <IngestionPortList className="p-6 bg-card border border-border rounded-2xl" />
+              
+              <div className="p-6 bg-primary/5 border border-primary/10 rounded-2xl">
+                 <h6 className="text-[9px] font-bold uppercase tracking-widest text-primary mb-2">Axiomatic Note</h6>
+                 <p className="text-[10px] text-muted-foreground leading-relaxed italic">
+                   Cada puerto es una ventana soberana a tu infraestructura. El borrado de un puerto no afecta los datos ya ingeridos, solo cierra el túnel de acceso.
+                 </p>
+              </div>
+            </div>
+
+            {/* DESIGNER */}
+            <div className="lg:col-span-2 bg-card border border-border p-8 rounded-2xl">
+              <h5 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-6">Ingestion Funnel Designer</h5>
+              <PortCreator 
+                connections={activeConnections.map(c => ({
+                  id: c.id,
+                  label: c.label,
+                  integration: c.type,
+                  type: c.type,
+                  connectionId: c.id
+                }))} 
+              />
+            </div>
           </div>
         </div>
       )}

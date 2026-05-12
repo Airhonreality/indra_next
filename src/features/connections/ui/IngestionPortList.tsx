@@ -15,10 +15,11 @@ import { cn } from '@/lib/utils';
 import { useIngestionPorts } from '@/hooks/use-ingestion-ports';
 
 interface IngestionPortListProps {
-  connectionId: string;
+  connectionId?: string;
+  className?: string;
 }
 
-export function IngestionPortList({ connectionId }: IngestionPortListProps) {
+export function IngestionPortList({ connectionId, className }: IngestionPortListProps) {
   const { ports, isLoading } = useIngestionPorts(connectionId);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
 
@@ -29,14 +30,19 @@ export function IngestionPortList({ connectionId }: IngestionPortListProps) {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  if (isLoading) return <div className="text-[10px] animate-pulse py-4 opacity-50 uppercase font-bold">Consultando Memoria de Proyectos...</div>;
+  if (isLoading) return <div className="text-[10px] animate-pulse py-8 opacity-50 uppercase font-bold text-center">Consultando Memoria de Proyectos...</div>;
   if (ports.length === 0) return null;
 
   return (
-    <div className="space-y-3 mt-6 border-t border-border pt-6 animate-in fade-in duration-500">
-      <div className="flex items-center gap-2 mb-2">
-        <Globe className="size-3 text-primary" />
-        <h5 className="text-[10px] font-bold uppercase tracking-widest text-primary">Proyectos de Ingesta Activos</h5>
+    <div className={cn("space-y-4 animate-in fade-in duration-500", className)}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Globe className="size-3 text-primary" />
+          <h5 className="text-[10px] font-bold uppercase tracking-widest text-primary">
+            {connectionId ? 'Proyectos de Ingesta Activos' : 'Inventario Global de Proyectos'}
+          </h5>
+        </div>
+        {!connectionId && <span className="text-[9px] font-mono opacity-30 uppercase">{ports.length} RUTAS</span>}
       </div>
       
       <div className="grid grid-cols-1 gap-2">

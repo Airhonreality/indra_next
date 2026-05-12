@@ -16,10 +16,10 @@ export function useIngestionPorts(connectionId?: string) {
   const [isLoading, setIsLoading] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!connectionId) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/p?connectionId=${connectionId}`);
+      const url = connectionId ? `/api/p?connectionId=${connectionId}` : '/api/p';
+      const res = await fetch(url);
       const data = await res.json();
       if (data.ports) setPorts(data.ports);
     } catch (err) {
@@ -30,6 +30,7 @@ export function useIngestionPorts(connectionId?: string) {
   }, [connectionId]);
 
   useEffect(() => {
+    // We always refresh if it's global or if we have a connectionId
     refresh();
   }, [refresh]);
 

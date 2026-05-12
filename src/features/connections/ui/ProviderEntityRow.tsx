@@ -2,24 +2,13 @@
  * 🗂️ ARTEFACTO: ProviderEntityRow.tsx
  * ────────────
  * CAPA: UI / Widgets (Capability Projector)
- * VERSIÓN: 1.5.0
- * COMMIT: P2-M4.2-UI-DYNAMIC-CAPABILITIES
+ * VERSIÓN: 1.6.0
+ * COMMIT: P2-M4.3-UI-AGNOSTIC-SEARCH-SCROLL
  * 
  * 🎯 FUNCTIONAL_SCOPE:
  * - Proyectar visualmente las capacidades de un nodo de infraestructura (Storage, DB, API).
  * - Proveer interfaces de operación: [Auth, Exploración de Inventario, Ejecución de Métodos].
  * - Gestionar el ciclo de vida visual de una conexión (Conectar, Reparar, Desconectar).
- * 
- * 🛡️ AXIOMATIC_CONTRACT:
- * - MUST: Descubrir y mostrar UI basada estrictamente en 'manifest.capabilities'.
- * - NEVER: Hardcodear inputs manuales (ej. rutas fijas) que no sean proyectados dinámicamente.
- * - NEVER: Mezclar lógica de transporte; usar los métodos del hook de acciones suministrado.
- * - ALWAYS: Proyectar el "Inventory Projection" solo si el nodo tiene capacidad de lectura.
- * 
- * 📜 ENTROPY_ALERT: Evitar el uso de inputs de texto plano para rutas de archivos; el widget debe evolucionar hacia un File Explorer agnóstico.
- * 
- * 🔑 KEYWORDS: #CapabilityProjector #InfrastructureNode #DynamicUI #AgnosticForm
- * 🔗 RELATIONSHIPS: [AgnosticConsoleShell, SchemaManager, IntegrationAdapter]
  */
 
 import { useState, useEffect } from 'react';
@@ -38,7 +27,8 @@ import {
   Settings2,
   Trash2,
   RefreshCw,
-  LayoutGrid
+  LayoutGrid,
+  Search
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProviderManifest, Connection } from '../integration_types';
@@ -86,6 +76,7 @@ export function ProviderEntityRow({
   const [isHydrating, setIsHydrating] = useState(false);
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const isActive = !!activeConnection;
 
   const addLog = (msg: string) => {
@@ -130,6 +121,11 @@ export function ProviderEntityRow({
       hydrateInventory();
     }
   }, [activeSubTab, isActive]);
+
+  const filteredInventory = inventory.filter(obj => 
+    obj.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    obj.id.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className={cn(
@@ -177,7 +173,7 @@ export function ProviderEntityRow({
       {/* EXPANDABLE BODY: THE MICRO-OPERATOR */}
       <div className={cn(
         "overflow-hidden transition-all duration-300",
-        isExpanded ? "max-h-[1200px] opacity-100" : "max-h-0 opacity-0"
+        isExpanded ? "max-h-[1600px] opacity-100" : "max-h-0 opacity-0"
       )}>
         <div className="px-6 pb-6 pt-2 border-t border-border/50">
           
@@ -319,9 +315,9 @@ export function ProviderEntityRow({
                     <p className="text-[10px] font-bold uppercase tracking-widest">Connect provider to project capabilities</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* MINI PROJECTION (Visualizer) */}
-                    <div className="md:col-span-1 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {/* AGNOSTIC INVENTORY PROJECTION */}
+                    <div className="md:col-span-1 flex flex-col gap-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <LayoutGrid className="size-3 text-primary" />
@@ -329,53 +325,75 @@ export function ProviderEntityRow({
                         </div>
                         <button 
                           onClick={hydrateInventory}
-                          className="p-1 hover:bg-muted rounded transition-colors"
+                          className="p-1.5 hover:bg-muted rounded-md transition-colors"
                           title="Refresh Inventory"
                         >
-                          <RefreshCw className={cn("size-3 text-muted-foreground", isHydrating && "animate-spin")} />
+                          <RefreshCw className={cn("size-3.5 text-muted-foreground", isHydrating && "animate-spin")} />
                         </button>
                       </div>
+
+                      {/* Agnostic Search Bar */}
+                      <div className="relative group">
+                        <input 
+                          type="text"
+                          placeholder="Search infrastructure atoms..."
+                          className="w-full bg-muted/40 border border-border rounded-lg pl-9 pr-4 py-2.5 text-[10px] font-mono focus:outline-none focus:ring-1 focus:ring-primary/30 transition-all"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        <Search className="absolute left-3 top-3 size-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                      </div>
                       
-                      <div className="min-h-[200px] rounded-xl bg-muted/40 border border-border overflow-y-auto p-3 space-y-2">
+                      {/* High-Density Scrollable Container */}
+                      <div className="h-[500px] rounded-xl bg-muted/10 border border-border/50 overflow-y-auto p-2 space-y-2 custom-scrollbar">
                          {isHydrating ? (
-                           <div className="flex flex-col items-center justify-center h-full gap-2 opacity-40 py-10">
-                              <Loader2 className="size-4 animate-spin" />
-                              <span className="text-[8px] uppercase tracking-widest">Hydrating Silo...</span>
+                           <div className="flex flex-col items-center justify-center h-full gap-3 opacity-40 py-20">
+                              <Loader2 className="size-5 animate-spin" />
+                              <span className="text-[9px] uppercase tracking-widest font-bold">Hydrating Silo...</span>
                            </div>
-                         ) : inventory.length > 0 ? (
-                           inventory.map((obj: any) => (
-                             <div key={obj.id} className="flex items-center gap-3 p-2 bg-background/50 rounded border border-border/50 hover:border-primary/30 transition-all group/item">
-                                <div className="size-6 rounded bg-muted flex items-center justify-center">
-                                  {obj.type === 'folder' ? <Database className="size-3 text-primary/60" /> : <FileJson className="size-3 text-muted-foreground" />}
+                         ) : filteredInventory.length > 0 ? (
+                           filteredInventory.map((obj: any) => (
+                             <div key={obj.id} className="flex items-center gap-3 p-3 bg-card/40 rounded-lg border border-border/40 hover:border-primary/40 hover:bg-card transition-all group/item shadow-sm">
+                                <div className="size-8 rounded-md bg-muted/60 flex items-center justify-center border border-border/20 group-hover/item:bg-primary/5 transition-colors">
+                                  {obj.type === 'folder' ? <Database className="size-4 text-primary/60" /> : <FileJson className="size-4 text-muted-foreground/60" />}
                                 </div>
-                                <div className="flex flex-col overflow-hidden text-left">
-                                  <span className="text-[10px] font-medium truncate text-foreground">{obj.name}</span>
-                                  <span className="text-[8px] font-mono opacity-40 truncate">{obj.id}</span>
+                                <div className="flex flex-col overflow-hidden text-left flex-1">
+                                  <span className="text-[10px] font-bold truncate text-foreground/90 group-hover/item:text-primary transition-colors">{obj.name}</span>
+                                  <div className="flex items-center gap-2">
+                                     <span className="text-[8px] font-mono opacity-30 truncate uppercase tracking-tighter">{obj.id}</span>
+                                     {obj.rawMimeType && (
+                                       <span className="text-[7px] px-1 bg-muted rounded border border-border/10 text-muted-foreground uppercase">{obj.rawMimeType.split('.').pop() || obj.rawMimeType.split('/').pop()}</span>
+                                     )}
+                                  </div>
                                 </div>
                              </div>
                            ))
                          ) : (
-                           <div className="flex flex-col items-center justify-center h-full opacity-20 py-10">
-                              <Database className="size-8 mb-2" />
-                              <p className="text-[9px] uppercase tracking-widest font-bold">Awaiting Object List</p>
-                              <button 
-                                onClick={hydrateInventory}
-                                className="mt-4 px-4 py-2 bg-primary/10 text-primary text-[8px] uppercase font-bold tracking-widest rounded border border-primary/20 hover:bg-primary/20 transition-all"
-                              >
-                                Trigger Manual Fetch
-                              </button>
+                           <div className="flex flex-col items-center justify-center h-full opacity-20 py-20">
+                              <Database className="size-10 mb-4 text-muted-foreground/30" />
+                              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground/40 text-center">
+                                {searchQuery ? 'No atoms match criteria' : 'Awaiting Object List'}
+                              </p>
+                              {!searchQuery && (
+                                <button 
+                                  onClick={hydrateInventory}
+                                  className="mt-6 px-6 py-2.5 bg-primary text-primary-foreground text-[9px] uppercase font-bold tracking-widest rounded-lg shadow-lg hover:opacity-90 transition-all"
+                                >
+                                  Trigger Manual Fetch
+                                </button>
+                              )}
                            </div>
                          )}
                       </div>
                     </div>
                     
                     {/* SCHEMA MANAGER */}
-                    <div className="md:col-span-2 space-y-4">
+                    <div className="md:col-span-2 flex flex-col gap-4">
                       <div className="flex items-center gap-2">
                         <Settings2 className="size-3 text-primary" />
                         <h5 className="text-[10px] font-bold uppercase tracking-widest">Data Schema Blueprint</h5>
                       </div>
-                      <div className="bg-muted/10 p-4 rounded-xl border border-border">
+                      <div className="bg-muted/10 p-5 rounded-xl border border-border h-full">
                         <SchemaManager 
                           integrationId={activeConnection.id}
                           currentSchema={activeConnection.dynamicSchema || []}

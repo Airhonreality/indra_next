@@ -37,7 +37,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-background text-foreground selection:bg-primary/30">
-      <div className="relative max-w-7xl mx-auto px-6 py-12 lg:py-20 space-y-20">
+      <div className="relative max-w-full mx-auto px-6 lg:px-12 py-12 lg:py-20 space-y-20">
         
         {/* HEADER */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-8 border-b border-border pb-12">

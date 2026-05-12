@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { deleteIngestionPort } from '@/app/actions/ports';
 
 export function useIngestionPorts(connectionId?: string) {
   const [ports, setPorts] = useState<any[]>([]);
@@ -29,10 +30,21 @@ export function useIngestionPorts(connectionId?: string) {
     }
   }, [connectionId]);
 
+  const removePort = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar este proyecto de ingesta?')) return;
+    try {
+      await deleteIngestionPort(id);
+      await refresh();
+    } catch (err) {
+      console.error('[Indra Memory Error] Failed to delete port:', err);
+      alert('Error al eliminar el proyecto.');
+    }
+  };
+
   useEffect(() => {
     // We always refresh if it's global or if we have a connectionId
     refresh();
   }, [refresh]);
 
-  return { ports, isLoading, refresh };
+  return { ports, isLoading, refresh, removePort };
 }

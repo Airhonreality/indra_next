@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { ExternalLink, Copy, CheckCircle2, Globe, Settings2 } from 'lucide-react';
+import { ExternalLink, Copy, CheckCircle2, Globe, Settings2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIngestionPorts } from '@/hooks/use-ingestion-ports';
 
@@ -20,7 +20,7 @@ interface IngestionPortListProps {
 }
 
 export function IngestionPortList({ connectionId, className }: IngestionPortListProps) {
-  const { ports, isLoading } = useIngestionPorts(connectionId);
+  const { ports, isLoading, removePort } = useIngestionPorts(connectionId);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
 
   const copyToClipboard = (slug: string) => {
@@ -53,7 +53,7 @@ export function IngestionPortList({ connectionId, className }: IngestionPortList
               <span className="text-[8px] font-mono opacity-50">/p/{port.slug}</span>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <button 
                 onClick={() => copyToClipboard(port.slug)}
                 className="p-1.5 hover:bg-background rounded-md border border-transparent hover:border-border transition-all"
@@ -69,7 +69,14 @@ export function IngestionPortList({ connectionId, className }: IngestionPortList
               >
                 <ExternalLink className="size-3 opacity-40 hover:opacity-100" />
               </a>
-              <button className="p-1.5 hover:bg-background rounded-md border border-transparent hover:border-border transition-all opacity-20 cursor-not-allowed">
+              <button 
+                onClick={() => removePort(port.id)}
+                className="p-1.5 hover:bg-destructive/10 text-destructive rounded-md border border-transparent hover:border-destructive/20 transition-all opacity-0 group-hover:opacity-100"
+                title="Eliminar Proyecto"
+              >
+                <Trash2 className="size-3" />
+              </button>
+              <button className="p-1.5 hover:bg-background rounded-md border border-transparent hover:border-border transition-all opacity-10 cursor-not-allowed">
                 <Settings2 className="size-3" />
               </button>
             </div>

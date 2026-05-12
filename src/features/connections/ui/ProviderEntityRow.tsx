@@ -28,7 +28,8 @@ import {
   Trash2,
   RefreshCw,
   LayoutGrid,
-  Search
+  Search,
+  UploadCloud
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProviderManifest, Connection } from '../integration_types';
@@ -387,18 +388,40 @@ export function ProviderEntityRow({
                       </div>
                     </div>
                     
-                    {/* SCHEMA MANAGER */}
-                    <div className="md:col-span-2 flex flex-col gap-4">
-                      <div className="flex items-center gap-2">
-                        <Settings2 className="size-3 text-primary" />
-                        <h5 className="text-[10px] font-bold uppercase tracking-widest">Data Schema Blueprint</h5>
-                      </div>
-                      <div className="bg-muted/10 p-5 rounded-xl border border-border h-full">
-                        <SchemaManager 
-                          integrationId={activeConnection.id}
-                          currentSchema={activeConnection.dynamicSchema || []}
-                          onUpdate={refreshData}
-                        />
+                    {/* SCHEMA MANAGER & INGESTION */}
+                    <div className="md:col-span-2 flex flex-col gap-6">
+                      
+                      {/* IMMEDIATE INGESTION (If capable) */}
+                      {manifest.capabilities.includes('file_upload') && (
+                        <div className="space-y-4 animate-in slide-in-from-right-4 duration-500">
+                          <div className="flex items-center gap-2">
+                            <UploadCloud className="size-3 text-primary" />
+                            <h5 className="text-[10px] font-bold uppercase tracking-widest text-primary">Immediate Ingestion Operator</h5>
+                          </div>
+                          <div className="group relative h-32 rounded-xl border-2 border-dashed border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all flex flex-col items-center justify-center cursor-pointer overflow-hidden">
+                             <div className="flex flex-col items-center gap-2 group-hover:scale-105 transition-transform duration-300">
+                                <UploadCloud className="size-6 text-primary/40 group-hover:text-primary" />
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground">Drop atom to inject into {manifest.label}</span>
+                                <span className="text-[7px] opacity-40 uppercase font-mono tracking-tighter">Target: {manifest.id} / Root</span>
+                             </div>
+                             {/* Shimmer effect for premium feel */}
+                             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent -translate-x-full group-hover:animate-shimmer" />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex flex-col gap-4">
+                        <div className="flex items-center gap-2">
+                          <Settings2 className="size-3 text-primary" />
+                          <h5 className="text-[10px] font-bold uppercase tracking-widest">Data Schema Blueprint</h5>
+                        </div>
+                        <div className="bg-muted/10 p-5 rounded-xl border border-border h-full">
+                          <SchemaManager 
+                            integrationId={activeConnection.id}
+                            currentSchema={activeConnection.dynamicSchema || []}
+                            onUpdate={refreshData}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -148,7 +148,9 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
                   required
                 >
                   <option value="">-- Seleccionar Nodo --</option>
-                  {connections.map(c => (
+                  {connections
+                    .filter((c: any) => c.connectionId) // Agnostic Sovereignty Filter
+                    .map(c => (
                     <option key={c.id} value={c.id}>{c.label} ({c.type})</option>
                   ))}
                 </select>

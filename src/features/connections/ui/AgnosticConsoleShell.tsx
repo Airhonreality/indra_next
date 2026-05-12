@@ -22,18 +22,34 @@
 'use client';
 
 import { useState } from 'react';
-import { Shield, Loader2, Zap, LayoutPanelLeft, Layers, Terminal } from 'lucide-react';
+import { 
+  Shield, 
+  Loader2, 
+  Zap, 
+  LayoutPanelLeft, 
+  Layers, 
+  Terminal, 
+  Settings, 
+  Database,
+  Activity,
+  User,
+  ExternalLink,
+  ChevronRight,
+  LogOut
+} from 'lucide-react';
+import { logout } from '@/app/actions/auth';
 import { i18n } from '@/lib/i18n';
 import { useIntegrationState } from '../logic/useIntegrationState';
 import { ProviderEntityRow } from './ProviderEntityRow';
 import { IntegrationMetricsGrid } from './IntegrationMetricsGrid';
 import { PortCreator } from '@/components/ports/port-creator';
 import { IngestionPortList } from './IngestionPortList';
+import { ResourceExplorer } from '@/components/resource-explorer';
 import { cn } from '@/lib/utils';
 
 const t = i18n.es;
 
-type ConsoleTab = 'infrastructure' | 'ingestion' | 'workflows';
+type ConsoleTab = 'nodes' | 'ingestion' | 'workflows' | 'settings' | 'explorer';
 
 export function AgnosticConsoleShell() {
   const { 
@@ -49,11 +65,11 @@ export function AgnosticConsoleShell() {
     state 
   } = useIntegrationState();
 
-  const [activeTab, setActiveTab] = useState<ConsoleTab>('infrastructure');
+  const [activeTab, setActiveTab] = useState<ConsoleTab>('ingestion');
 
   if (status === 'loading' || loading) {
     return (
-      <div className="flex flex-col items-center justify-center p-20 space-y-4">
+      <div className="fixed inset-0 flex flex-col items-center justify-center space-y-4 bg-background z-50">
         <Loader2 className="size-8 animate-spin text-primary opacity-20" />
         <p className="text-[10px] uppercase font-bold tracking-[0.4em] text-muted-foreground animate-pulse">Synchronizing Kernel...</p>
       </div>
@@ -66,146 +82,285 @@ export function AgnosticConsoleShell() {
     return aActive === bActive ? 0 : aActive ? -1 : 1;
   });
 
+  const connectionConfigs = activeConnections.map(c => ({
+    id: c.id,
+    label: c.label,
+    integration: c.type,
+    type: c.type,
+    connectionId: c.id
+  }));
+
   return (
-    <div className="space-y-10 animate-in fade-in duration-700">
+    <div className="fixed inset-0 flex bg-background overflow-hidden animate-in fade-in duration-700">
       
-      {/* GLOBAL HEADER: IDENTITY & KPI SUMMARY */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-muted/20 p-6 rounded-2xl border border-border/50">
-        <div className="flex items-center gap-4">
-          <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-            <Shield className="size-6 text-primary" />
+      {/* ── SIDEBAR (Nango Inspired) ── */}
+      <aside className="w-64 border-r border-border bg-card/50 flex flex-col">
+        {/* Branding */}
+        <div className="p-6 border-b border-border flex items-center gap-3">
+          <div className="size-8 rounded-lg bg-primary flex items-center justify-center">
+            <Shield className="size-5 text-primary-foreground" />
           </div>
           <div>
-            <h3 className="text-lg font-bold tracking-tighter text-foreground uppercase">Sovereign Environment</h3>
-            <p className="text-[10px] text-muted-foreground font-mono opacity-60">KERNEL_ID: {userId?.slice(0, 8)}...{userId?.slice(-4)}</p>
+            <h1 className="text-sm font-black tracking-tighter uppercase leading-none">Indra <span className="text-primary">Next</span></h1>
+            <p className="text-[8px] font-mono text-muted-foreground opacity-50 mt-1">AXIOMATIC_OS v1.6.1</p>
           </div>
         </div>
-        <div className="flex gap-8">
-          <div className="text-right">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Coverage</p>
-            <p className="text-xl font-black text-emerald-500">{metrics.coverage}%</p>
-          </div>
-          <div className="text-right">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Nodes</p>
-            <p className="text-xl font-black text-foreground">{metrics.configuredNango}/{metrics.totalAdapters}</p>
-          </div>
-        </div>
-      </div>
 
-      {/* TABS NAVIGATION */}
-      <div className="flex gap-1 p-1 bg-muted/30 rounded-xl w-fit border border-border">
-        <button 
-          onClick={() => setActiveTab('infrastructure')}
-          className={cn(
-            "flex items-center gap-2 px-6 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
-            activeTab === 'infrastructure' ? "bg-background text-primary shadow-sm border border-border" : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <Layers className="size-3" />
-          1. Infrastructure
-        </button>
-        <button 
-          onClick={() => setActiveTab('ingestion')}
-          className={cn(
-            "flex items-center gap-2 px-6 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
-            activeTab === 'ingestion' ? "bg-background text-primary shadow-sm border border-border" : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <Zap className="size-3" />
-          2. Ingestion
-        </button>
-        <button 
-          onClick={() => setActiveTab('workflows')}
-          className={cn(
-            "flex items-center gap-2 px-6 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
-            activeTab === 'workflows' ? "bg-background text-primary shadow-sm border border-border" : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <Terminal className="size-3" />
-          3. Workflows
-        </button>
-      </div>
-
-      {/* TAB CONTENT: INFRASTRUCTURE (WIDGET 1) */}
-      {activeTab === 'infrastructure' && (
-        <div className="space-y-6 animate-in slide-in-from-left-4 duration-500">
-          <div className="flex flex-col gap-1 ml-1">
-            <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary">Structural Provider Catalog</h4>
-            <p className="text-xs text-muted-foreground">Expose, configure, and operate your sovereign infrastructure nodes.</p>
+        {/* Navigation Groups */}
+        <nav className="flex-1 p-4 space-y-8 overflow-y-auto">
+          <div className="space-y-1">
+            <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Control Plane</p>
+            <SidebarItem 
+              active={activeTab === 'nodes'} 
+              onClick={() => setActiveTab('nodes')}
+              icon={<Database className="size-4" />}
+              label="Nodes & Adapters"
+              badge={activeConnections.length.toString()}
+            />
           </div>
-          
-          <div className="flex flex-col gap-4">
-            {sortedAdapters.map(manifest => {
-              const isNangoConfigured = availableProviders.some(p => p.provider === manifest.id);
-              const activeConnection = activeConnections.find(c => c.type === manifest.id);
 
-              return (
-                <ProviderEntityRow 
-                  key={manifest.id}
-                  manifest={manifest}
-                  isNangoConfigured={isNangoConfigured}
-                  activeConnection={activeConnection}
-                  isProcessing={isProcessing === manifest.id}
-                  localPathValue={state.localPaths[manifest.id] || ''}
-                  onSetLocalPath={(path) => actions.setLocalPath(manifest.id, path)}
-                  onAuthorize={actions.authorizeOAuth}
-                  onMountLocal={actions.mountLocalProvider}
-                  onDisconnect={actions.disconnectIntegration}
-                  refreshData={actions.refreshData}
-                />
-              );
-            })}
+          <div className="space-y-1">
+            <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Operations</p>
+            <SidebarItem 
+              active={activeTab === 'ingestion'} 
+              onClick={() => setActiveTab('ingestion')}
+              icon={<Zap className="size-4" />}
+              label="Ingestion Hub"
+            />
+            <SidebarItem 
+              active={activeTab === 'explorer'} 
+              onClick={() => setActiveTab('explorer')}
+              icon={<Layers className="size-4" />}
+              label="Silo Explorer"
+            />
+            <SidebarItem 
+              active={activeTab === 'workflows'} 
+              onClick={() => setActiveTab('workflows')}
+              icon={<Terminal className="size-4" />}
+              label="Workflows"
+              disabled
+            />
           </div>
-        </div>
-      )}
 
-      {/* TAB CONTENT: INGESTION (WIDGET 2) */}
-      {activeTab === 'ingestion' && (
-        <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
-          <div className="flex flex-col gap-1 ml-1">
-            <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary">Ingestion Hub</h4>
-            <p className="text-xs text-muted-foreground">Manage existing project tunnels or design new entry points.</p>
+          <div className="space-y-1">
+            <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">System</p>
+            <SidebarItem 
+              active={activeTab === 'settings'} 
+              onClick={() => setActiveTab('settings')}
+              icon={<Settings className="size-4" />}
+              label="Environment Settings"
+            />
           </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            {/* GLOBAL INVENTORY (Memory) */}
-            <div className="lg:col-span-1 space-y-4">
-              <IngestionPortList className="p-6 bg-card border border-border rounded-2xl" />
-              
-              <div className="p-6 bg-primary/5 border border-primary/10 rounded-2xl">
-                 <h6 className="text-[9px] font-bold uppercase tracking-widest text-primary mb-2">Axiomatic Note</h6>
-                 <p className="text-[10px] text-muted-foreground leading-relaxed italic">
-                   Cada puerto es una ventana soberana a tu infraestructura. El borrado de un puerto no afecta los datos ya ingeridos, solo cierra el túnel de acceso.
-                 </p>
+        </nav>
+
+        {/* User Profile / Identity (Bottom Left) */}
+        <div className="p-4 border-t border-border bg-muted/20">
+          <div className="group relative flex items-center justify-between p-3 rounded-xl bg-card border border-border shadow-sm hover:border-primary/50 transition-all">
+            <div className="flex items-center gap-3">
+              <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                <User className="size-4 text-primary" />
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-[10px] font-bold truncate leading-none">HG García</p>
+                <p className="text-[8px] text-muted-foreground truncate mt-1">hgarcia@indra.net</p>
               </div>
             </div>
-
-            {/* DESIGNER */}
-            <div className="lg:col-span-2 bg-card border border-border p-8 rounded-2xl">
-              <h5 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-6">Ingestion Funnel Designer</h5>
-              <PortCreator 
-                connections={activeConnections.map(c => ({
-                  id: c.id,
-                  label: c.label,
-                  integration: c.type,
-                  type: c.type,
-                  connectionId: c.id
-                }))} 
-              />
-            </div>
+            
+            <button 
+              onClick={() => logout()}
+              className="p-1.5 hover:bg-destructive/10 text-destructive rounded-md opacity-0 group-hover:opacity-100 transition-all"
+              title="Cerrar Sesión"
+            >
+              <LogOut className="size-3" />
+            </button>
           </div>
         </div>
-      )}
+      </aside>
 
-      {/* TAB CONTENT: WORKFLOWS (WIDGET 3) */}
-      {activeTab === 'workflows' && (
-        <div className="p-20 border border-dashed border-border rounded-2xl flex flex-col items-center justify-center opacity-40 grayscale animate-in zoom-in-95 duration-500">
-          <LayoutPanelLeft className="size-12 text-muted-foreground mb-4" />
-          <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground text-center">Workflow Engine Proxy</p>
-          <p className="text-[9px] text-muted-foreground mt-2 italic">Awaiting node stabilization...</p>
+      {/* ── MAIN VIEWPORT ── */}
+      <main className="flex-1 flex flex-col overflow-hidden bg-background">
+        {/* Top Header Context */}
+        <header className="h-16 border-b border-border flex items-center justify-between px-8 bg-card/20 backdrop-blur-sm">
+          <div className="flex items-center gap-4">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              {activeTab === 'nodes' && 'Infrastructure / Nodes'}
+              {activeTab === 'ingestion' && 'Operations / Ingestion Hub'}
+              {activeTab === 'explorer' && 'Operations / Silo Explorer'}
+              {activeTab === 'workflows' && 'Operations / Workflows'}
+              {activeTab === 'settings' && 'System / Settings'}
+            </h2>
+          </div>
+          
+          <div className="flex items-center gap-6">
+            <div className="flex gap-4 border-r border-border pr-6">
+              <div className="text-right">
+                <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Coverage</p>
+                <p className="text-xs font-black text-emerald-500">{metrics.coverage}%</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Health</p>
+                <p className="text-xs font-black text-primary">Axiomatic</p>
+              </div>
+            </div>
+            <button className="text-[9px] font-bold uppercase tracking-widest flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors">
+              Docs <ExternalLink className="size-3" />
+            </button>
+          </div>
+        </header>
+
+        {/* Content Area (Scrollable) */}
+        <div className="flex-1 overflow-y-auto p-12 custom-scrollbar">
+          <div className="max-w-6xl mx-auto space-y-12 pb-20">
+            
+            {/* TAB: NODES & ADAPTERS */}
+            {activeTab === 'nodes' && (
+              <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-bold tracking-tighter">Infrastructure Catalog</h3>
+                  <p className="text-sm text-muted-foreground max-w-xl">Configure and authorize connection adapters to expose your sovereign infrastructure silos.</p>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  {sortedAdapters.map(manifest => {
+                    const isNangoConfigured = availableProviders.some(p => p.provider === manifest.id);
+                    const activeConnection = activeConnections.find(c => c.type === manifest.id);
+                    return (
+                      <ProviderEntityRow 
+                        key={manifest.id}
+                        manifest={manifest}
+                        isNangoConfigured={isNangoConfigured}
+                        activeConnection={activeConnection}
+                        isProcessing={isProcessing === manifest.id}
+                        localPathValue={state.localPaths[manifest.id] || ''}
+                        onSetLocalPath={(path) => actions.setLocalPath(manifest.id, path)}
+                        onAuthorize={actions.authorizeOAuth}
+                        onMountLocal={actions.mountLocalProvider}
+                        onDisconnect={actions.disconnectIntegration}
+                        refreshData={actions.refreshData}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* TAB: SILO EXPLORER */}
+            {activeTab === 'explorer' && (
+              <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-bold tracking-tighter">Silo Explorer</h3>
+                  <p className="text-sm text-muted-foreground">Direct resource discovery across authorized infrastructure nodes.</p>
+                </div>
+                <div className="bg-card border border-border p-8 rounded-2xl shadow-sm">
+                  <ResourceExplorer connections={connectionConfigs} />
+                </div>
+              </div>
+            )}
+
+            {/* TAB: INGESTION HUB */}
+            {activeTab === 'ingestion' && (
+              <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                   <div className="lg:col-span-1 space-y-8">
+                      <div className="space-y-1">
+                        <h3 className="text-2xl font-bold tracking-tighter">Active Projects</h3>
+                        <p className="text-xs text-muted-foreground">Sovereign tunnels mapped to active infrastructure nodes.</p>
+                      </div>
+                      <IngestionPortList className="p-6 bg-card border border-border rounded-2xl shadow-sm" />
+                      
+                      <div className="p-6 bg-primary/5 border border-primary/10 rounded-2xl border-dashed">
+                        <h6 className="text-[9px] font-bold uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
+                          <Shield className="size-3" />
+                          Security Axiom
+                        </h6>
+                        <p className="text-[10px] text-muted-foreground leading-relaxed italic">
+                          Indra Next utilizes double-blind authorization. Access slugs are detached from infrastructure IDs to prevent resource harvesting.
+                        </p>
+                      </div>
+                   </div>
+
+                   <div className="lg:col-span-2 space-y-6">
+                      <div className="bg-card border border-border p-10 rounded-2xl shadow-xl relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                          <Zap className="size-32" />
+                        </div>
+                        <h5 className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary mb-8">Funnel Architect</h5>
+                        <PortCreator 
+                          connections={activeConnections.map(c => ({
+                            id: c.id,
+                            label: c.label,
+                            integration: c.type,
+                            type: c.type,
+                            connectionId: c.id
+                          }))} 
+                        />
+                      </div>
+                   </div>
+                 </div>
+              </div>
+            )}
+
+            {/* TAB: SETTINGS & METRICS */}
+            {activeTab === 'settings' && (
+              <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-bold tracking-tighter">Environment Settings</h3>
+                  <p className="text-sm text-muted-foreground">System metrics, webhooks, and core axiomatic configuration.</p>
+                </div>
+                <IntegrationMetricsGrid {...metrics} />
+                
+                <div className="p-12 border border-dashed border-border rounded-2xl flex flex-col items-center justify-center bg-card/20">
+                  <Activity className="size-10 text-muted-foreground mb-4 opacity-20" />
+                  <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground">Awaiting Webhook Manifest...</p>
+                </div>
+              </div>
+            )}
+
+          </div>
         </div>
-      )}
-
+      </main>
     </div>
+  );
+}
+
+// ── SIDEBAR SUB-COMPONENTS ───────────────────────────────────────────────────
+
+function SidebarItem({ 
+  active, 
+  onClick, 
+  icon, 
+  label, 
+  badge, 
+  disabled 
+}: { 
+  active: boolean; 
+  onClick: () => void; 
+  icon: React.ReactNode; 
+  label: string; 
+  badge?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "w-full flex items-center justify-between px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all group",
+        disabled ? "opacity-30 cursor-not-allowed" : "hover:bg-primary/5 hover:text-primary",
+        active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "text-muted-foreground"
+      )}
+    >
+      <div className="flex items-center gap-3">
+        {icon}
+        <span>{label}</span>
+      </div>
+      {badge && (
+        <span className={cn(
+          "px-1.5 py-0.5 rounded text-[8px] font-black",
+          active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
+        )}>
+          {badge}
+        </span>
+      )}
+    </button>
   );
 }

@@ -60,7 +60,11 @@ export function useIntegrationState() {
   };
 
   useEffect(() => {
-    if (status === 'authenticated') refreshData();
+    if (status === 'authenticated') {
+      refreshData();
+    } else if (status === 'unauthenticated') {
+      setLoading(false);
+    }
   }, [status, userId]);
 
   const authorizeOAuth = async (provider: string) => {

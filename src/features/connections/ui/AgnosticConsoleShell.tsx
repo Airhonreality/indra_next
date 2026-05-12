@@ -254,31 +254,34 @@ export function AgnosticConsoleShell() {
             {/* TAB: INGESTION HUB */}
             {activeTab === 'ingestion' && (
               <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
-                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                    <div className="lg:col-span-1 space-y-8">
                       <div className="space-y-1">
-                        <h3 className="text-2xl font-bold tracking-tighter">Active Projects</h3>
-                        <p className="text-xs text-muted-foreground">Sovereign tunnels mapped to active infrastructure nodes.</p>
+                        <div className="flex items-center gap-2 text-primary/60 mb-1">
+                          <Terminal className="size-3" />
+                          <span className="text-[8px] font-bold uppercase tracking-[0.3em]">Project Memory</span>
+                        </div>
+                        <h3 className="text-xl font-black tracking-tighter uppercase leading-none">Túneles de Ingesta</h3>
                       </div>
-                      <IngestionPortList className="p-6 bg-card border border-border rounded-2xl shadow-sm" />
+                      <IngestionPortList className="p-4 bg-card border border-border rounded-xl shadow-sm" />
                       
-                      <div className="p-6 bg-primary/5 border border-primary/10 rounded-2xl border-dashed">
-                        <h6 className="text-[9px] font-bold uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
+                      <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl border-dashed">
+                        <h6 className="text-[8px] font-bold uppercase tracking-widest text-primary mb-1 flex items-center gap-2">
                           <Shield className="size-3" />
-                          Security Axiom
+                          Seguridad
                         </h6>
-                        <p className="text-[10px] text-muted-foreground leading-relaxed italic">
-                          Indra Next utilizes double-blind authorization. Access slugs are detached from infrastructure IDs to prevent resource harvesting.
+                        <p className="text-[9px] text-muted-foreground leading-tight italic">
+                          Acceso por slugs aislados.
                         </p>
                       </div>
                    </div>
 
-                   <div className="lg:col-span-2 space-y-6">
-                      <div className="bg-card border border-border p-10 rounded-2xl shadow-xl relative overflow-hidden group">
+                   <div className="lg:col-span-3 space-y-6">
+                      <div className="bg-card border border-border p-8 rounded-2xl shadow-xl relative overflow-hidden group">
                         <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                           <Zap className="size-32" />
                         </div>
-                        <h5 className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary mb-8">Funnel Architect</h5>
+                        <h5 className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary mb-6">Funnel Architect</h5>
                         <PortCreator 
                           connections={activeConnections.map(c => ({
                             id: c.id,

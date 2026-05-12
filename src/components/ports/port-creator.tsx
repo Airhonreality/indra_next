@@ -23,6 +23,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Globe, Loader2, Check, FolderTree, Link, PlusCircle, XCircle } from 'lucide-react';
 import { useEffect } from 'react';
+import { AgnosticTree } from '@/components/ui/agnostic-tree';
+import { IngestionFieldDesigner } from '@/components/ingestion/field-designer';
+import { IngestionOperator } from '@/components/ingestion/operator';
 
 interface PortCreatorProps {
   connections: Array<{ id: string; label: string; type: string; connectionId?: string }>;

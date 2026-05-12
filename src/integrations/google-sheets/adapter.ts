@@ -2,11 +2,8 @@ import { BaseAdapter } from '@/integrations/shared/base-adapter';
 import type { AuthorizedClient } from '@/lib/authorized-client';
 import type { FieldSchema, OperationResult } from '@/core/types/integration';
 import type { Record as IndraRecord } from '@/core/types/integration';
+import { RoutingService } from '@/core/services/routing';
 import { AgnosticQuery } from '@/core/inventory/types';
-
-function slugify(str: string): string {
-  return String(str).toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '_');
-}
 
 const SHEETS_BASE = 'https://sheets.googleapis.com/v4';
 const DEFAULT_SHEET = 'ATOMS';
@@ -57,7 +54,7 @@ export class SheetsAdapter extends BaseAdapter {
     try {
       const headerRow = await this.getHeaderRow(sourceId, this.defaultSheetName);
       const fields: FieldSchema[] = headerRow.map(h => ({
-        key: slugify(h),
+        key: RoutingService.toKey(h),
         label: h,
         type: 'string' as const,
       }));
@@ -109,7 +106,7 @@ export class SheetsAdapter extends BaseAdapter {
   async pushRecords(targetId: string, records: IndraRecord[]): Promise<OperationResult<{ created: number; updated: number; failed: number }>> {
     try {
       const headerRow = await this.getHeaderRow(targetId, this.defaultSheetName);
-      const existingKeys = new Set(headerRow.map(slugify));
+      const existingKeys = new Set(headerRow.map(h => RoutingService.toKey(h)));
 
       // Ensure all field keys exist as columns
       const allKeys = new Set<string>();
@@ -128,7 +125,7 @@ export class SheetsAdapter extends BaseAdapter {
       const finalHeaders = headerRow;
       const rowValues = records.map(record =>
         finalHeaders.map(h => {
-          const val = record.fields[slugify(h)] ?? record.fields[h] ?? '';
+          const val = record.fields[RoutingService.toKey(h)] ?? record.fields[h] ?? '';
           return typeof val === 'object' ? JSON.stringify(val) : String(val);
         })
       );
@@ -157,7 +154,7 @@ export class SheetsAdapter extends BaseAdapter {
   private rowToRecord(row: any[], headers: string[], spreadsheetId: string, index: number): IndraRecord {
     const fields: Record<string, any> = {};
     headers.forEach((h, i) => {
-      const key = slugify(h);
+      const key = RoutingService.toKey(h);
       let val: any = row[i] ?? '';
       if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
         try { val = JSON.parse(val); } catch {}
@@ -176,7 +173,7 @@ export class SheetsAdapter extends BaseAdapter {
   private applyFilter(records: IndraRecord[], filter: Record<string, any>): IndraRecord[] {
     return records.filter(r =>
       Object.entries(filter).every(([k, v]) => {
-        const val = r.fields[slugify(k)] ?? r.fields[k];
+        const val = r.fields[RoutingService.toKey(k)] ?? r.fields[k];
         if (v && typeof v === 'object') {
           if ('$gt' in v) return val > v.$gt;
           if ('$lt' in v) return val < v.$lt;

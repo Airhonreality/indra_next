@@ -6,6 +6,7 @@ import { eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import type { PortConfig, PortFieldSchema } from '@/core/db/schema';
 import { auth } from "@/auth";
+import { RoutingService } from '@/core/services/routing';
 
 export async function getIngestionPorts() {
   const session = await auth();
@@ -29,8 +30,15 @@ export async function createIngestionPort(data: {
   const session = await auth();
   if (!session?.user?.id) throw new Error('Unauthorized');
 
+  // ENFORCE AXIOMATIC NAMING (Intelligence Decoupled)
+  let finalSlug = data.slug;
+  if (!RoutingService.isValidSlug(data.slug)) {
+    finalSlug = RoutingService.generateSlug(data.label || 'port');
+  }
+
   const [newPort] = await db.insert(ingestionPorts).values({
     ...data,
+    slug: finalSlug,
     userId: session.user.id,
     isActive: true,
   }).returning();

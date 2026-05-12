@@ -11,25 +11,26 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { ingestionPorts } from '@/core/db/schema';
+import { eq, desc } from 'drizzle-orm';
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const connectionId = searchParams.get('connectionId');
 
-    let query = 'SELECT * FROM ingestion_ports';
-    const params: any[] = [];
+    let query = db.select()
+      .from(ingestionPorts)
+      .orderBy(desc(ingestionPorts.createdAt));
 
     if (connectionId) {
-      query += ' WHERE target_id = $1';
-      params.push(connectionId);
+      // In Indra, the field in ingestion_ports that links to connection is integrationId
+      query = query.where(eq(ingestionPorts.integrationId, connectionId)) as any;
     }
 
-    query += ' ORDER BY created_at DESC';
-
-    const result = await db.query(query, params);
+    const result = await query;
     
-    return NextResponse.json({ ports: result.rows });
+    return NextResponse.json({ ports: result });
   } catch (err) {
     console.error('[API Error] Failed to list ports:', err);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

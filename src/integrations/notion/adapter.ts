@@ -26,6 +26,7 @@ import { BaseAdapter } from '@/integrations/shared/base-adapter';
 import type { AuthorizedClient } from '@/lib/authorized-client';
 import type { FieldSchema, OperationResult } from '@/core/types/integration';
 import type { Record as IndraRecord } from '@/core/types/integration';
+import type { AgnosticQuery } from '@/core/inventory/types';
 
 function slugify(str: string): string {
   return String(str).toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '_');
@@ -119,7 +120,7 @@ export class NotionAdapter extends BaseAdapter {
     }
   }
 
-  async listInventory(): Promise<OperationResult<any[]>> {
+  async listInventory(query?: AgnosticQuery): Promise<OperationResult<any[]>> {
     try {
       // In Notion, inventory = Databases or Pages the user has shared with the integration
       const sources = await this.listSources();

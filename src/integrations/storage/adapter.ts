@@ -31,6 +31,7 @@ import { join, extname, basename } from 'node:path';
 import { BaseAdapter } from '@/integrations/shared/base-adapter';
 import type { FieldSchema, OperationResult } from '@/core/types/integration';
 import type { Record as IndraRecord } from '@/core/types/integration';
+import type { AgnosticQuery } from '@/core/inventory/types';
 
 /**
  * StorageAdapter: treats the local filesystem (or any byte store) as a data silo.
@@ -110,7 +111,7 @@ export class StorageAdapter extends BaseAdapter {
     }
   }
 
-  async listInventory(): Promise<OperationResult<any[]>> {
+  async listInventory(query?: AgnosticQuery): Promise<OperationResult<any[]>> {
     try {
       // In local storage, inventory = Files in the directory
       const sources = await this.listSources();

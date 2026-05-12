@@ -24,18 +24,18 @@
 import { useState, useCallback, useEffect } from 'react';
 import { AgnosticInventoryItem, AgnosticQuery } from '@/core/inventory/types';
 
-export function useInventory(integrationId?: string, query: Partial<AgnosticQuery> = {}) {
+export function useInventory(integrationId?: string, initialQuery: Partial<AgnosticQuery> = {}) {
   const [items, setItems] = useState<AgnosticInventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState(initialQuery.search || '');
   
   // Destructure query with defaults for stable deps
   const { 
     parentId = 'root', 
-    search = '', 
     type = 'all', 
     limit = 50 
-  } = query;
+  } = initialQuery;
 
   const refresh = useCallback(async () => {
     if (!integrationId) return;
@@ -48,7 +48,7 @@ export function useInventory(integrationId?: string, query: Partial<AgnosticQuer
         parentId,
         limit: limit.toString(),
         type,
-        ...(search && { search })
+        ...(searchQuery && { search: searchQuery })
       });
 
       const res = await fetch(`/api/integrations/${integrationId}/inventory?${params.toString()}`);
@@ -63,7 +63,7 @@ export function useInventory(integrationId?: string, query: Partial<AgnosticQuer
     } finally {
       setIsLoading(false);
     }
-  }, [integrationId, parentId, search, type, limit]);
+  }, [integrationId, parentId, searchQuery, type, limit]);
 
   // Auto-hydrate when integration or critical query params change
   useEffect(() => {
@@ -83,6 +83,8 @@ export function useInventory(integrationId?: string, query: Partial<AgnosticQuer
     files,
     isLoading,
     error,
-    refresh
+    refresh,
+    searchQuery,
+    setSearchQuery
   };
 }

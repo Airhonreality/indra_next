@@ -1,3 +1,5 @@
+import { AgnosticQuery } from '../inventory/types';
+
 /**
  * SACRED CONTRACT: INTEGRATION & RECORDS
  * This file defines the universal interface for all adapters and data.
@@ -110,7 +112,7 @@ export interface IntegrationAdapter {
   }[]>>;
 
   /** List objects/inventory within the silo (real-time projection) */
-  listInventory(): Promise<OperationResult<{
+  listInventory(query?: AgnosticQuery): Promise<OperationResult<{
     id: string;
     name: string;
     type: 'folder' | 'file' | 'page' | 'table';

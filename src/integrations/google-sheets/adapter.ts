@@ -2,6 +2,7 @@ import { BaseAdapter } from '@/integrations/shared/base-adapter';
 import type { AuthorizedClient } from '@/lib/authorized-client';
 import type { FieldSchema, OperationResult } from '@/core/types/integration';
 import type { Record as IndraRecord } from '@/core/types/integration';
+import { AgnosticQuery } from '@/core/inventory/types';
 
 function slugify(str: string): string {
   return String(str).toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '_');
@@ -95,7 +96,7 @@ export class SheetsAdapter extends BaseAdapter {
     }
   }
 
-  async listInventory(): Promise<OperationResult<any[]>> {
+  async listInventory(query?: AgnosticQuery): Promise<OperationResult<any[]>> {
     try {
       // In Sheets, inventory = Worksheets within the spreadsheet
       // Note: We need a spreadsheet ID, which usually comes from sourceId or the context

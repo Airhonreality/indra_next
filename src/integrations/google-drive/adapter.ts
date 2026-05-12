@@ -172,7 +172,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
           q,
           fields: 'files(id, name, mimeType, shared, size, modifiedTime)',
           pageSize: query?.limit?.toString() || '50',
-          pageToken: query?.cursor,
+          ...(query?.cursor && { pageToken: query.cursor }),
           supportsAllDrives: 'true',
           includeItemsFromAllDrives: 'true'
         }

@@ -44,8 +44,6 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
   const [isSuccess, setIsSuccess] = useState(false);
   const [showPublicLink, setShowPublicLink] = useState<string | null>(null);
   
-  const { folders: availableFolders, isLoading: isLoadingFolders } = useInventory(formData.integrationId || undefined);
-  
   const [formData, setFormData] = useState({
     label: '',
     slug: '',
@@ -53,6 +51,8 @@ export function PortCreator({ connections, onCreated }: PortCreatorProps) {
     targetPath: 'root',
     pattern: '/{year}/{month}/{project}' // Routing Engine Template
   });
+
+  const { folders: availableFolders, isLoading: isLoadingFolders } = useInventory(formData.integrationId || undefined);
 
   const [schemaFields, setSchemaFields] = useState<any[]>([
     { key: 'project', type: 'string', label: 'Nombre del Proyecto', required: true }

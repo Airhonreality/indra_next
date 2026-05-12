@@ -42,6 +42,7 @@ import {
   Search,
   UploadCloud
 } from 'lucide-react';
+import { IngestionPortList } from './IngestionPortList';
 import { AgnosticDropzone } from '@/components/ui/agnostic-dropzone';
 import { TelemetryHUD } from '@/components/ingestion/telemetry-hud';
 import { useIngestionOrchestrator } from '@/hooks/use-ingestion-orchestrator';

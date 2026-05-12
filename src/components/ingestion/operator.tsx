@@ -1,10 +1,9 @@
-'use client';
-
-import { UploadCloud, Copy, Check } from 'lucide-react';
+import { UploadCloud, Copy, Check, Info } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { RoutingService } from '@/core/services/routing';
 
 interface IngestionOperatorProps {
   targetPath: string;
@@ -22,6 +21,11 @@ export function IngestionOperator({
   className 
 }: IngestionOperatorProps) {
   const [copied, setCopied] = useState(false);
+  const [projectValue, setProjectValue] = useState('taller-tejido');
+
+  const resolvedPath = RoutingService.resolveTemplate(targetPath + '/' + pattern, { 
+    project: projectValue 
+  });
 
   const handleCopy = () => {
     if (publicUrl) {
@@ -60,14 +64,24 @@ export function IngestionOperator({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-1 space-y-4">
-          <div className="p-3 rounded-lg bg-background/50 border border-border">
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter mb-1">Punto de Inyección:</p>
-            <p className="text-[10px] font-mono truncate text-primary">{targetPath}{pattern}</p>
+          <div className="p-3 rounded-lg bg-background/50 border border-border shadow-inner">
+            <div className="flex items-center gap-2 mb-2">
+               <Info className="size-3 text-primary opacity-50" />
+               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Inyección Proyectada:</p>
+            </div>
+            <p className="text-[10px] font-mono break-all text-primary bg-primary/5 p-2 rounded border border-primary/10">
+              {resolvedPath}
+            </p>
           </div>
           
           <div className="space-y-2">
-            <Label className="text-[9px] font-bold uppercase tracking-widest opacity-50">Variable: Project Name</Label>
-            <Input placeholder="Ej: Proyecto_Alpha_2024" className="h-8 text-xs bg-background" />
+            <Label className="text-[9px] font-bold uppercase tracking-widest opacity-50">Variable Simulada: {`{project}`}</Label>
+            <Input 
+              value={projectValue}
+              onChange={(e) => setProjectValue(e.target.value)}
+              placeholder="Ej: taller-tejido" 
+              className="h-8 text-xs bg-background border-primary/20" 
+            />
           </div>
         </div>
 
@@ -77,15 +91,19 @@ export function IngestionOperator({
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground">
               {mode === 'preview' ? 'Arrastra archivos para probar' : 'Soltar archivos para iniciar ingesta'}
             </p>
-            <p className="text-[8px] text-muted-foreground/60 mt-1">Lógica de enrutamiento: {pattern}</p>
+            <div className="mt-2 px-3 py-1 bg-primary/10 rounded-full">
+               <p className="text-[8px] text-primary font-bold uppercase tracking-widest">
+                  Auto-Routing: {pattern}
+               </p>
+            </div>
           </div>
         </div>
       </div>
       
       {mode === 'preview' && (
         <div className="pt-2">
-          <p className="text-[8px] text-muted-foreground italic text-center uppercase tracking-widest">
-            🛡️ Modo Preview: Los archivos se procesarán pero no se persistirán hasta activar la configuración.
+          <p className="text-[8px] text-muted-foreground italic text-center uppercase tracking-widest opacity-60">
+            🛡️ Axiom Check: Las variables temporalmente resueltas ({new Date().getFullYear()}) son deterministas.
           </p>
         </div>
       )}

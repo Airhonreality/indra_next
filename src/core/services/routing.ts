@@ -69,5 +69,42 @@ export const RoutingService = {
   isValidSlug(slug: string): boolean {
     const indraSlugRegex = /^[a-z0-9-]+_[a-z][0-9]{4}$/;
     return indraSlugRegex.test(slug);
+  },
+
+  /**
+   * 🧠 EJECUTOR DE REGLAS (Agnostic Template Resolver)
+   * Transforma un template con variables semánticas en una ruta real.
+   */
+  resolveTemplate(template: string, context: Record<string, any> = {}): string {
+    const now = new Date();
+    
+    // 1. Inyectar variables de tiempo estándar
+    const timeVars = {
+      year: now.getFullYear().toString(),
+      month: (now.getMonth() + 1).toString().padStart(2, '0'),
+      day: now.getDate().toString().padStart(2, '0'),
+      date: now.toISOString().split('T')[0]
+    };
+
+    const fullContext = { ...timeVars, ...context };
+    let resolved = template;
+
+    // 2. Resolver variables {variable}
+    Object.entries(fullContext).forEach(([key, value]) => {
+      const placeholder = `{${key}}`;
+      if (resolved.includes(placeholder)) {
+        // Limpiamos el valor para que sea seguro en una ruta
+        const safeValue = typeof value === 'string' ? this.cleanKey(value) : String(value);
+        resolved = resolved.split(placeholder).join(safeValue);
+      }
+    });
+
+    // 3. Limpieza final de la ruta (quitar barras dobles, asegurar inicio, etc)
+    return resolved
+      .replace(/\/+/g, '/') // No double slashes
+      .replace(/\/$/, '')   // No trailing slash
+      .split('/')
+      .map(part => part.startsWith('{') ? 'undetermined' : part) // Fallback para variables no resueltas
+      .join('/');
   }
 };

@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { ingestionPorts } from '@/core/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import type { PortConfig, PortFieldSchema } from '@/core/db/schema';
 import { auth } from "@/auth";
@@ -77,4 +77,17 @@ export async function deleteIngestionPort(id: string) {
     .where(and(eq(ingestionPorts.id, id), eq(ingestionPorts.userId, session.user.id)));
     
   revalidatePath('/dashboard/ports');
+}
+export async function rescueGhostProjects() {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error('Unauthorized');
+
+  const result = await db
+    .update(ingestionPorts)
+    .set({ userId: session.user.id })
+    .where(isNull(ingestionPorts.userId))
+    .returning();
+    
+  revalidatePath('/dashboard/ports');
+  return result.length;
 }

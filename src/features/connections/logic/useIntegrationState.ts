@@ -81,19 +81,15 @@ export function useIntegrationState() {
       const { sessionToken, error } = await sessionRes.json();
       if (error) throw new Error(error);
 
+      const cId = `${provider}-${userId}`;
+      
       await new Promise<void>((resolve) => {
         const connect = nango.openConnectUI({
           onEvent: (event: any) => {
             console.log("📡 Nango Event:", event);
             if (event.type === 'connect') {
-              const cId = event.connectionId || event.payload?.connectionId;
-              console.log("✅ Connection ID captured:", cId);
+              console.log("✅ Connection authorized for:", cId);
               
-              if (!cId) {
-                console.error("❌ Critical: Nango returned no Connection ID!", event);
-                return;
-              }
-
               fetch('/api/integrations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -128,7 +124,7 @@ export function useIntegrationState() {
         body: JSON.stringify({
           type: providerId,
           label: `${providerId.toUpperCase()} [${path}]`,
-          connectionId: 'local_volume'
+          connectionId: `local-${providerId}-${userId}`
         })
       });
       await refreshData();
@@ -158,6 +154,7 @@ export function useIntegrationState() {
 
   return {
     userId,
+    session,
     status,
     loading,
     isProcessing,

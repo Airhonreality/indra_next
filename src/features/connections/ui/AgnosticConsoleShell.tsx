@@ -36,13 +36,15 @@ import {
   User,
   ExternalLink,
   ChevronRight,
-  LogOut
+  LogOut,
+  RefreshCw
 } from 'lucide-react';
 import { i18n } from '@/lib/i18n';
 import { useIntegrationState } from '../logic/useIntegrationState';
 import { ProviderEntityRow } from './ProviderEntityRow';
 import { IntegrationMetricsGrid } from './IntegrationMetricsGrid';
 import { PortCreator } from '@/components/ports/port-creator';
+import { rescueGhostProjects } from '@/app/actions/ports';
 import { IngestionPortList } from './IngestionPortList';
 import { ResourceExplorer } from '@/components/resource-explorer';
 import { cn } from '@/lib/utils';
@@ -54,6 +56,7 @@ type ConsoleTab = 'nodes' | 'ingestion' | 'workflows' | 'settings' | 'explorer';
 export function AgnosticConsoleShell() {
   const { 
     userId, 
+    session,
     status, 
     loading, 
     isProcessing, 
@@ -161,14 +164,18 @@ export function AgnosticConsoleShell() {
                 <User className="size-4 text-primary" />
               </div>
               <div className="overflow-hidden">
-                <p className="text-[10px] font-bold truncate leading-none">HG García</p>
-                <p className="text-[8px] text-muted-foreground truncate mt-1">hgarcia@indra.net</p>
+                <p className="text-[10px] font-bold truncate leading-none">
+                  {status === 'authenticated' ? session?.user?.name || 'Usuario Indra' : 'Invitado'}
+                </p>
+                <p className="text-[8px] text-muted-foreground truncate mt-1">
+                  {status === 'authenticated' ? session?.user?.email || 'authenticated' : 'Sovereign Node'}
+                </p>
               </div>
             </div>
             
             <button 
               onClick={() => signOut({ callbackUrl: '/' })}
-              className="p-1.5 hover:bg-destructive/10 text-destructive rounded-md opacity-0 group-hover:opacity-100 transition-all"
+              className="p-2 hover:bg-destructive/10 text-destructive rounded-lg transition-all bg-destructive/5 border border-destructive/10"
               title={t.auth.logout}
             >
               <LogOut className="size-3" />
@@ -297,10 +304,21 @@ export function AgnosticConsoleShell() {
                   <p className="text-sm text-muted-foreground">System metrics, webhooks, and core axiomatic configuration.</p>
                 </div>
                 <IntegrationMetricsGrid {...metrics} />
-                
-                <div className="p-12 border border-dashed border-border rounded-2xl flex flex-col items-center justify-center bg-card/20">
-                  <Activity className="size-10 text-muted-foreground mb-4 opacity-20" />
-                  <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-muted-foreground">Awaiting Webhook Manifest...</p>
+
+                <div className="mt-8 p-6 border border-primary/10 bg-primary/5 rounded-2xl">
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2">Herramientas de Soberanía</h4>
+                  <p className="text-[10px] text-muted-foreground mb-4">Si tienes proyectos creados en sesiones anteriores que no puedes borrar, usa esta herramienta para vincularlos a tu identidad actual.</p>
+                  <button 
+                    onClick={async () => {
+                      const count = await rescueGhostProjects();
+                      alert(`Se han rescatado ${count} proyectos. Refrescando...`);
+                      window.location.reload();
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest rounded-lg hover:shadow-lg hover:shadow-primary/20 transition-all"
+                  >
+                    <RefreshCw className="size-3" />
+                    Rescatar Proyectos Huérfanos
+                  </button>
                 </div>
               </div>
             )}

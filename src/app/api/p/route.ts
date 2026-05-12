@@ -12,23 +12,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { ingestionPorts } from '@/core/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
+import { auth } from "@/auth";
 
 export async function GET(req: NextRequest) {
+  const session = await auth();
+  
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const connectionId = searchParams.get('connectionId');
 
-    let query = db.select()
-      .from(ingestionPorts)
-      .orderBy(desc(ingestionPorts.createdAt));
+    // Base query filtered by USER ID (Sovereign Axiom)
+    let whereClause = eq(ingestionPorts.userId, session.user.id);
 
+    // If connectionId is provided, narrow down the filter
     if (connectionId) {
-      // In Indra, the field in ingestion_ports that links to connection is integrationId
-      query = query.where(eq(ingestionPorts.integrationId, connectionId)) as any;
+      whereClause = and(
+        eq(ingestionPorts.userId, session.user.id),
+        eq(ingestionPorts.integrationId, connectionId)
+      ) as any;
     }
 
-    const result = await query;
+    const result = await db.select()
+      .from(ingestionPorts)
+      .where(whereClause)
+      .orderBy(desc(ingestionPorts.createdAt));
     
     return NextResponse.json({ ports: result });
   } catch (err) {

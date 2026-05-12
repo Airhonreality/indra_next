@@ -35,12 +35,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'User ID missing in session' }, { status: 400 });
     }
 
+    // Sovereign Connection ID generated on server side
+    const connectionId = `${integrationId}-${userId}`;
+
     const payload: any = {
+      connection_id: connectionId,
       tags: { end_user_id: userId }
     };
 
     if (integrationId) {
-      payload.allowed_integrations = [integrationId];
+      payload.provider_config_key = integrationId;
     }
     
     const secretKey = process.env.NANGO_SECRET_KEY;

@@ -81,13 +81,13 @@ export function useIntegrationState() {
       const { sessionToken, error } = await sessionRes.json();
       if (error) throw new Error(error);
 
-      const cId = `${provider}-${userId}`;
-      
+
       await new Promise<void>((resolve) => {
         const connect = nango.openConnectUI({
           onEvent: (event: any) => {
             console.log("📡 Nango Event:", event);
             if (event.type === 'connect') {
+              const cId = event.connectionId || event.payload?.connectionId;
               console.log("✅ Connection authorized for:", cId);
               
               fetch('/api/integrations', {

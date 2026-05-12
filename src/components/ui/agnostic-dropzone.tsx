@@ -2,27 +2,16 @@
  * ☁️ ARTEFACTO: agnostic-dropzone.tsx
  * ────────────
  * CAPA: UI / Atoms (Ingestion Engine)
- * VERSIÓN: 1.0.0
- * COMMIT: P3-M5.1-PREMIUM-DROPZONE-IMPLEMENTATION
+ * VERSIÓN: 1.1.0
+ * COMMIT: P3-M7.1-SYNTAX-REPAIR-UNIFICATION
  * 
  * 🎯 FUNCTIONAL_SCOPE:
  * - Operador de ingesta universal con soporte para Drag & Drop, Explorador Nativo y Clipboard.
  * - Interfaz agnóstica de formatos para evitar bloqueos de galería en dispositivos móviles.
- * - Feedback visual de pre-procesamiento (Transcoding/Distributed Load).
- * 
- * 🛡️ AXIOMATIC_CONTRACT:
- * - MUST: Priorizar el explorador de archivos nativo (OS Picker) sobre la galería multimedia.
- * - NEVER: Limitar tipos de archivos mediante el atributo 'accept' (Agnosticismo Total).
- * - ALWAYS: Gestionar eventos de 'paste' para permitir la ingesta rápida desde el portapapeles.
- * - ALWAYS: Proyectar estados de 'Processing' para simular inteligencia subrepticia (Transcoding).
- * 
- * 📜 ARCH_DECISION: Se opta por un input oculto con disparador manual para garantizar que el explorador de archivos sea el destino por defecto en iOS y Android.
- * 
- * 🔑 KEYWORDS: #Dropzone #FileIngestion #AgnosticUI #MobileFirst #TranscodingFeedback
  */
 
 import React, { useState, useRef, useCallback } from 'react';
-import { UploadCloud, FileText, X, Loader2, Cpu } from 'lucide-react';
+import { UploadCloud, FileText, X, Cpu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AgnosticDropzoneProps {
@@ -97,7 +86,7 @@ export function AgnosticDropzone({
         {isProcessing ? (
           <div className="flex flex-col items-center gap-3 animate-in fade-in zoom-in duration-300">
              <Cpu className="size-8 text-primary animate-pulse" />
-             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Inyectando Inteligencia...</span>
+             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Analizando Activos...</span>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4">
@@ -110,10 +99,15 @@ export function AgnosticDropzone({
                 Depósito de Activos Digitales
               </p>
               <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground/60">
-                Arrastra, Pega o Selecciona // Sin Límites de Formato
+                Arrastra, Pega o Selecciona // Sin Límites
               </p>
             </div>
           </div>
+        )}
+
+        {/* Shimmer overlay for active processing */}
+        {isDragActive && (
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent -translate-x-full animate-shimmer" />
         )}
       </div>
 
@@ -142,14 +136,6 @@ export function AgnosticDropzone({
             </div>
           ))}
         </div>
-      )}
-    </div>
-  );
-}
-
-      {/* Shimmer overlay for active processing */}
-      {isDragActive && (
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent -translate-x-full animate-shimmer" />
       )}
     </div>
   );

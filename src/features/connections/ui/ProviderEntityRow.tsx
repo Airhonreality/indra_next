@@ -42,6 +42,9 @@ import {
   Search,
   UploadCloud
 } from 'lucide-react';
+import { AgnosticDropzone } from '@/components/ui/agnostic-dropzone';
+import { TelemetryHUD } from '@/components/ingestion/telemetry-hud';
+import { useIngestionOrchestrator } from '@/hooks/use-ingestion-orchestrator';
 import { cn } from '@/lib/utils';
 import { ProviderManifest, Connection } from '../integration_types';
 import { SchemaManager } from '@/components/schema-manager';
@@ -88,6 +91,7 @@ export function ProviderEntityRow({
   const [activeSubTab, setActiveSubTab] = useState<'auth' | 'view' | 'execute'>('auth');
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const isActive = !!activeConnection;
 
   const { 
@@ -97,6 +101,8 @@ export function ProviderEntityRow({
     searchQuery,
     setSearchQuery
   } = useInventory(isActive ? activeConnection.id : undefined);
+
+  const { processQueue, status: uploadStatus, telemetry } = useIngestionOrchestrator(activeConnection?.id || '');
 
   const addLog = (msg: string) => {
     setTerminalLogs(prev => [...prev.slice(-4), `[${new Date().toLocaleTimeString()}] ${msg}`]);
@@ -121,8 +127,19 @@ export function ProviderEntityRow({
     }
   };
 
-
-
+  const handleImmediateIngestion = async () => {
+    if (!activeConnection || selectedFiles.length === 0) return;
+    addLog(`Initiating sovereign ingestion via unified orchestrator...`);
+    
+    try {
+      // Reutilizamos la misma lógica de cola que el portal público
+      await processQueue(selectedFiles, { targetPath: '/' }); 
+      addLog(`Success: Assets injected into ${manifest.label}`);
+      setSelectedFiles([]);
+    } catch (err) {
+      addLog(`Error: Ingestion failed at domain level.`);
+    }
+  };
 
   return (
     <div className={cn(
@@ -170,7 +187,7 @@ export function ProviderEntityRow({
       {/* EXPANDABLE BODY: THE MICRO-OPERATOR */}
       <div className={cn(
         "overflow-hidden transition-all duration-300",
-        isExpanded ? "max-h-[1600px] opacity-100" : "max-h-0 opacity-0"
+        isExpanded ? "max-h-[2600px] opacity-100" : "max-h-0 opacity-0"
       )}>
         <div className="px-6 pb-6 pt-2 border-t border-border/50">
           
@@ -225,6 +242,9 @@ export function ProviderEntityRow({
                       </span>
                     ))}
                   </div>
+
+                  {/* PROJECT MEMORY (New!) */}
+                  {isActive && <IngestionPortList connectionId={activeConnection.id} />}
                 </div>
 
                 <div className="bg-muted/30 p-5 rounded-xl border border-border space-y-4">
@@ -343,24 +363,36 @@ export function ProviderEntityRow({
                     </div>
                     
                     {/* SCHEMA MANAGER & INGESTION */}
-                    <div className="md:col-span-2 flex flex-col gap-6">
+                    <div className="md:col-span-3 flex flex-col gap-6">
                       
-                      {/* IMMEDIATE INGESTION (If capable) */}
+                      {/* UNIFIED INGESTION OPERATOR (AgnosticDropzone) */}
                       {manifest.capabilities.includes('file_upload') && (
-                        <div className="space-y-4 animate-in slide-in-from-right-4 duration-500">
+                        <div className="space-y-4 animate-in slide-in-from-top-4 duration-500">
                           <div className="flex items-center gap-2">
                             <UploadCloud className="size-3 text-primary" />
                             <h5 className="text-[10px] font-bold uppercase tracking-widest text-primary">Immediate Ingestion Operator</h5>
                           </div>
-                          <div className="group relative h-32 rounded-xl border-2 border-dashed border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all flex flex-col items-center justify-center cursor-pointer overflow-hidden">
-                             <div className="flex flex-col items-center gap-2 group-hover:scale-105 transition-transform duration-300">
-                                <UploadCloud className="size-6 text-primary/40 group-hover:text-primary" />
-                                <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground">Drop atom to inject into {manifest.label}</span>
-                                <span className="text-[7px] opacity-40 uppercase font-mono tracking-tighter">Target: {manifest.id} / Root</span>
-                             </div>
-                             {/* Shimmer effect for premium feel */}
-                             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent -translate-x-full group-hover:animate-shimmer" />
-                          </div>
+                          <AgnosticDropzone 
+                            onFilesAdded={(files) => setSelectedFiles(prev => [...prev, ...files])}
+                            files={selectedFiles}
+                            onRemoveFile={(idx) => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))}
+                            className="h-32 rounded-2xl"
+                          />
+
+                          <TelemetryHUD 
+                            telemetry={telemetry}
+                            status={uploadStatus}
+                            fileName={selectedFiles[telemetry.currentFileIndex]?.name || ''}
+                          />
+
+                          {selectedFiles.length > 0 && uploadStatus === 'idle' && (
+                            <button 
+                              onClick={handleImmediateIngestion}
+                              className="w-full py-2.5 bg-primary text-primary-foreground rounded-xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-all shadow-sm"
+                            >
+                              Inject {selectedFiles.length} Assets into {manifest.label}
+                            </button>
+                          )}
                         </div>
                       )}
 

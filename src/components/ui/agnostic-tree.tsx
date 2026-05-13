@@ -109,7 +109,7 @@ function TreeColumn({
   isActive: boolean;
   level: number;
 }) {
-  const { items, isLoading, error } = useInventory(integrationId, { parentId });
+  const { items, isLoading, error, refresh } = useInventory(integrationId, { parentId });
 
   return (
     <div className="min-w-[240px] w-[240px] h-full bg-background/40 backdrop-blur-sm border-r border-border/50 flex flex-col animate-in slide-in-from-left-2">

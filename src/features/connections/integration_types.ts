@@ -23,6 +23,27 @@ export interface ProviderManifest {
   configType: ConfigRequirement;
 }
 
+export interface ConnectionMetrics {
+  totalAdapters: number;
+  configuredNango: number;
+  coverage: number;
+}
+
+/** Pure selector — compute KPIs from the raw providers list. Zero side effects. */
+export function computeMetrics(availableProviders: ProviderConfig[]): ConnectionMetrics {
+  const translatedCount = availableProviders.filter((p) =>
+    INDRA_ADAPTERS.some((a) => a.id === p.provider)
+  ).length;
+  return {
+    totalAdapters: INDRA_ADAPTERS.length,
+    configuredNango: availableProviders.length,
+    coverage:
+      availableProviders.length > 0
+        ? Math.round((translatedCount / availableProviders.length) * 100)
+        : 0,
+  };
+}
+
 export const INDRA_ADAPTERS: ProviderManifest[] = [
   {
     id: 'google-drive',

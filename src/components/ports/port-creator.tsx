@@ -4,113 +4,118 @@
  * 🌐 ARTEFACTO: port-creator.tsx
  * ────────────
  * CAPA: UI / Components (Ingestion Orchestrator)
- * VERSIÓN: 3.0.0 (Modularized)
- * 
+ * VERSIÓN: 4.0.0 — Autonomous Cell (Axiomatic Decoupling)
+ *
  * 🎯 FUNCTIONAL_SCOPE:
- * - Orquestador para la creación de Túneles de Ingesta.
- * - Coordina el diseño del portal, esquema de datos y previsualización operativa.
- * 
- * 🛡️ AXIOMATIC_CONTRACT:
- * - MUST: Delegar la lógica de nomenclatura al RoutingService.
- * - MUST: Separar la configuración (Form) de la operación (Operator).
+ * - Orquestador autónomo para creación/edición de Túneles de Ingesta.
+ * - Se hidrata solo (useConnections) sin recibir datos del padre.
+ * - Lee selectedPort del store y emite invalidate('ports') al completar.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createIngestionPort, updateIngestionPort } from '@/app/actions/ports';
 import { RoutingService } from '@/core/services/routing';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Globe, Loader2, Check, FolderTree, Link, PlusCircle, XCircle } from 'lucide-react';
-import { useEffect } from 'react';
+import { Badge } from '@/components/ui/badge';
+import {
+  Globe, Loader2, Check, Link, PlusCircle,
+  Database, Folder, Zap,
+} from 'lucide-react';
 import { AgnosticTree } from '@/components/ui/agnostic-tree';
 import { IngestionFieldDesigner } from '@/components/ingestion/field-designer';
 import { IngestionOperator } from '@/components/ingestion/operator';
 import { RuleArchitect } from '@/components/routing/rule-architect';
+import { useConnections } from '@/hooks/use-connections';
+import { useIndraStore, type PortSchemaField } from '@/stores/indra-store';
 
 interface PortCreatorProps {
-  connections: Array<{ id: string; label: string; type: string; connectionId?: string }>;
-  initialData?: any;
-  onReset?: () => void;
-  onCreated?: () => void;
+  className?: string;
 }
 
-export function PortCreator({ connections, initialData, onReset, onCreated }: PortCreatorProps) {
+export function PortCreator({ className }: PortCreatorProps) {
+  const { activeConnections } = useConnections();
+  const selectedPort = useIndraStore((s) => s.selectedPort);
+  const selectPort = useIndraStore((s) => s.selectPort);
+  const invalidate = useIndraStore((s) => s.invalidate);
+
   const [isPending, setIsPending] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showPublicLink, setShowPublicLink] = useState<string | null>(null);
-  
+
   const [formData, setFormData] = useState({
     label: '',
     slug: '',
     integrationId: '',
     targetPath: 'root',
-    pattern: '/{year}/{month}/{project}'
+    pattern: '/{year}/{month}/{project}',
   });
 
-  const [schemaFields, setSchemaFields] = useState<any[]>([
-    { key: 'project', type: 'string', label: 'Nombre del Proyecto', required: true }
+  const [schemaFields, setSchemaFields] = useState<PortSchemaField[]>([
+    { key: 'project', type: 'string', label: 'Nombre del Proyecto', required: true },
   ]);
 
-  const isEditMode = !!initialData;
+  const isEditMode = !!selectedPort;
 
   useEffect(() => {
-    if (initialData) {
+    if (selectedPort) {
       setFormData({
-        label: initialData.label,
-        slug: initialData.slug,
-        integrationId: initialData.integrationId,
-        targetPath: initialData.targetPath,
-        pattern: initialData.config?.pattern || '/{year}/{month}/{project}'
+        label: selectedPort.label,
+        slug: selectedPort.slug,
+        integrationId: selectedPort.integrationId,
+        targetPath: selectedPort.targetPath,
+        pattern: selectedPort.config?.pattern || '/{year}/{month}/{project}',
       });
-      setSchemaFields(initialData.schema || []);
+      setSchemaFields(selectedPort.schema ?? []);
     } else {
       setFormData({
         label: '',
         slug: '',
         integrationId: '',
         targetPath: 'root',
-        pattern: '/{year}/{month}/{project}'
+        pattern: '/{year}/{month}/{project}',
       });
       setSchemaFields([{ key: 'project', type: 'string', label: 'Nombre del Proyecto', required: true }]);
     }
-  }, [initialData]);
+  }, [selectedPort]);
 
   const handleNameChange = (val: string) => {
     if (isEditMode) {
-      setFormData(prev => ({ ...prev, label: val }));
+      setFormData((prev) => ({ ...prev, label: val }));
       return;
     }
     const slug = RoutingService.generateSlug(val);
-    setFormData(prev => ({ ...prev, label: val, slug }));
+    setFormData((prev) => ({ ...prev, label: val, slug }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsPending(true);
-    
+
     try {
       if (isEditMode) {
-        await updateIngestionPort(initialData.id, {
+        await updateIngestionPort(selectedPort.id, {
           ...formData,
           config: { pattern: formData.pattern },
-          schema: schemaFields
+          schema: schemaFields,
         });
       } else {
         await createIngestionPort({
           ...formData,
           config: { pattern: formData.pattern },
-          schema: schemaFields
+          schema: schemaFields,
         });
       }
-      
+
       const publicUrl = `${window.location.origin}/p/${formData.slug}`;
       setIsSuccess(true);
       setShowPublicLink(publicUrl);
-      
+
       setTimeout(() => {
         setIsSuccess(false);
-        onCreated?.();
+        selectPort(null);
+        invalidate('ports');
       }, 2000);
     } catch (err) {
       alert('Error: ' + (err as Error).message);
@@ -120,7 +125,7 @@ export function PortCreator({ connections, initialData, onReset, onCreated }: Po
   };
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${className ?? ''}`}>
       <form onSubmit={handleSubmit} className="p-8 rounded-xl bg-card border border-border shadow-sm space-y-6 animate-in fade-in slide-in-from-bottom-2">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
@@ -136,16 +141,16 @@ export function PortCreator({ connections, initialData, onReset, onCreated }: Po
           </div>
           <div className="flex items-center gap-2">
             {isEditMode && (
-              <Button 
+              <Button
                 type="button"
-                variant="ghost" 
-                onClick={onReset}
+                variant="ghost"
+                onClick={() => selectPort(null)}
                 className="text-[9px] font-bold uppercase tracking-widest h-8 gap-2 hover:bg-primary/5"
               >
                 <PlusCircle className="size-3" /> Nuevo Proyecto
               </Button>
             )}
-            <span className="text-[9px] font-mono opacity-40 uppercase tracking-tighter">v3.0 Sovereign Hub</span>
+            <span className="text-[9px] font-mono opacity-40 uppercase tracking-tighter">v4.0 Sovereign Hub</span>
           </div>
         </div>
 
@@ -154,10 +159,10 @@ export function PortCreator({ connections, initialData, onReset, onCreated }: Po
           <div className="space-y-4">
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Nombre del Portal</Label>
-              <Input 
-                placeholder="Ej: Recepción de Activos" 
+              <Input
+                placeholder="Ej: Recepción de Activos"
                 value={formData.label}
-                onChange={e => handleNameChange(e.target.value)}
+                onChange={(e) => handleNameChange(e.target.value)}
                 className="bg-muted border-border font-medium"
                 required
               />
@@ -175,64 +180,86 @@ export function PortCreator({ connections, initialData, onReset, onCreated }: Po
           <div className="space-y-4">
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Silo de Destino</Label>
-              <select 
+              <select
                 disabled={isEditMode}
                 className="w-full h-10 px-3 rounded-md bg-muted border border-border text-sm outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
                 value={formData.integrationId}
-                onChange={e => setFormData({ ...formData, integrationId: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, integrationId: e.target.value })}
                 required
               >
                 <option value="">-- Seleccionar Silo --</option>
-                {connections.filter(c => c.connectionId).map(c => (
+                {activeConnections.filter((c) => c.id).map((c) => (
                   <option key={c.id} value={c.id}>{c.label} ({c.type})</option>
                 ))}
               </select>
               {isEditMode && <p className="text-[8px] text-muted-foreground mt-1 italic">El destino no puede modificarse en túneles activos.</p>}
             </div>
-
-            <div className="space-y-4">
-              <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                <FolderTree className="size-3" /> Arquitectura de Namespace (Reglas)
-              </Label>
-              <RuleArchitect 
-                initialRules={[]} 
-                availableFields={schemaFields.map(f => ({ id: f.key, label: f.label }))}
-                onChange={(nodes) => {
-                  const pattern = nodes.map(n => n.value).join('/');
-                  setFormData({ ...formData, pattern: pattern || '/' });
-                }}
-                className="mt-2"
-              />
-              <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border border-border rounded-lg text-[10px] font-mono text-muted-foreground overflow-hidden">
-                 <span className="opacity-40 uppercase shrink-0">Template Generado:</span>
-                 <span className="text-primary truncate">{formData.pattern}</span>
-              </div>
-            </div>
           </div>
         </div>
 
+        {/* ── SECCIÓN 1: DEFINICIÓN DE DATOS ── */}
         <div className="pt-4 border-t border-border/50 space-y-4">
-          <Label className="text-[10px] font-bold uppercase tracking-widest text-primary">Punto de Inyección (Navegador Fractal)</Label>
-          <AgnosticTree 
-            integrationId={formData.integrationId}
-            onSelect={(atom) => setFormData({ ...formData, targetPath: atom.id })}
-            className="h-[200px]"
-          />
-        </div>
-
-        <div className="pt-4 border-t border-border/50">
-          <IngestionFieldDesigner 
+          <div className="flex items-center justify-between">
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-primary">Esquema de Datos (Formulario de Ingesta)</Label>
+            <Badge variant="outline" className="text-[8px] opacity-50">Variables Disponibles</Badge>
+          </div>
+          <IngestionFieldDesigner
             fields={schemaFields}
             onChange={setSchemaFields}
           />
+        </div>
+
+        {/* ── SECCIÓN 2: ORIGEN Y ENRUTAMIENTO ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-border/50">
+          {/* Punto de Inyección */}
+          <div className="space-y-4">
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <Database className="size-3" /> 1. Punto de Inyección (Origen)
+            </Label>
+            <AgnosticTree
+              integrationId={formData.integrationId}
+              onSelect={(atom) => setFormData({ ...formData, targetPath: atom.id })}
+              className="h-[250px]"
+            />
+            <div className="p-3 bg-muted/30 border border-border rounded-lg flex items-center gap-3">
+              <div className="size-6 rounded bg-primary/10 flex items-center justify-center">
+                <Folder className="size-3 text-primary" />
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-[8px] uppercase font-black opacity-40">Base Path Seleccionado:</p>
+                <p className="text-[10px] font-mono truncate">{formData.targetPath}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Arquitectura de Reglas */}
+          <div className="space-y-4">
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <Zap className="size-3" /> 2. Arquitectura de Namespace (Reglas)
+            </Label>
+            <RuleArchitect
+              initialRules={[]}
+              basePath={formData.targetPath}
+              availableFields={schemaFields.map((f) => ({ id: f.key, label: f.label }))}
+              onChange={(nodes) => {
+                const pattern = nodes.map((n) => n.value).join('/');
+                setFormData({ ...formData, pattern: pattern || '/' });
+              }}
+              className="mt-0"
+            />
+            <div className="flex items-center gap-2 px-3 py-2 bg-primary/5 border border-primary/20 rounded-lg text-[10px] font-mono text-primary overflow-hidden">
+              <span className="opacity-40 uppercase shrink-0">Ruta Resultante:</span>
+              <span className="truncate">{formData.targetPath}/{formData.pattern}</span>
+            </div>
+          </div>
         </div>
 
         <div className="pt-4 border-t border-border flex flex-col md:flex-row gap-4 items-center justify-between">
           <p className="text-[9px] text-muted-foreground leading-tight max-w-xs">
             <span className="font-bold text-primary">INFO:</span> Se aplicará un sufijo único para evitar colisiones en producción.
           </p>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             disabled={isPending || isSuccess || !formData.integrationId}
             className={`w-full md:w-auto px-10 ${isEditMode ? 'bg-amber-600 hover:bg-amber-700' : 'bg-primary'} text-primary-foreground font-bold uppercase tracking-widest text-[10px] py-6 shadow-lg transition-all`}
           >
@@ -242,7 +269,7 @@ export function PortCreator({ connections, initialData, onReset, onCreated }: Po
       </form>
 
       {formData.integrationId && (
-        <IngestionOperator 
+        <IngestionOperator
           targetPath={formData.targetPath}
           pattern={formData.pattern}
           publicUrl={showPublicLink}

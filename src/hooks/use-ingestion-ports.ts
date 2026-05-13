@@ -11,10 +11,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { deleteIngestionPort } from '@/app/actions/ports';
+import { useIndraStore } from '@/stores/indra-store';
 
 export function useIngestionPorts(connectionId?: string) {
   const [ports, setPorts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const invalidationKey = useIndraStore((s) => s._invalidationCounter['ports'] ?? 0);
+  const invalidate = useIndraStore((s) => s.invalidate);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
@@ -34,7 +37,7 @@ export function useIngestionPorts(connectionId?: string) {
     if (!confirm('¿Estás seguro de eliminar este proyecto de ingesta?')) return;
     try {
       await deleteIngestionPort(id);
-      await refresh();
+      invalidate('ports');
     } catch (err) {
       console.error('[Indra Memory Error] Failed to delete port:', err);
       alert('Error al eliminar el proyecto.');
@@ -42,9 +45,8 @@ export function useIngestionPorts(connectionId?: string) {
   };
 
   useEffect(() => {
-    // We always refresh if it's global or if we have a connectionId
     refresh();
-  }, [refresh]);
+  }, [refresh, invalidationKey]);
 
   return { ports, isLoading, refresh, removePort };
 }

@@ -4,19 +4,20 @@ import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Plus, 
-  Trash2, 
-  ChevronRight, 
-  Calendar, 
-  Folder, 
-  Variable, 
+import {
+  Plus,
+  Trash2,
+  ChevronRight,
+  Calendar,
+  Folder,
+  Variable,
   Settings2,
   CalendarDays,
   CalendarRange,
   Zap,
   Split,
-  FileCode
+  FileCode,
+  Database
 } from 'lucide-react';
 
 export type RuleBlockType = 'date' | 'variable' | 'static' | 'logic';
@@ -32,11 +33,18 @@ export interface RuleNode {
 interface RuleArchitectProps {
   initialRules?: RuleNode[];
   availableFields?: Array<{ id: string, label: string }>;
+  basePath?: string;
   onChange?: (rules: RuleNode[]) => void;
   className?: string;
 }
 
-export function RuleArchitect({ initialRules = [], availableFields = [], onChange, className }: RuleArchitectProps) {
+export function RuleArchitect({ 
+  initialRules = [], 
+  availableFields = [], 
+  basePath = 'root',
+  onChange, 
+  className 
+}: RuleArchitectProps) {
   const [rules, setRules] = useState<RuleNode[]>(initialRules);
 
   const addRule = (type: RuleBlockType) => {
@@ -106,6 +114,15 @@ export function RuleArchitect({ initialRules = [], availableFields = [], onChang
       </div>
 
       <div className="flex items-start gap-4 overflow-x-auto pb-4 custom-scrollbar min-h-[220px]">
+        {/* PHYSICAL ROOT (The Anchor) */}
+        <div className="min-w-[180px] bg-muted/40 border border-border/50 border-dashed rounded-xl p-4 flex flex-col justify-center items-center text-center opacity-60">
+           <Database className="size-4 text-primary mb-2" />
+           <p className="text-[8px] uppercase font-black tracking-widest text-muted-foreground mb-1">Origen Físico</p>
+           <p className="text-[10px] font-mono truncate w-full px-2" title={basePath}>/{basePath}</p>
+        </div>
+
+        {rules.length > 0 && <div className="flex items-center h-[200px] text-muted-foreground/30"><ChevronRight className="size-4" /></div>}
+
         {/* Renderizado de Columnas (Fractal Mode) */}
         {rules.map((rule, index) => (
           <React.Fragment key={rule.id}>

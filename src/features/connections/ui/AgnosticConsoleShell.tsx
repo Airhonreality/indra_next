@@ -1,83 +1,49 @@
 /**
  * 🏛️ ARTEFACTO: AgnosticConsoleShell.tsx
  * ────────────
- * CAPA: UI / Shell (Functional Projector)
- * VERSIÓN: 1.2.0
- * COMMIT: P2-M4.1-UI-WIDGET-SHELL
- * 
+ * CAPA: UI / Shell (Inert Skeleton)
+ * VERSIÓN: 2.0.0 — Axiomatic Skeleton (Nam P. Suh DP1)
+ *
  * 🎯 FUNCTIONAL_SCOPE:
- * - Contenedor principal para la proyección de micro-apps (widgets funcionales) de Indra.
- * - Gestión de navegación entre contextos: [Infraestructura, Ingestión, Workflows].
- * - Orquestación de estados globales de sincronización del Kernel.
- * 
+ * - Carcasa inerte: gestiona layout y tab activo únicamente.
+ * - CERO hooks de datos — toda hidratación ocurre dentro de los paneles hijos.
+ *
  * 🛡️ AXIOMATIC_CONTRACT:
- * - MUST: Ser un contenedor puro; la lógica de negocio debe vivir en los widgets proyectados o hooks.
- * - NEVER: Acoplarse a un proveedor específico. Su función es proyectar lo que el Kernel expone.
- * - ALWAYS: Mantener la estética "esquemática/diario" (colores crema, tipografía técnica).
- * 
- * 🔑 KEYWORDS: #WidgetProjector #MicroApps #DashboardShell #AgnosticUI
- * 🔗 RELATIONSHIPS: [ProviderEntityRow, PortCreator, useIntegrationState]
+ * - NEVER: Consumir hooks de datos (conexiones, ports, métricas).
+ * - ALWAYS: Derivar estado de UI exclusivamente de useIndraStore().
  */
 
 'use client';
 
-import { useState } from 'react';
 import { signOut } from 'next-auth/react';
-import { 
-  Shield, 
-  Loader2, 
-  Zap, 
-  LayoutPanelLeft, 
-  Layers, 
-  Terminal, 
-  Settings, 
-  Database,
-  Activity,
-  User,
-  ExternalLink,
-  ChevronRight,
-  ChevronLeft,
-  LogOut
+import {
+  Shield, Loader2, Zap, Layers, Terminal,
+  Settings, Database, User, ExternalLink,
+  ChevronRight, ChevronLeft, LogOut,
 } from 'lucide-react';
 import { i18n } from '@/lib/i18n';
-import { useIntegrationState } from '../logic/useIntegrationState';
-import { ProviderEntityRow } from './ProviderEntityRow';
-import { IntegrationMetricsGrid } from './IntegrationMetricsGrid';
-import { PortCreator } from '@/components/ports/port-creator';
+import { useIndraStore } from '@/stores/indra-store';
+import { useSessionSync } from '@/hooks/use-session-sync';
+import { NodesPanel } from './NodesPanel';
+import { ExplorerPanel } from './ExplorerPanel';
+import { MetricsPanel } from './MetricsPanel';
 import { IngestionPortList } from './IngestionPortList';
-import { ResourceExplorer } from '@/components/resource-explorer';
+import { PortCreator } from '@/components/ports/port-creator';
 import { cn } from '@/lib/utils';
 
 const t = i18n.es;
 
-type ConsoleTab = 'nodes' | 'ingestion' | 'workflows' | 'settings' | 'explorer';
-
 export function AgnosticConsoleShell() {
-  const { 
-    userId, 
-    session,
-    status, 
-    loading, 
-    isProcessing, 
-    availableProviders, 
-    activeConnections, 
-    INDRA_ADAPTERS, 
-    metrics, 
-    actions,
-    state 
-  } = useIntegrationState();
+  const { session, status } = useSessionSync();
 
-  const [activeTab, setActiveTab] = useState<ConsoleTab>('ingestion');
-  const [selectedPort, setSelectedPort] = useState<any>(null);
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isInventoryCollapsed, setIsInventoryCollapsed] = useState(false);
+  const activeTab = useIndraStore((s) => s.activeTab);
+  const setActiveTab = useIndraStore((s) => s.setActiveTab);
+  const isSidebarCollapsed = useIndraStore((s) => s.isSidebarCollapsed);
+  const toggleSidebar = useIndraStore((s) => s.toggleSidebar);
+  const isInventoryCollapsed = useIndraStore((s) => s.isInventoryCollapsed);
+  const toggleInventory = useIndraStore((s) => s.toggleInventory);
 
-  const handlePortCreated = () => {
-    actions.refreshData();
-    setSelectedPort(null);
-  };
-
-  if (status === 'loading' || loading) {
+  if (status === 'loading') {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center space-y-4 bg-background z-50">
         <Loader2 className="size-8 animate-spin text-primary opacity-20" />
@@ -86,48 +52,34 @@ export function AgnosticConsoleShell() {
     );
   }
 
-  const sortedAdapters = [...INDRA_ADAPTERS].sort((a, b) => {
-    const aActive = activeConnections.some(c => c.type === a.id);
-    const bActive = activeConnections.some(c => c.type === b.id);
-    return aActive === bActive ? 0 : aActive ? -1 : 1;
-  });
-
-  const connectionConfigs = activeConnections.map(c => ({
-    id: c.id,
-    label: c.label,
-    integration: c.type,
-    type: c.type,
-    connectionId: c.id
-  }));
-
   return (
     <div className="fixed inset-0 flex bg-background overflow-hidden animate-in fade-in duration-700">
-      
+
       {/* ── SIDEBAR (Control Soberano) ── */}
       <aside className={cn(
         "border-r border-border bg-card/50 flex flex-col transition-all duration-300 ease-in-out relative",
-        isCollapsed ? "w-20" : "w-64"
+        isSidebarCollapsed ? "w-20" : "w-64"
       )}>
         {/* Toggle Button */}
-        <button 
-          onClick={() => setIsCollapsed(!isCollapsed)}
+        <button
+          onClick={toggleSidebar}
           className="absolute -right-3 top-10 size-6 rounded-full bg-background border border-border flex items-center justify-center hover:bg-muted transition-colors z-10"
         >
-          {isCollapsed ? <ChevronRight className="size-3" /> : <ChevronLeft className="size-3" />}
+          {isSidebarCollapsed ? <ChevronRight className="size-3" /> : <ChevronLeft className="size-3" />}
         </button>
 
         {/* Branding */}
         <div className={cn(
           "p-6 border-b border-border flex items-center gap-3 transition-all",
-          isCollapsed ? "justify-center px-4" : "px-6"
+          isSidebarCollapsed ? "justify-center px-4" : "px-6"
         )}>
           <div className="size-8 shrink-0 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
             <Shield className="size-5 text-primary-foreground" />
           </div>
-          {!isCollapsed && (
+          {!isSidebarCollapsed && (
             <div className="animate-in fade-in slide-in-from-left-2 duration-300">
               <h1 className="text-sm font-black tracking-tighter uppercase leading-none">Indra <span className="text-primary">Next</span></h1>
-              <p className="text-[8px] font-mono text-muted-foreground opacity-50 mt-1">AXIOMATIC_OS v1.6.1</p>
+              <p className="text-[8px] font-mono text-muted-foreground opacity-50 mt-1">AXIOMATIC_OS v2.0.0</p>
             </div>
           )}
         </div>
@@ -135,63 +87,62 @@ export function AgnosticConsoleShell() {
         {/* Grupos de Navegación */}
         <nav className="flex-1 p-4 space-y-8 overflow-y-auto overflow-x-hidden">
           <div className="space-y-1">
-            {!isCollapsed && <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 animate-in fade-in duration-500">Plano de Control</p>}
-            <SidebarItem 
-              active={activeTab === 'nodes'} 
+            {!isSidebarCollapsed && <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 animate-in fade-in duration-500">Plano de Control</p>}
+            <SidebarItem
+              active={activeTab === 'nodes'}
               onClick={() => setActiveTab('nodes')}
               icon={<Database className="size-4" />}
               label={t.connections.title}
-              badge={activeConnections.length.toString()}
-              isCollapsed={isCollapsed}
+              isCollapsed={isSidebarCollapsed}
             />
           </div>
 
           <div className="space-y-1">
-            {!isCollapsed && <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 animate-in fade-in duration-500">Operaciones</p>}
-            <SidebarItem 
-              active={activeTab === 'ingestion'} 
+            {!isSidebarCollapsed && <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 animate-in fade-in duration-500">Operaciones</p>}
+            <SidebarItem
+              active={activeTab === 'ingestion'}
               onClick={() => setActiveTab('ingestion')}
               icon={<Zap className="size-4" />}
               label={t.portals.title}
-              isCollapsed={isCollapsed}
+              isCollapsed={isSidebarCollapsed}
             />
-            <SidebarItem 
-              active={activeTab === 'explorer'} 
+            <SidebarItem
+              active={activeTab === 'explorer'}
               onClick={() => setActiveTab('explorer')}
               icon={<Layers className="size-4" />}
               label={t.connections.explore}
-              isCollapsed={isCollapsed}
+              isCollapsed={isSidebarCollapsed}
             />
-            <SidebarItem 
-              active={activeTab === 'workflows'} 
+            <SidebarItem
+              active={activeTab === 'workflows'}
               onClick={() => setActiveTab('workflows')}
               icon={<Terminal className="size-4" />}
               label={t.workflow.title}
               disabled
-              isCollapsed={isCollapsed}
+              isCollapsed={isSidebarCollapsed}
             />
           </div>
 
           <div className="space-y-1">
-            {!isCollapsed && <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Sistema</p>}
-            <SidebarItem 
-              active={activeTab === 'settings'} 
+            {!isSidebarCollapsed && <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Sistema</p>}
+            <SidebarItem
+              active={activeTab === 'settings'}
               onClick={() => setActiveTab('settings')}
               icon={<Settings className="size-4" />}
               label={t.common.settings}
-              isCollapsed={isCollapsed}
+              isCollapsed={isSidebarCollapsed}
             />
           </div>
         </nav>
 
-        {/* Perfil de Usuario (Identidad Soberana) */}
+        {/* Perfil de Usuario */}
         <div className="p-4 border-t border-border bg-muted/20">
           <div className="group relative flex items-center justify-between p-3 rounded-xl bg-card border border-border shadow-sm hover:border-primary/50 transition-all">
             <div className="flex items-center gap-3">
               <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
                 <User className="size-4 text-primary" />
               </div>
-              {!isCollapsed && (
+              {!isSidebarCollapsed && (
                 <div className="overflow-hidden">
                   <p className="text-[10px] font-bold truncate leading-none">
                     {status === 'authenticated' ? session?.user?.name || 'Usuario Indra' : 'Invitado'}
@@ -202,9 +153,9 @@ export function AgnosticConsoleShell() {
                 </div>
               )}
             </div>
-            
-            {!isCollapsed && (
-              <button 
+
+            {!isSidebarCollapsed && (
+              <button
                 onClick={() => signOut({ callbackUrl: '/' })}
                 className="p-2 hover:bg-destructive/10 text-destructive rounded-lg transition-all bg-destructive/5 border border-destructive/10"
                 title={t.auth.logout}
@@ -229,7 +180,7 @@ export function AgnosticConsoleShell() {
               {activeTab === 'settings' && `Sistema / ${t.common.settings}`}
             </h2>
           </div>
-          
+
           <div className="flex items-center gap-6">
             <button className="text-[9px] font-bold uppercase tracking-widest flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors">
               Documentación <ExternalLink className="size-3" />
@@ -240,7 +191,7 @@ export function AgnosticConsoleShell() {
         {/* Content Area (Scrollable) */}
         <div className="flex-1 overflow-y-auto p-4 lg:p-6 custom-scrollbar">
           <div className="max-w-[98%] mx-auto space-y-12 pb-20">
-            
+
             {/* TAB: NODES & ADAPTERS */}
             {activeTab === 'nodes' && (
               <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
@@ -248,27 +199,7 @@ export function AgnosticConsoleShell() {
                   <h3 className="text-2xl font-bold tracking-tighter">Infrastructure Catalog</h3>
                   <p className="text-sm text-muted-foreground max-w-xl">Configure and authorize connection adapters to expose your sovereign infrastructure silos.</p>
                 </div>
-                <div className="grid grid-cols-1 gap-4">
-                  {sortedAdapters.map(manifest => {
-                    const isNangoConfigured = availableProviders.some(p => p.provider === manifest.id);
-                    const activeConnection = activeConnections.find(c => c.type === manifest.id);
-                    return (
-                      <ProviderEntityRow 
-                        key={manifest.id}
-                        manifest={manifest}
-                        isNangoConfigured={isNangoConfigured}
-                        activeConnection={activeConnection}
-                        isProcessing={isProcessing === manifest.id}
-                        localPathValue={state.localPaths[manifest.id] || ''}
-                        onSetLocalPath={(path) => actions.setLocalPath(manifest.id, path)}
-                        onAuthorize={actions.authorizeOAuth}
-                        onMountLocal={actions.mountLocalProvider}
-                        onDisconnect={actions.disconnectIntegration}
-                        refreshData={actions.refreshData}
-                      />
-                    );
-                  })}
-                </div>
+                <NodesPanel />
               </div>
             )}
 
@@ -279,84 +210,68 @@ export function AgnosticConsoleShell() {
                   <h3 className="text-2xl font-bold tracking-tighter">Silo Explorer</h3>
                   <p className="text-sm text-muted-foreground">Direct resource discovery across authorized infrastructure nodes.</p>
                 </div>
-                <div className="bg-card border border-border p-8 rounded-2xl shadow-sm">
-                  <ResourceExplorer connections={connectionConfigs} />
-                </div>
+                <ExplorerPanel />
               </div>
             )}
 
             {/* TAB: INGESTION HUB */}
             {activeTab === 'ingestion' && (
               <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
-                 <div className="flex flex-col lg:flex-row gap-8 relative">
-                   
-                   {/* Project Inventory Column */}
-                   <div className={cn(
-                     "transition-all duration-500 ease-in-out overflow-hidden flex flex-col",
-                     isInventoryCollapsed ? "w-0 opacity-0 pointer-events-none" : "w-full lg:w-[25%] opacity-100"
-                   )}>
-                      <div className="space-y-8 min-w-[280px]">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-primary/60 mb-1">
-                            <Terminal className="size-3" />
-                            <span className="text-[8px] font-bold uppercase tracking-[0.3em]">Project Memory</span>
-                          </div>
-                          <h3 className="text-xl font-black tracking-tighter uppercase leading-none">Túneles de Ingesta</h3>
-                        </div>
-                        <IngestionPortList 
-                          onSelect={setSelectedPort}
-                          className="p-4 bg-card border border-border rounded-xl shadow-sm" 
-                        />
-                        
-                        <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl border-dashed">
-                          <h6 className="text-[8px] font-bold uppercase tracking-widest text-primary mb-1 flex items-center gap-2">
-                            <Shield className="size-3" />
-                            Seguridad
-                          </h6>
-                          <p className="text-[9px] text-muted-foreground leading-tight italic">
-                            Acceso por slugs aislados.
-                          </p>
-                        </div>
-                      </div>
-                   </div>
+                <div className="flex flex-col lg:flex-row gap-8 relative">
 
-                   {/* Toggle Button for Project Panel */}
-                   <button 
-                     onClick={() => setIsInventoryCollapsed(!isInventoryCollapsed)}
-                     className={cn(
-                       "absolute top-0 z-20 size-8 rounded-full bg-card border border-border shadow-md flex items-center justify-center hover:bg-muted transition-all",
-                       isInventoryCollapsed ? "left-0 -ml-4" : "left-[25%] -ml-12"
-                     )}
-                     title={isInventoryCollapsed ? "Expandir Proyectos" : "Colapsar Proyectos"}
-                   >
-                     {isInventoryCollapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
-                   </button>
-
-                   {/* Main Builder Column */}
-                   <div className={cn(
-                     "transition-all duration-500 flex-1",
-                     isInventoryCollapsed ? "w-full" : "w-full lg:w-[75%]"
-                   )}>
-                      <div className="bg-card border border-border p-8 rounded-2xl shadow-xl relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                          <Zap className="size-32" />
+                  {/* Project Inventory Column */}
+                  <div className={cn(
+                    "transition-all duration-500 ease-in-out overflow-hidden flex flex-col",
+                    isInventoryCollapsed ? "w-0 opacity-0 pointer-events-none" : "w-full lg:w-[25%] opacity-100"
+                  )}>
+                    <div className="space-y-8 min-w-[280px]">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-primary/60 mb-1">
+                          <Terminal className="size-3" />
+                          <span className="text-[8px] font-bold uppercase tracking-[0.3em]">Project Memory</span>
                         </div>
-                        <h5 className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary mb-6">Funnel Architect</h5>
-                        <PortCreator 
-                          initialData={selectedPort}
-                          onReset={() => setSelectedPort(null)}
-                          connections={activeConnections.map(c => ({
-                            id: c.id,
-                            label: c.label,
-                            integration: c.type,
-                            type: c.type,
-                            connectionId: c.id
-                          }))} 
-                          onCreated={handlePortCreated}
-                        />
+                        <h3 className="text-xl font-black tracking-tighter uppercase leading-none">Túneles de Ingesta</h3>
                       </div>
-                   </div>
-                 </div>
+                      <IngestionPortList className="p-4 bg-card border border-border rounded-xl shadow-sm" />
+
+                      <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl border-dashed">
+                        <h6 className="text-[8px] font-bold uppercase tracking-widest text-primary mb-1 flex items-center gap-2">
+                          <Shield className="size-3" />
+                          Seguridad
+                        </h6>
+                        <p className="text-[9px] text-muted-foreground leading-tight italic">
+                          Acceso por slugs aislados.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Toggle Button for Project Panel */}
+                  <button
+                    onClick={toggleInventory}
+                    className={cn(
+                      "absolute top-0 z-20 size-8 rounded-full bg-card border border-border shadow-md flex items-center justify-center hover:bg-muted transition-all",
+                      isInventoryCollapsed ? "left-0 -ml-4" : "left-[25%] -ml-12"
+                    )}
+                    title={isInventoryCollapsed ? "Expandir Proyectos" : "Colapsar Proyectos"}
+                  >
+                    {isInventoryCollapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
+                  </button>
+
+                  {/* Main Builder Column */}
+                  <div className={cn(
+                    "transition-all duration-500 flex-1",
+                    isInventoryCollapsed ? "w-full" : "w-full lg:w-[75%]"
+                  )}>
+                    <div className="bg-card border border-border p-8 rounded-2xl shadow-xl relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <Zap className="size-32" />
+                      </div>
+                      <h5 className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary mb-6">Funnel Architect</h5>
+                      <PortCreator />
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -367,7 +282,7 @@ export function AgnosticConsoleShell() {
                   <h3 className="text-2xl font-bold tracking-tighter">Environment Settings</h3>
                   <p className="text-sm text-muted-foreground">System metrics, webhooks, and core axiomatic configuration.</p>
                 </div>
-                <IntegrationMetricsGrid {...metrics} />
+                <MetricsPanel />
               </div>
             )}
 
@@ -380,20 +295,18 @@ export function AgnosticConsoleShell() {
 
 // ── SIDEBAR SUB-COMPONENTS ───────────────────────────────────────────────────
 
-function SidebarItem({ 
-  active, 
-  onClick, 
-  icon, 
-  label, 
-  badge, 
+function SidebarItem({
+  active,
+  onClick,
+  icon,
+  label,
   disabled,
-  isCollapsed
-}: { 
-  active: boolean; 
-  onClick: () => void; 
-  icon: React.ReactNode; 
-  label: string; 
-  badge?: string;
+  isCollapsed,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
   disabled?: boolean;
   isCollapsed?: boolean;
 }) {
@@ -404,8 +317,8 @@ function SidebarItem({
       className={cn(
         "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 group",
         isCollapsed ? "justify-center" : "justify-start",
-        active 
-          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" 
+        active
+          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
           : "text-muted-foreground hover:bg-muted hover:text-foreground",
         disabled && "opacity-30 cursor-not-allowed grayscale"
       )}
@@ -419,14 +332,6 @@ function SidebarItem({
       {!isCollapsed && (
         <span className="flex-1 text-left truncate animate-in fade-in slide-in-from-left-1 duration-300">
           {label}
-        </span>
-      )}
-      {badge && !isCollapsed && (
-        <span className={cn(
-          "px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-tighter",
-          active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/10 text-primary"
-        )}>
-          {badge}
         </span>
       )}
     </button>

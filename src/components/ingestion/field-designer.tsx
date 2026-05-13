@@ -3,12 +3,13 @@
 import { Trash2, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import type { FieldSchema } from '@/core/types/integration';
 
 interface Field {
   key: string;
-  type: string;
+  type: FieldSchema['type'];
   label: string;
-  required: boolean;
+  required?: boolean;
 }
 
 interface IngestionFieldDesignerProps {
@@ -18,11 +19,11 @@ interface IngestionFieldDesignerProps {
 
 export function IngestionFieldDesigner({ fields, onChange }: IngestionFieldDesignerProps) {
   const addField = () => {
-    const newField = { 
-      key: `field_${Date.now()}`, 
-      type: 'string', 
-      label: 'Nuevo Campo', 
-      required: true 
+    const newField: Field = {
+      key: `field_${Date.now()}`,
+      type: 'string',
+      label: 'Nuevo Campo',
+      required: true,
     };
     onChange([...fields, newField]);
   };
@@ -34,12 +35,11 @@ export function IngestionFieldDesigner({ fields, onChange }: IngestionFieldDesig
   const updateField = (idx: number, updates: Partial<Field>) => {
     const newFields = [...fields];
     newFields[idx] = { ...newFields[idx], ...updates };
-    
-    // Auto-update key if label changes
+
     if (updates.label) {
       newFields[idx].key = updates.label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     }
-    
+
     onChange(newFields);
   };
 
@@ -47,7 +47,7 @@ export function IngestionFieldDesigner({ fields, onChange }: IngestionFieldDesig
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Label className="text-[10px] font-bold uppercase tracking-widest text-primary">Esquema de Datos (Campos del Formulario)</Label>
-        <button 
+        <button
           type="button"
           onClick={addField}
           className="text-[9px] font-bold uppercase tracking-widest px-3 py-1 bg-primary/10 text-primary rounded-full hover:bg-primary/20 transition-all"
@@ -55,19 +55,19 @@ export function IngestionFieldDesigner({ fields, onChange }: IngestionFieldDesig
           <Plus className="size-3 inline mr-1" /> Añadir Campo
         </button>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {fields.map((field, idx) => (
           <div key={idx} className="flex items-center gap-2 p-2 bg-muted/20 border border-border rounded-lg group animate-in fade-in slide-in-from-left-2">
-            <Input 
+            <Input
               value={field.label}
-              onChange={e => updateField(idx, { label: e.target.value })}
+              onChange={(e) => updateField(idx, { label: e.target.value })}
               className="h-8 text-[10px] bg-background"
               placeholder="Nombre del campo"
             />
-            <select 
+            <select
               value={field.type}
-              onChange={e => updateField(idx, { type: e.target.value })}
+              onChange={(e) => updateField(idx, { type: e.target.value as FieldSchema['type'] })}
               className="h-8 text-[10px] bg-background border border-border rounded-md px-1 outline-none focus:ring-1 focus:ring-primary"
             >
               <option value="string">Texto</option>
@@ -75,7 +75,7 @@ export function IngestionFieldDesigner({ fields, onChange }: IngestionFieldDesig
               <option value="number">Número</option>
               <option value="select">Lista</option>
             </select>
-            <button 
+            <button
               type="button"
               onClick={() => removeField(idx)}
               className="p-1 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"

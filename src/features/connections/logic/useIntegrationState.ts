@@ -1,104 +1,58 @@
 /**
  * 🧠 ARTEFACTO: useIntegrationState.ts
  * ────────────
- * CAPA: Features / Connections (State Logic)
- * VERSIÓN: 1.5.0
- * COMMIT: P3-M1.4-STATE-ORCHESTRATION-STABILITY
- * 
+ * CAPA: Features / Connections (Action Layer)
+ * VERSIÓN: 2.1.0 — Session identity from store, no direct useSession() call
+ *
  * 🎯 FUNCTIONAL_SCOPE:
- * - Orquestador central del estado de la Shell de Infraestructura.
- * - Gestión del ciclo de vida de conexiones (Discovery -> Auth -> Hydration).
- * - Cálculo de KPIs de cobertura de adaptadores (Indra vs. Nango Catalog).
- * 
- * 🛡️ AXIOMATIC_CONTRACT:
- * - MUST: Garantizar la atomicidad en la actualización de 'activeConnections' tras cambios en el Backend.
- * - NEVER: Realizar lógica de negocio específica de un proveedor; delegar a los adaptadores del Kernel.
- * - NEVER: Silenciar errores de red; deben ser proyectados al estado para visibilidad del usuario.
- * - ALWAYS: Utilizar el 'connectionId' persistido para evitar la duplicidad de sesiones en Nango.
- * 
- * 📜 ARCH_DECISION: Se mantiene el estado de 'isProcessing' a nivel de ID de proveedor para evitar colisiones visuales durante operaciones asíncronas concurrentes.
- * 
- * 🔑 KEYWORDS: #StateOrchestrator #IntegrationLogic #OAuthFlow #CoverageMetrics
- * 🔗 RELATIONSHIPS: [AgnosticConsoleShell, ProviderEntityRow, AuthorizedClient]
+ * - Gestión del ciclo de vida de conexiones: OAuth, local mount, disconnect.
+ * - Emite invalidate('connections') al completar cada acción.
+ * - Obtiene userId del store (provisto por useSessionSync en el Shell).
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Nango from '@nangohq/frontend';
-import { ProviderConfig, Connection, INDRA_ADAPTERS } from '../integration_types';
-import { useSession } from 'next-auth/react';
+import { useIndraStore } from '@/stores/indra-store';
 
 export function useIntegrationState() {
-  const { data: session, status } = useSession();
-  const userId = session?.user?.id;
+  const userId = useIndraStore((s) => s.userId);
+  const invalidate = useIndraStore((s) => s.invalidate);
 
-  const [availableProviders, setAvailableProviders] = useState<ProviderConfig[]>([]);
-  const [activeConnections, setActiveConnections] = useState<Connection[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [localPaths, setLocalPaths] = useState<Record<string, string>>({});
 
   const nango = new Nango();
 
-  const refreshData = async () => {
-    if (!userId) return;
-    try {
-      const [discoveryRes, connectionsRes] = await Promise.all([
-        fetch('/api/discovery/integrations'),
-        fetch(`/api/integrations?userId=${userId}`)
-      ]);
-
-      const discoveryData = await discoveryRes.json();
-      const connectionsData = await connectionsRes.json();
-
-      setAvailableProviders(discoveryData.providers || []);
-      setActiveConnections(connectionsData.integrations || []);
-    } catch (err) {
-      console.error('[useConnections]: Initialization failed', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (status === 'authenticated') {
-      refreshData();
-    } else if (status === 'unauthenticated') {
-      setLoading(false);
-    }
-  }, [status, userId]);
-
   const authorizeOAuth = async (provider: string) => {
     if (!userId) return;
     setIsProcessing(provider);
-    
+
     try {
       const sessionRes = await fetch('/api/nango/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ integrationId: provider }),
       });
-      
+
       const { sessionToken, error } = await sessionRes.json();
       if (error) throw new Error(error);
-
 
       await new Promise<void>((resolve) => {
         const connect = nango.openConnectUI({
           onEvent: (event: any) => {
-            console.log("📡 Nango Event:", event);
             if (event.type === 'connect') {
               const cId = event.connectionId || event.payload?.connectionId;
-              console.log("✅ Connection authorized for:", cId);
-              
               fetch('/api/integrations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   type: provider,
                   label: `${provider.charAt(0).toUpperCase() + provider.slice(1)} Connection`,
-                  connectionId: cId
-                })
-              }).then(() => refreshData()).then(resolve);
+                  connectionId: cId,
+                }),
+              })
+                .then(() => invalidate('connections'))
+                .then(resolve);
             } else if (event.type === 'close') {
               resolve();
             }
@@ -124,10 +78,10 @@ export function useIntegrationState() {
         body: JSON.stringify({
           type: providerId,
           label: `${providerId.toUpperCase()} [${path}]`,
-          connectionId: `local-${providerId}-${userId}`
-        })
+          connectionId: `local-${providerId}-${userId}`,
+        }),
       });
-      await refreshData();
+      invalidate('connections');
     } finally {
       setIsProcessing(null);
     }
@@ -138,7 +92,7 @@ export function useIntegrationState() {
     setIsProcessing(id);
     try {
       await fetch(`/api/integrations/${id}`, { method: 'DELETE' });
-      await refreshData();
+      invalidate('connections');
     } catch (err) {
       console.error('[Disconnect Error]:', err);
     } finally {
@@ -146,35 +100,15 @@ export function useIntegrationState() {
     }
   };
 
-  // KPI Calculations
-  const translatedNangoProviders = availableProviders.filter(p => INDRA_ADAPTERS.some(a => a.id === p.provider));
-  const translationKPI = availableProviders.length > 0 
-    ? Math.round((translatedNangoProviders.length / availableProviders.length) * 100) 
-    : 0;
-
   return {
-    userId,
-    session,
-    status,
-    loading,
     isProcessing,
-    availableProviders,
-    activeConnections,
-    INDRA_ADAPTERS,
-    metrics: {
-      totalAdapters: INDRA_ADAPTERS.length,
-      configuredNango: availableProviders.length,
-      coverage: translationKPI
-    },
     actions: {
-      refreshData,
       authorizeOAuth,
       mountLocalProvider,
       disconnectIntegration,
-      setLocalPath: (id: string, path: string) => setLocalPaths(prev => ({ ...prev, [id]: path }))
+      setLocalPath: (id: string, path: string) =>
+        setLocalPaths((prev) => ({ ...prev, [id]: path })),
     },
-    state: {
-      localPaths
-    }
+    state: { localPaths },
   };
 }

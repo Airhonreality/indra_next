@@ -2,26 +2,28 @@
  * 🗂️ ARTEFACTO: IngestionPortList.tsx
  * ────────────
  * CAPA: UI / Features (Project Memory)
- * VERSIÓN: 1.0.0
- * 
+ * VERSIÓN: 2.0.0 — Autonomous Cell (Axiomatic Decoupling)
+ *
  * 🎯 FUNCTIONAL_SCOPE:
- * - Proyección visual de los puertos de ingesta activos vinculados a una conexión.
- * - Acceso rápido a la edición y visualización de rutas públicas expuestas.
+ * - Proyección visual de los puertos de ingesta activos.
+ * - Auto-hidratación vía useIngestionPorts + bus de invalidación 'ports'.
+ * - Comunicación hacia PortCreator vía store selectPort(), sin prop drilling.
  */
 
 import React from 'react';
-import { ExternalLink, Copy, CheckCircle2, Globe, Settings2, Trash2 } from 'lucide-react';
+import { ExternalLink, Copy, CheckCircle2, Globe, Settings2, Trash2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIngestionPorts } from '@/hooks/use-ingestion-ports';
+import { useIndraStore } from '@/stores/indra-store';
 
 interface IngestionPortListProps {
   connectionId?: string;
   className?: string;
-  onSelect?: (port: any) => void;
 }
 
-export function IngestionPortList({ connectionId, className, onSelect }: IngestionPortListProps) {
+export function IngestionPortList({ connectionId, className }: IngestionPortListProps) {
   const { ports, isLoading, removePort } = useIngestionPorts(connectionId);
+  const selectPort = useIndraStore((s) => s.selectPort);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
 
   const copyToClipboard = (slug: string) => {
@@ -31,7 +33,14 @@ export function IngestionPortList({ connectionId, className, onSelect }: Ingesti
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  if (isLoading) return <div className="text-[10px] animate-pulse py-8 opacity-50 uppercase font-bold text-center">Consultando Memoria de Proyectos...</div>;
+  if (isLoading) {
+    return (
+      <div className={cn("flex items-center justify-center py-8", className)}>
+        <Loader2 className="size-4 animate-spin text-muted-foreground opacity-40" />
+      </div>
+    );
+  }
+
   if (ports.length === 0) return null;
 
   return (
@@ -45,7 +54,7 @@ export function IngestionPortList({ connectionId, className, onSelect }: Ingesti
         </div>
         {!connectionId && <span className="text-[9px] font-mono opacity-30 uppercase">{ports.length} RUTAS</span>}
       </div>
-      
+
       <div className="grid grid-cols-1 gap-2">
         {ports.map((port) => (
           <div key={port.id} className="group flex items-center justify-between p-3 bg-muted/20 border border-border rounded-xl hover:bg-muted/40 transition-all">
@@ -53,32 +62,32 @@ export function IngestionPortList({ connectionId, className, onSelect }: Ingesti
               <span className="text-[10px] font-bold uppercase tracking-tight">{port.label}</span>
               <span className="text-[8px] font-mono opacity-50">/p/{port.slug}</span>
             </div>
-            
+
             <div className="flex items-center gap-1">
-              <button 
+              <button
                 onClick={() => copyToClipboard(port.slug)}
                 className="p-1.5 hover:bg-background rounded-md border border-transparent hover:border-border transition-all"
                 title="Copiar URL Pública"
               >
                 {copiedId === port.slug ? <CheckCircle2 className="size-3 text-emerald-500" /> : <Copy className="size-3 opacity-40 hover:opacity-100" />}
               </button>
-              <a 
-                href={`/p/${port.slug}`} 
-                target="_blank" 
+              <a
+                href={`/p/${port.slug}`}
+                target="_blank"
                 className="p-1.5 hover:bg-background rounded-md border border-transparent hover:border-border transition-all"
                 title="Ver Ruta Pública"
               >
                 <ExternalLink className="size-3 opacity-40 hover:opacity-100" />
               </a>
-              <button 
+              <button
                 onClick={() => removePort(port.id)}
                 className="p-1.5 hover:bg-destructive/10 text-destructive rounded-md border border-transparent hover:border-destructive/20 transition-all opacity-0 group-hover:opacity-100"
                 title="Eliminar Proyecto"
               >
                 <Trash2 className="size-3" />
               </button>
-              <button 
-                onClick={() => onSelect?.(port)}
+              <button
+                onClick={() => selectPort(port)}
                 className="p-1.5 hover:bg-background rounded-md border border-transparent hover:border-border transition-all text-primary"
                 title="Editar Configuración"
               >

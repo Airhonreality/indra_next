@@ -22,24 +22,23 @@
  * 🔗 RELATIONSHIPS: [AgnosticConsoleShell, useInventory, SchemaManager, PortCreator]
  */
 
-import { useState, useEffect } from 'react';
-import { 
-  ChevronDown, 
-  Link2, 
-  Loader2, 
-  Key, 
-  Database, 
-  HardDrive, 
-  FileJson, 
-  Cloud, 
-  Activity, 
+import { useState } from 'react';
+import {
+  ChevronDown,
+  Link2,
+  Loader2,
+  Key,
+  Database,
+  HardDrive,
+  FileJson,
+  Cloud,
+  Activity,
   Terminal,
   Eye,
   Settings2,
   Trash2,
   RefreshCw,
   LayoutGrid,
-  Search,
   UploadCloud
 } from 'lucide-react';
 import { IngestionPortList } from './IngestionPortList';
@@ -51,6 +50,7 @@ import { ProviderManifest, Connection } from '../integration_types';
 import { SchemaManager } from '@/components/schema-manager';
 import { useInventory } from '@/hooks/use-inventory';
 import { AgnosticTree } from '@/components/ui/agnostic-tree';
+import { useIndraStore } from '@/stores/indra-store';
 
 interface ProviderEntityRowProps {
   manifest: ProviderManifest;
@@ -62,7 +62,6 @@ interface ProviderEntityRowProps {
   onAuthorize: (id: string) => void;
   onMountLocal: (id: string, path: string) => void;
   onDisconnect?: (id: string) => void;
-  refreshData: () => void;
 }
 
 const getIcon = (iconName: string) => {
@@ -86,8 +85,8 @@ export function ProviderEntityRow({
   onAuthorize,
   onMountLocal,
   onDisconnect,
-  refreshData
 }: ProviderEntityRowProps) {
+  const invalidate = useIndraStore((s) => s.invalidate);
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'auth' | 'view' | 'execute'>('auth');
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
@@ -403,10 +402,10 @@ export function ProviderEntityRow({
                           <h5 className="text-[10px] font-bold uppercase tracking-widest">Data Schema Blueprint</h5>
                         </div>
                         <div className="bg-muted/10 p-5 rounded-xl border border-border h-full">
-                          <SchemaManager 
+                          <SchemaManager
                             integrationId={activeConnection.id}
                             currentSchema={activeConnection.dynamicSchema || []}
-                            onUpdate={refreshData}
+                            onUpdate={() => invalidate('connections')}
                           />
                         </div>
                       </div>

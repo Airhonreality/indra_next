@@ -102,6 +102,14 @@ export class GoogleDriveAdapter extends BaseAdapter {
   }
 
   /**
+   * INTERNAL: Resolves a fresh access token from Nango.
+   */
+  private async getFreshToken(): Promise<string> {
+    const tokenResponse = await nango.getToken('google-drive', this.connectionId) as any;
+    return tokenResponse.access_token;
+  }
+
+  /**
    * Initiates a Google Drive Resumable Upload session.
    * This is the production way to handle ingestion.
    */
@@ -109,11 +117,11 @@ export class GoogleDriveAdapter extends BaseAdapter {
     targetFolderId: string,
     fileName: string,
     mimeType: string,
-    totalSize: number
+    totalSize: number,
+    retry = true
   ): Promise<OperationResult<{ resumableUri: string; sessionId: string }>> {
     try {
-      const tokenResponse = await nango.getToken('google-drive', this.connectionId) as any;
-      const token = tokenResponse.access_token;
+      const token = await this.getFreshToken();
 
       const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
         method: 'POST',
@@ -129,8 +137,13 @@ export class GoogleDriveAdapter extends BaseAdapter {
         }),
       });
 
+      if (response.status === 401 && retry) {
+        console.warn('⚠️ [Drive] Token expired during session creation. Retrying with fresh token...');
+        return this.createResumableSession(targetFolderId, fileName, mimeType, totalSize, false);
+      }
+
       if (!response.ok) {
-        throw new Error(`Drive Session Error: ${response.statusText}`);
+        throw new Error(`Drive Session Error: ${response.statusText} (${response.status})`);
       }
 
       const resumableUri = response.headers.get('Location');
@@ -222,11 +235,11 @@ export class GoogleDriveAdapter extends BaseAdapter {
         currentParentId = searchRes.files[0].id;
       } else {
         // 2. Create it
-        const tokenResponse = await nango.getToken('google-drive', this.connectionId) as any;
+        const token = await this.getFreshToken();
         const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${tokenResponse.access_token}`,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -236,7 +249,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
           }),
         });
         const folder = await createRes.json();
-        if (!folder.id) throw new Error(`Failed to create folder segment: ${segment}`);
+        if (!folder.id) throw new Error(`Failed to create folder segment: ${segment} (${createRes.status})`);
         currentParentId = folder.id;
       }
     }

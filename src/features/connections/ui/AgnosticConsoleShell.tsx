@@ -36,6 +36,7 @@ import {
   User,
   ExternalLink,
   ChevronRight,
+  ChevronLeft,
   LogOut
 } from 'lucide-react';
 import { i18n } from '@/lib/i18n';
@@ -68,6 +69,7 @@ export function AgnosticConsoleShell() {
 
   const [activeTab, setActiveTab] = useState<ConsoleTab>('ingestion');
   const [selectedPort, setSelectedPort] = useState<any>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handlePortCreated = () => {
     actions.refreshData();
@@ -101,44 +103,63 @@ export function AgnosticConsoleShell() {
     <div className="fixed inset-0 flex bg-background overflow-hidden animate-in fade-in duration-700">
       
       {/* ── SIDEBAR (Control Soberano) ── */}
-      <aside className="w-64 border-r border-border bg-card/50 flex flex-col">
+      <aside className={cn(
+        "border-r border-border bg-card/50 flex flex-col transition-all duration-300 ease-in-out relative",
+        isCollapsed ? "w-20" : "w-64"
+      )}>
+        {/* Toggle Button */}
+        <button 
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="absolute -right-3 top-10 size-6 rounded-full bg-background border border-border flex items-center justify-center hover:bg-muted transition-colors z-10"
+        >
+          {isCollapsed ? <ChevronRight className="size-3" /> : <ChevronLeft className="size-3" />}
+        </button>
+
         {/* Branding */}
-        <div className="p-6 border-b border-border flex items-center gap-3">
-          <div className="size-8 rounded-lg bg-primary flex items-center justify-center">
+        <div className={cn(
+          "p-6 border-b border-border flex items-center gap-3 transition-all",
+          isCollapsed ? "justify-center px-4" : "px-6"
+        )}>
+          <div className="size-8 shrink-0 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
             <Shield className="size-5 text-primary-foreground" />
           </div>
-          <div>
-            <h1 className="text-sm font-black tracking-tighter uppercase leading-none">Indra <span className="text-primary">Next</span></h1>
-            <p className="text-[8px] font-mono text-muted-foreground opacity-50 mt-1">AXIOMATIC_OS v1.6.1</p>
-          </div>
+          {!isCollapsed && (
+            <div className="animate-in fade-in slide-in-from-left-2 duration-300">
+              <h1 className="text-sm font-black tracking-tighter uppercase leading-none">Indra <span className="text-primary">Next</span></h1>
+              <p className="text-[8px] font-mono text-muted-foreground opacity-50 mt-1">AXIOMATIC_OS v1.6.1</p>
+            </div>
+          )}
         </div>
 
         {/* Grupos de Navegación */}
-        <nav className="flex-1 p-4 space-y-8 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-8 overflow-y-auto overflow-x-hidden">
           <div className="space-y-1">
-            <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Plano de Control</p>
+            {!isCollapsed && <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 animate-in fade-in duration-500">Plano de Control</p>}
             <SidebarItem 
               active={activeTab === 'nodes'} 
               onClick={() => setActiveTab('nodes')}
               icon={<Database className="size-4" />}
               label={t.connections.title}
               badge={activeConnections.length.toString()}
+              isCollapsed={isCollapsed}
             />
           </div>
 
           <div className="space-y-1">
-            <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Operaciones</p>
+            {!isCollapsed && <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 animate-in fade-in duration-500">Operaciones</p>}
             <SidebarItem 
               active={activeTab === 'ingestion'} 
               onClick={() => setActiveTab('ingestion')}
               icon={<Zap className="size-4" />}
               label={t.portals.title}
+              isCollapsed={isCollapsed}
             />
             <SidebarItem 
               active={activeTab === 'explorer'} 
               onClick={() => setActiveTab('explorer')}
               icon={<Layers className="size-4" />}
               label={t.connections.explore}
+              isCollapsed={isCollapsed}
             />
             <SidebarItem 
               active={activeTab === 'workflows'} 
@@ -146,16 +167,18 @@ export function AgnosticConsoleShell() {
               icon={<Terminal className="size-4" />}
               label={t.workflow.title}
               disabled
+              isCollapsed={isCollapsed}
             />
           </div>
 
           <div className="space-y-1">
-            <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Sistema</p>
+            {!isCollapsed && <p className="px-2 mb-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Sistema</p>}
             <SidebarItem 
               active={activeTab === 'settings'} 
               onClick={() => setActiveTab('settings')}
               icon={<Settings className="size-4" />}
               label={t.common.settings}
+              isCollapsed={isCollapsed}
             />
           </div>
         </nav>
@@ -167,23 +190,27 @@ export function AgnosticConsoleShell() {
               <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
                 <User className="size-4 text-primary" />
               </div>
-              <div className="overflow-hidden">
-                <p className="text-[10px] font-bold truncate leading-none">
-                  {status === 'authenticated' ? session?.user?.name || 'Usuario Indra' : 'Invitado'}
-                </p>
-                <p className="text-[8px] text-muted-foreground truncate mt-1">
-                  {status === 'authenticated' ? session?.user?.email || 'authenticated' : 'Sovereign Node'}
-                </p>
-              </div>
+              {!isCollapsed && (
+                <div className="overflow-hidden">
+                  <p className="text-[10px] font-bold truncate leading-none">
+                    {status === 'authenticated' ? session?.user?.name || 'Usuario Indra' : 'Invitado'}
+                  </p>
+                  <p className="text-[8px] text-muted-foreground truncate mt-1">
+                    {status === 'authenticated' ? session?.user?.email || 'authenticated' : 'Sovereign Node'}
+                  </p>
+                </div>
+              )}
             </div>
             
-            <button 
-              onClick={() => signOut({ callbackUrl: '/' })}
-              className="p-2 hover:bg-destructive/10 text-destructive rounded-lg transition-all bg-destructive/5 border border-destructive/10"
-              title={t.auth.logout}
-            >
-              <LogOut className="size-3" />
-            </button>
+            {!isCollapsed && (
+              <button 
+                onClick={() => signOut({ callbackUrl: '/' })}
+                className="p-2 hover:bg-destructive/10 text-destructive rounded-lg transition-all bg-destructive/5 border border-destructive/10"
+                title={t.auth.logout}
+              >
+                <LogOut className="size-3" />
+              </button>
+            )}
           </div>
         </div>
       </aside>
@@ -335,7 +362,8 @@ function SidebarItem({
   icon, 
   label, 
   badge, 
-  disabled 
+  disabled,
+  isCollapsed
 }: { 
   active: boolean; 
   onClick: () => void; 
@@ -343,25 +371,36 @@ function SidebarItem({
   label: string; 
   badge?: string;
   disabled?: boolean;
+  isCollapsed?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "w-full flex items-center justify-between px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all group",
-        disabled ? "opacity-30 cursor-not-allowed" : "hover:bg-primary/5 hover:text-primary",
-        active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "text-muted-foreground"
+        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 group",
+        isCollapsed ? "justify-center" : "justify-start",
+        active 
+          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" 
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        disabled && "opacity-30 cursor-not-allowed grayscale"
       )}
     >
-      <div className="flex items-center gap-3">
+      <div className={cn(
+        "shrink-0 transition-transform duration-200",
+        active ? "scale-110" : "group-hover:scale-110"
+      )}>
         {icon}
-        <span>{label}</span>
       </div>
-      {badge && (
+      {!isCollapsed && (
+        <span className="flex-1 text-left truncate animate-in fade-in slide-in-from-left-1 duration-300">
+          {label}
+        </span>
+      )}
+      {badge && !isCollapsed && (
         <span className={cn(
-          "px-1.5 py-0.5 rounded text-[8px] font-black",
-          active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
+          "px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-tighter",
+          active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/10 text-primary"
         )}>
           {badge}
         </span>

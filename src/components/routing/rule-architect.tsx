@@ -10,19 +10,20 @@ import {
   Variable, 
   Settings2,
   CalendarDays,
-  CalendarRange
+  CalendarRange,
+  Zap,
+  Split,
+  FileCode
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 
-export type RuleBlockType = 'date' | 'variable' | 'static' | 'filter';
+export type RuleBlockType = 'date' | 'variable' | 'static' | 'logic';
 
 export interface RuleNode {
   id: string;
   type: RuleBlockType;
   value: string;
   label: string;
+  config?: any;
 }
 
 interface RuleArchitectProps {
@@ -38,8 +39,9 @@ export function RuleArchitect({ initialRules = [], onChange, className }: RuleAr
     const newRule: RuleNode = {
       id: Math.random().toString(36).substr(2, 9),
       type,
-      value: type === 'date' ? '{year}/{month}' : '',
-      label: type === 'date' ? 'Time-based' : 'New Rule'
+      value: type === 'date' ? '{year}/{month}' : type === 'logic' ? 'auto' : '',
+      label: type === 'date' ? 'Time-based' : type === 'logic' ? 'Logic Router' : 'New Rule',
+      config: type === 'logic' ? { variable: 'ext', rules: [{ condition: '.pdf', folder: 'Docs' }, { condition: '*', folder: 'Others' }] } : {}
     };
     const updated = [...rules, newRule];
     setRules(updated);
@@ -78,16 +80,28 @@ export function RuleArchitect({ initialRules = [], onChange, className }: RuleAr
           >
             <Folder className="size-3 mr-1" /> + Carpeta
           </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            type="button"
+            className="h-7 text-[9px] uppercase tracking-tighter border-primary/40 text-primary"
+            onClick={() => addRule('logic')}
+          >
+            <Split className="size-3 mr-1" /> + Lógica
+          </Button>
         </div>
       </div>
 
-      <div className="flex items-start gap-4 overflow-x-auto pb-4 custom-scrollbar min-h-[160px]">
+      <div className="flex items-start gap-4 overflow-x-auto pb-4 custom-scrollbar min-h-[220px]">
         {/* Renderizado de Columnas (Fractal Mode) */}
         {rules.map((rule, index) => (
           <React.Fragment key={rule.id}>
-            <div className="min-w-[200px] bg-card border border-border rounded-xl p-4 shadow-sm animate-in slide-in-from-left-4 duration-300">
+            <div className="min-w-[240px] bg-card border border-border rounded-xl p-4 shadow-lg animate-in slide-in-from-left-4 duration-300 relative group">
               <div className="flex items-center justify-between mb-3">
-                <Badge variant="outline" className="text-[8px] uppercase tracking-widest bg-primary/5">
+                <Badge variant="outline" className={cn(
+                  "text-[8px] uppercase tracking-widest",
+                  rule.type === 'logic' ? "bg-primary/10 text-primary border-primary/20" : "bg-primary/5"
+                )}>
                   Lvl {index + 1}
                 </Badge>
                 <button 
@@ -142,6 +156,38 @@ export function RuleArchitect({ initialRules = [], onChange, className }: RuleAr
                         onChange?.(updated);
                       }}
                     />
+                  </div>
+                )}
+
+                {rule.type === 'logic' && (
+                  <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 space-y-3">
+                    <div className="flex items-center gap-2 text-primary">
+                      <Split className="size-3" />
+                      <span className="text-[10px] font-bold uppercase">Logic Router</span>
+                    </div>
+                    
+                    <div className="space-y-2">
+                       <p className="text-[8px] uppercase font-black opacity-40">Variable de Control:</p>
+                       <select className="w-full bg-background border border-border rounded px-2 py-1 text-[10px] outline-none">
+                          <option value="ext">File Extension</option>
+                          <option value="size">File Size</option>
+                          <option value="name">File Name</option>
+                       </select>
+                    </div>
+
+                    <div className="space-y-1.5 pt-2 border-t border-primary/10">
+                       <p className="text-[8px] uppercase font-black opacity-40">Reglas de Enrutamiento:</p>
+                       {rule.config?.rules?.map((r: any, rid: number) => (
+                         <div key={rid} className="flex items-center gap-1">
+                            <Badge variant="secondary" className="text-[7px] py-0 px-1">{r.condition}</Badge>
+                            <ChevronRight className="size-2 opacity-30" />
+                            <span className="text-[9px] font-mono font-bold truncate">/{r.folder}</span>
+                         </div>
+                       ))}
+                       <Button variant="ghost" className="w-full h-5 text-[7px] uppercase font-black tracking-widest p-0 opacity-40 hover:opacity-100">
+                          + Añadir Condición
+                       </Button>
+                    </div>
                   </div>
                 )}
               </div>

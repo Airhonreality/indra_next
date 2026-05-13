@@ -26,6 +26,7 @@ import { useEffect } from 'react';
 import { AgnosticTree } from '@/components/ui/agnostic-tree';
 import { IngestionFieldDesigner } from '@/components/ingestion/field-designer';
 import { IngestionOperator } from '@/components/ingestion/operator';
+import { RuleArchitect } from '@/components/routing/rule-architect';
 
 interface PortCreatorProps {
   connections: Array<{ id: string; label: string; type: string; connectionId?: string }>;
@@ -189,16 +190,22 @@ export function PortCreator({ connections, initialData, onReset, onCreated }: Po
               {isEditMode && <p className="text-[8px] text-muted-foreground mt-1 italic">El destino no puede modificarse en túneles activos.</p>}
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-4">
               <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                <FolderTree className="size-3" /> Template de Ruta
+                <FolderTree className="size-3" /> Arquitectura de Namespace (Reglas)
               </Label>
-              <Input 
-                value={formData.pattern}
-                onChange={e => setFormData({ ...formData, pattern: e.target.value })}
-                className="bg-muted border-border font-mono text-[10px]"
-                required
+              <RuleArchitect 
+                initialRules={[]} 
+                onChange={(nodes) => {
+                  const pattern = nodes.map(n => n.value).join('/');
+                  setFormData({ ...formData, pattern: pattern || '/' });
+                }}
+                className="mt-2"
               />
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border border-border rounded-lg text-[10px] font-mono text-muted-foreground overflow-hidden">
+                 <span className="opacity-40 uppercase shrink-0">Template Generado:</span>
+                 <span className="text-primary truncate">{formData.pattern}</span>
+              </div>
             </div>
           </div>
         </div>

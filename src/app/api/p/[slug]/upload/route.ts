@@ -83,11 +83,11 @@ export async function POST(
       return NextResponse.json({ error: 'ADAPTER_CAPABILITY_MISSING:RESUMABLE_UPLOAD' }, { status: 501 });
     }
 
-    // AXIOMATIC FIX: Google Drive API requires Folder IDs, not Paths.
-    // Resolve the human-readable path to a physical Google Drive Folder ID first.
+    // AXIOMATIC FIX: Separate anchor (baseDirectory) from dynamic path (resolvedSubPath).
+    // This prevents the system from trying to create a physical folder named 'root'.
     let targetFolderId = 'root';
     try {
-      targetFolderId = await adapter.getOrCreateFolderByPath(absoluteDestinationPath);
+      targetFolderId = await adapter.getOrCreateFolderByPath(resolvedSubPath, baseDirectory);
     } catch (pathError) {
       console.error('[Path Resolution Error]:', pathError);
       return NextResponse.json({ error: 'FAILED_TO_RESOLVE_STORAGE_PATH' }, { status: 500 });

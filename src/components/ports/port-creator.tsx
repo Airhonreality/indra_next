@@ -196,7 +196,7 @@ export function PortCreator({ connections, initialData, onReset, onCreated }: Po
               </Label>
               <RuleArchitect 
                 initialRules={[]} 
-                availableFields={formData.fields.map(f => ({ id: f.id, label: f.label }))}
+                availableFields={schemaFields.map(f => ({ id: f.key, label: f.label }))}
                 onChange={(nodes) => {
                   const pattern = nodes.map(n => n.value).join('/');
                   setFormData({ ...formData, pattern: pattern || '/' });

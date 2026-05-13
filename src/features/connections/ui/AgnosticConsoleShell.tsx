@@ -70,6 +70,7 @@ export function AgnosticConsoleShell() {
   const [activeTab, setActiveTab] = useState<ConsoleTab>('ingestion');
   const [selectedPort, setSelectedPort] = useState<any>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isInventoryCollapsed, setIsInventoryCollapsed] = useState(false);
 
   const handlePortCreated = () => {
     actions.refreshData();
@@ -237,8 +238,8 @@ export function AgnosticConsoleShell() {
         </header>
 
         {/* Content Area (Scrollable) */}
-        <div className="flex-1 overflow-y-auto p-12 custom-scrollbar">
-          <div className="max-w-6xl mx-auto space-y-12 pb-20">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6 custom-scrollbar">
+          <div className="max-w-[98%] mx-auto space-y-12 pb-20">
             
             {/* TAB: NODES & ADAPTERS */}
             {activeTab === 'nodes' && (
@@ -287,32 +288,55 @@ export function AgnosticConsoleShell() {
             {/* TAB: INGESTION HUB */}
             {activeTab === 'ingestion' && (
               <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
-                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                   <div className="lg:col-span-1 space-y-8">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-primary/60 mb-1">
-                          <Terminal className="size-3" />
-                          <span className="text-[8px] font-bold uppercase tracking-[0.3em]">Project Memory</span>
+                 <div className="flex flex-col lg:flex-row gap-8 relative">
+                   
+                   {/* Project Inventory Column */}
+                   <div className={cn(
+                     "transition-all duration-500 ease-in-out overflow-hidden flex flex-col",
+                     isInventoryCollapsed ? "w-0 opacity-0 pointer-events-none" : "w-full lg:w-[25%] opacity-100"
+                   )}>
+                      <div className="space-y-8 min-w-[280px]">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-primary/60 mb-1">
+                            <Terminal className="size-3" />
+                            <span className="text-[8px] font-bold uppercase tracking-[0.3em]">Project Memory</span>
+                          </div>
+                          <h3 className="text-xl font-black tracking-tighter uppercase leading-none">Túneles de Ingesta</h3>
                         </div>
-                        <h3 className="text-xl font-black tracking-tighter uppercase leading-none">Túneles de Ingesta</h3>
-                      </div>
-                      <IngestionPortList 
-                        onSelect={setSelectedPort}
-                        className="p-4 bg-card border border-border rounded-xl shadow-sm" 
-                      />
-                      
-                      <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl border-dashed">
-                        <h6 className="text-[8px] font-bold uppercase tracking-widest text-primary mb-1 flex items-center gap-2">
-                          <Shield className="size-3" />
-                          Seguridad
-                        </h6>
-                        <p className="text-[9px] text-muted-foreground leading-tight italic">
-                          Acceso por slugs aislados.
-                        </p>
+                        <IngestionPortList 
+                          onSelect={setSelectedPort}
+                          className="p-4 bg-card border border-border rounded-xl shadow-sm" 
+                        />
+                        
+                        <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl border-dashed">
+                          <h6 className="text-[8px] font-bold uppercase tracking-widest text-primary mb-1 flex items-center gap-2">
+                            <Shield className="size-3" />
+                            Seguridad
+                          </h6>
+                          <p className="text-[9px] text-muted-foreground leading-tight italic">
+                            Acceso por slugs aislados.
+                          </p>
+                        </div>
                       </div>
                    </div>
 
-                   <div className="lg:col-span-3 space-y-6">
+                   {/* Toggle Button for Project Panel */}
+                   <button 
+                     onClick={() => setIsInventoryCollapsed(!isInventoryCollapsed)}
+                     className={cn(
+                       "absolute top-0 z-20 size-8 rounded-full bg-card border border-border shadow-md flex items-center justify-center hover:bg-muted transition-all",
+                       isInventoryCollapsed ? "left-0 -ml-4" : "left-[25%] -ml-12"
+                     )}
+                     title={isInventoryCollapsed ? "Expandir Proyectos" : "Colapsar Proyectos"}
+                   >
+                     {isInventoryCollapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
+                   </button>
+
+                   {/* Main Builder Column */}
+                   <div className={cn(
+                     "transition-all duration-500 flex-1",
+                     isInventoryCollapsed ? "w-full" : "w-full lg:w-[75%]"
+                   )}>
                       <div className="bg-card border border-border p-8 rounded-2xl shadow-xl relative overflow-hidden group">
                         <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                           <Zap className="size-32" />

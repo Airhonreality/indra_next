@@ -28,19 +28,20 @@ export interface RuleNode {
 
 interface RuleArchitectProps {
   initialRules?: RuleNode[];
+  availableFields?: Array<{ id: string, label: string }>;
   onChange?: (rules: RuleNode[]) => void;
   className?: string;
 }
 
-export function RuleArchitect({ initialRules = [], onChange, className }: RuleArchitectProps) {
+export function RuleArchitect({ initialRules = [], availableFields = [], onChange, className }: RuleArchitectProps) {
   const [rules, setRules] = useState<RuleNode[]>(initialRules);
 
   const addRule = (type: RuleBlockType) => {
     const newRule: RuleNode = {
       id: Math.random().toString(36).substr(2, 9),
       type,
-      value: type === 'date' ? '{year}/{month}' : type === 'logic' ? 'auto' : '',
-      label: type === 'date' ? 'Time-based' : type === 'logic' ? 'Logic Router' : 'New Rule',
+      value: type === 'date' ? '{year}/{month}' : type === 'logic' ? 'auto' : type === 'variable' ? (availableFields[0]?.label ? `{${availableFields[0].label}}` : '{project}') : '',
+      label: type === 'date' ? 'Time-based' : type === 'logic' ? 'Logic Router' : type === 'variable' ? 'Form Field' : 'New Rule',
       config: type === 'logic' ? { variable: 'ext', rules: [{ condition: '.pdf', folder: 'Docs' }, { condition: '*', folder: 'Others' }] } : {}
     };
     const updated = [...rules, newRule];
@@ -84,6 +85,15 @@ export function RuleArchitect({ initialRules = [], onChange, className }: RuleAr
             variant="outline" 
             size="sm" 
             type="button"
+            className="h-7 text-[9px] uppercase tracking-tighter border-amber-500/40 text-amber-500 hover:bg-amber-500/5"
+            onClick={() => addRule('variable')}
+          >
+            <Variable className="size-3 mr-1" /> + Variable
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            type="button"
             className="h-7 text-[9px] uppercase tracking-tighter border-primary/40 text-primary"
             onClick={() => addRule('logic')}
           >
@@ -100,7 +110,8 @@ export function RuleArchitect({ initialRules = [], onChange, className }: RuleAr
               <div className="flex items-center justify-between mb-3">
                 <Badge variant="outline" className={cn(
                   "text-[8px] uppercase tracking-widest",
-                  rule.type === 'logic' ? "bg-primary/10 text-primary border-primary/20" : "bg-primary/5"
+                  rule.type === 'logic' ? "bg-primary/10 text-primary border-primary/20" : 
+                  rule.type === 'variable' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : "bg-primary/5"
                 )}>
                   Lvl {index + 1}
                 </Badge>
@@ -156,6 +167,34 @@ export function RuleArchitect({ initialRules = [], onChange, className }: RuleAr
                         onChange?.(updated);
                       }}
                     />
+                  </div>
+                )}
+
+                {rule.type === 'variable' && (
+                  <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/20 space-y-2">
+                    <div className="flex items-center gap-2 text-amber-600">
+                      <Variable className="size-3" />
+                      <span className="text-[10px] font-bold uppercase">Form Field Variable</span>
+                    </div>
+                    <select 
+                      className="w-full bg-background border border-border rounded px-2 py-1 text-[10px] outline-none"
+                      value={rule.value}
+                      onChange={(e) => {
+                        const updated = [...rules];
+                        updated[index].value = e.target.value;
+                        setRules(updated);
+                        onChange?.(updated);
+                      }}
+                    >
+                      {availableFields.length > 0 ? (
+                        availableFields.map(field => (
+                          <option key={field.id} value={`{${field.label}}`}>{field.label}</option>
+                        ))
+                      ) : (
+                        <option value="{project}">Proyecto (Default)</option>
+                      )}
+                    </select>
+                    <p className="text-[7px] text-muted-foreground opacity-60">Se inyectará el valor capturado en el formulario.</p>
                   </div>
                 )}
 

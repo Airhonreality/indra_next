@@ -15,6 +15,11 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
+  
+  if (!process.env.NANGO_SECRET_KEY) {
+    console.error('[CRITICAL] Nango Secret Key is missing in environment.');
+    return NextResponse.json({ error: 'NANGO_INFRASTRUCTURE_OFFLINE' }, { status: 500 });
+  }
 
   try {
     // 1. Resolve Port and its associated Integration
@@ -78,8 +83,18 @@ export async function POST(
       return NextResponse.json({ error: 'ADAPTER_CAPABILITY_MISSING:RESUMABLE_UPLOAD' }, { status: 501 });
     }
 
+    // AXIOMATIC FIX: Google Drive API requires Folder IDs, not Paths.
+    // Resolve the human-readable path to a physical Google Drive Folder ID first.
+    let targetFolderId = 'root';
+    try {
+      targetFolderId = await adapter.getOrCreateFolderByPath(absoluteDestinationPath);
+    } catch (pathError) {
+      console.error('[Path Resolution Error]:', pathError);
+      return NextResponse.json({ error: 'FAILED_TO_RESOLVE_STORAGE_PATH' }, { status: 500 });
+    }
+
     const sessionResult = await adapter.createResumableSession(
-      absoluteDestinationPath,
+      targetFolderId,
       fileName,
       mimeType,
       fileSize

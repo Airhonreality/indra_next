@@ -130,6 +130,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
         headers: {
           'X-Upload-Content-Type': mimeType,
           'X-Upload-Content-Length': String(totalSize),
+          'Origin': 'https://indra-next.vercel.app', // 🏛️ Requesting CORS for the session
         },
         data: {
           name: fileName,

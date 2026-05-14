@@ -73,11 +73,21 @@ export class NangoAuthorizedClient implements AuthorizedClient {
       },
     });
 
-    // Normalize headers to lowercase for axiomatic robustness
+    // 🏛️ AXIOMATIC POLYMORPHIC READER: Handle both POJO and Headers object
     const headers: Record<string, string> = {};
-    Object.entries(response.headers || {}).forEach(([k, v]) => {
-      headers[k.toLowerCase()] = String(v);
-    });
+    const rawHeaders = response.headers || {};
+
+    if (typeof (rawHeaders as any).forEach === 'function') {
+      // It's a Headers instance (standard in Fetch/Edge runtimes)
+      (rawHeaders as any).forEach((v: string, k: string) => {
+        headers[k.toLowerCase()] = v;
+      });
+    } else {
+      // It's a plain object (standard in Axios/Node runtimes)
+      Object.entries(rawHeaders).forEach(([k, v]) => {
+        headers[k.toLowerCase()] = String(v);
+      });
+    }
 
     return {
       data: response.data,
@@ -128,7 +138,7 @@ export class DirectFetchClient implements AuthorizedClient {
 
     const data = await res.json();
     
-    // Normalize headers to lowercase for axiomatic robustness
+    // 🏛️ AXIOMATIC POLYMORPHIC READER
     const headers: Record<string, string> = {};
     res.headers.forEach((v, k) => { 
       headers[k.toLowerCase()] = v; 

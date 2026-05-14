@@ -77,7 +77,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
         }
       });
 
-      const folders = response.files.map((f: any) => ({
+      const folders = response.data.files.map((f: any) => ({
         id: f.id,
         label: f.shared ? `👥 ${f.name} (Shared)` : f.name,
         type: 'folder'
@@ -102,58 +102,40 @@ export class GoogleDriveAdapter extends BaseAdapter {
   }
 
   /**
-   * INTERNAL: Resolves a fresh access token from Nango.
-   */
-  private async getFreshToken(): Promise<string> {
-    const tokenResponse = await nango.getToken('google-drive', this.connectionId) as any;
-    return tokenResponse.access_token;
-  }
-
-  /**
    * Initiates a Google Drive Resumable Upload session.
-   * This is the production way to handle ingestion.
+   * This is the scientific way (Nango v2 Proxy) to handle ingestion.
    */
   async createResumableSession(
     targetFolderId: string,
     fileName: string,
     mimeType: string,
-    totalSize: number,
-    retry = true
+    totalSize: number
   ): Promise<OperationResult<{ resumableUri: string; sessionId: string }>> {
     try {
-      const token = await this.getFreshToken();
-
-      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
+      // 🧪 SCIENTIFIC STANDARD: Use Proxy for negotiation to handle auto-refresh
+      const response = await this.client.request({
         method: 'POST',
+        endpoint: '/upload/drive/v3/files?uploadType=resumable',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
           'X-Upload-Content-Type': mimeType,
           'X-Upload-Content-Length': String(totalSize),
         },
-        body: JSON.stringify({
+        data: {
           name: fileName,
           parents: [targetFolderId],
-        }),
+        },
       });
 
-      if (response.status === 401 && retry) {
-        console.warn('⚠️ [Drive] Token expired during session creation. Retrying with fresh token...');
-        return this.createResumableSession(targetFolderId, fileName, mimeType, totalSize, false);
-      }
-
-      if (!response.ok) {
-        throw new Error(`Drive Session Error: ${response.statusText} (${response.status})`);
-      }
-
-      const resumableUri = response.headers.get('Location');
-      if (!resumableUri) throw new Error('NO_LOCATION_HEADER');
+      // Google returns the session URI in the 'location' header
+      const resumableUri = response.headers['location'];
+      if (!resumableUri) throw new Error('NO_LOCATION_HEADER_FROM_PROXY');
 
       return this.result({
         resumableUri,
         sessionId: `GD_SESSION_${Date.now()}`,
       });
     } catch (err) {
+      console.error('[GoogleDriveAdapter] createResumableSession failed:', err);
       return this.error((err as Error).message);
     }
   }
@@ -191,7 +173,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
         }
       });
 
-      const items = (response.files || []).map((f: any) => ({
+      const items = (response.data.files || []).map((f: any) => ({
         id: f.id,
         name: f.shared ? `👥 ${f.name}` : f.name,
         type: f.mimeType?.includes('folder') ? 'folder' : 'file',
@@ -231,26 +213,24 @@ export class GoogleDriveAdapter extends BaseAdapter {
         },
       });
 
-      if (searchRes.files && searchRes.files.length > 0) {
-        currentParentId = searchRes.files[0].id;
+      if (searchRes.data.files && searchRes.data.files.length > 0) {
+        currentParentId = searchRes.data.files[0].id;
       } else {
-        // 2. Create it
-        const token = await this.getFreshToken();
-        const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+        // 🧪 SCIENTIFIC STANDARD: Use Proxy for creation to handle auto-refresh
+        const folder = await this.client.request({
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+          endpoint: '/drive/v3/files',
+          data: {
             name: segment,
             parents: [currentParentId],
             mimeType: 'application/vnd.google-apps.folder',
-          }),
+          },
         });
-        const folder = await createRes.json();
-        if (!folder.id) throw new Error(`Failed to create folder segment: ${segment} (${createRes.status})`);
-        currentParentId = folder.id;
+
+        if (!folder.data?.id) {
+          throw new Error(`Failed to create folder segment: ${segment}`);
+        }
+        currentParentId = folder.data.id;
       }
     }
 

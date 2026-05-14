@@ -33,12 +33,18 @@ export interface RequestConfig {
   headers?: Record<string, string>;
 }
 
+export interface AuthorizedResponse<T = any> {
+  data: T;
+  headers: Record<string, string>;
+  status: number;
+}
+
 export interface AuthorizedClient {
   get(endpoint: string): Promise<any>;
   post(endpoint: string, data?: any): Promise<any>;
   patch(endpoint: string, data?: any): Promise<any>;
   batchGet(endpoints: string[]): Promise<any[]>;
-  request(config: RequestConfig): Promise<any>;
+  request<T = any>(config: RequestConfig): Promise<AuthorizedResponse<T>>;
 }
 
 export class NangoAuthorizedClient implements AuthorizedClient {
@@ -48,9 +54,8 @@ export class NangoAuthorizedClient implements AuthorizedClient {
     private readonly extraHeaders?: Record<string, string>
   ) {}
 
-  async request(config: RequestConfig): Promise<any> {
+  async request<T = any>(config: RequestConfig): Promise<AuthorizedResponse<T>> {
     // 🛠️ CANONICAL V2 PROXY ENFORCEMENT
-    // Remove leading slash if present to avoid double slashes in https://api.nango.dev/proxy/{endpoint}
     const cleanEndpoint = config.endpoint.startsWith('/') 
       ? config.endpoint.slice(1) 
       : config.endpoint;
@@ -62,18 +67,31 @@ export class NangoAuthorizedClient implements AuthorizedClient {
       connectionId: this.connectionId,
       data: config.data,
       params: config.params,
-      // 🛡️ Ensure standard headers as per manual
       headers: { 
         ...this.extraHeaders, 
         ...config.headers
       },
     });
-    return response.data;
+
+    return {
+      data: response.data,
+      headers: response.headers as Record<string, string>,
+      status: response.status
+    };
   }
 
-  get(endpoint: string) { return this.request({ method: 'GET', endpoint }); }
-  post(endpoint: string, data?: any) { return this.request({ method: 'POST', endpoint, data }); }
-  patch(endpoint: string, data?: any) { return this.request({ method: 'PATCH', endpoint, data }); }
+  async get(endpoint: string) { 
+    const res = await this.request({ method: 'GET', endpoint }); 
+    return res.data;
+  }
+  async post(endpoint: string, data?: any) { 
+    const res = await this.request({ method: 'POST', endpoint, data }); 
+    return res.data;
+  }
+  async patch(endpoint: string, data?: any) { 
+    const res = await this.request({ method: 'PATCH', endpoint, data }); 
+    return res.data;
+  }
 
   async batchGet(endpoints: string[]): Promise<any[]> {
     return Promise.all(endpoints.map(ep => this.get(ep)));
@@ -86,7 +104,7 @@ export class DirectFetchClient implements AuthorizedClient {
     private readonly headers: Record<string, string>
   ) {}
 
-  async request(config: RequestConfig): Promise<any> {
+  async request<T = any>(config: RequestConfig): Promise<AuthorizedResponse<T>> {
     const url = new URL(this.baseUrl + config.endpoint);
     if (config.params) {
       Object.entries(config.params).forEach(([k, v]) => url.searchParams.append(k, v));
@@ -101,12 +119,26 @@ export class DirectFetchClient implements AuthorizedClient {
       const text = await res.text();
       throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
     }
-    return res.json();
+
+    const data = await res.json();
+    const headers: Record<string, string> = {};
+    res.headers.forEach((v, k) => { headers[k] = v; });
+
+    return { data, headers, status: res.status };
   }
 
-  get(endpoint: string) { return this.request({ method: 'GET', endpoint }); }
-  post(endpoint: string, data?: any) { return this.request({ method: 'POST', endpoint, data }); }
-  patch(endpoint: string, data?: any) { return this.request({ method: 'PATCH', endpoint, data }); }
+  async get(endpoint: string) { 
+    const res = await this.request({ method: 'GET', endpoint }); 
+    return res.data;
+  }
+  async post(endpoint: string, data?: any) { 
+    const res = await this.request({ method: 'POST', endpoint, data }); 
+    return res.data;
+  }
+  async patch(endpoint: string, data?: any) { 
+    const res = await this.request({ method: 'PATCH', endpoint, data }); 
+    return res.data;
+  }
 
   async batchGet(endpoints: string[]): Promise<any[]> {
     return Promise.all(endpoints.map(ep => this.get(ep)));

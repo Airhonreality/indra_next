@@ -48,9 +48,8 @@ export function AgnosticTree({
     const newPath = [...activePath.slice(0, columnIndex + 1), atom.id];
     setActivePath(newPath);
 
-    if (atom.type === 'file') {
-      onSelect(atom);
-    }
+    // 2. Emit selection event (Agnostic of type)
+    onSelect(atom);
 
     // 2. Scroll to right to show new column
     setTimeout(() => {
@@ -133,6 +132,7 @@ function TreeColumn({
               Error de Conexión:<br/>{error}
             </p>
             <Button 
+              type="button"
               variant="outline" 
               size="sm" 
               className="h-7 text-[8px] uppercase font-black tracking-widest border-destructive/20 hover:bg-destructive/10"
@@ -155,6 +155,7 @@ function TreeColumn({
             const isSelected = selectedId === atom.id;
             return (
               <button
+                type="button"
                 key={atom.id}
                 onClick={() => onItemClick(atom as AgnosticAtom)}
                 className={cn(

@@ -243,7 +243,7 @@ export function RuleArchitect({
                             <span className="text-[9px] font-mono font-bold truncate">/{r.folder}</span>
                          </div>
                        ))}
-                       <Button variant="ghost" className="w-full h-5 text-[7px] uppercase font-black tracking-widest p-0 opacity-40 hover:opacity-100">
+                       <Button type="button" variant="ghost" className="w-full h-5 text-[7px] uppercase font-black tracking-widest p-0 opacity-40 hover:opacity-100">
                           + Añadir Condición
                        </Button>
                     </div>

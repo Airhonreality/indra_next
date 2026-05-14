@@ -109,9 +109,18 @@ export class GoogleDriveAdapter extends BaseAdapter {
     targetFolderId: string,
     fileName: string,
     mimeType: string,
-    totalSize: number
+    totalSize: number,
+    metadata?: { [key: string]: string }
   ): Promise<OperationResult<{ resumableUri: string; sessionId: string }>> {
     try {
+      // 🏛️ AXIOMATIC LOGIC: Map sovereign metadata to Google Drive appProperties
+      // These are private, indexed metadata that survive transcoding.
+      const appProperties: Record<string, string> = {
+        indra_ingested_at: new Date().toISOString(),
+        indra_original_name: fileName,
+        ...metadata,
+      };
+
       // 🧪 SCIENTIFIC STANDARD: Use Proxy for negotiation to handle auto-refresh
       const response = await this.client.request({
         method: 'POST',
@@ -123,6 +132,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
         data: {
           name: fileName,
           parents: [targetFolderId],
+          appProperties, // 🎯 Sovereign Traceability
         },
       });
 
@@ -170,7 +180,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
         endpoint: '/drive/v3/files',
         params: {
           q,
-          fields: 'files(id, name, mimeType, shared, size, modifiedTime)',
+          fields: 'files(id, name, mimeType, shared, size, modifiedTime, fileExtension, capabilities, appProperties)',
           pageSize: query?.limit?.toString() || '50',
           ...(query?.cursor && { pageToken: query.cursor }),
           supportsAllDrives: 'true',

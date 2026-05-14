@@ -73,9 +73,15 @@ export class NangoAuthorizedClient implements AuthorizedClient {
       },
     });
 
+    // Normalize headers to lowercase for axiomatic robustness
+    const headers: Record<string, string> = {};
+    Object.entries(response.headers || {}).forEach(([k, v]) => {
+      headers[k.toLowerCase()] = String(v);
+    });
+
     return {
       data: response.data,
-      headers: response.headers as Record<string, string>,
+      headers,
       status: response.status
     };
   }
@@ -121,8 +127,12 @@ export class DirectFetchClient implements AuthorizedClient {
     }
 
     const data = await res.json();
+    
+    // Normalize headers to lowercase for axiomatic robustness
     const headers: Record<string, string> = {};
-    res.headers.forEach((v, k) => { headers[k] = v; });
+    res.headers.forEach((v, k) => { 
+      headers[k.toLowerCase()] = v; 
+    });
 
     return { data, headers, status: res.status };
   }

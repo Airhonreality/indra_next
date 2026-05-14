@@ -20,6 +20,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
+import exifr from 'exifr';
 
 export type IngestionStatus = 'idle' | 'uploading' | 'processing' | 'success' | 'error';
 
@@ -55,14 +56,40 @@ export function useIngestionOrchestrator(slug: string) {
       lastUpdateRef.current = { time: Date.now(), loaded: 0 };
 
       try {
-        // 1. Negotiation Phase
+        // 1. Metadata Extraction Phase (Sovereign Ingestion)
+        // ---------------------------------------------------------------------
+        // According to invs_Metadata_transcode, we must extract binary data 
+        // before any processing to avoid browser-induced metadata loss.
+        let metadata: Record<string, string> = {};
+        
+        if (file.type.startsWith('image/')) {
+          try {
+            const exif = await exifr.parse(file, {
+              pick: ['DateTimeOriginal', 'GPSLatitude', 'GPSLongitude', 'Make', 'Model', 'Software']
+            });
+            if (exif) {
+              metadata = {
+                capture_date: exif.DateTimeOriginal?.toISOString() || '',
+                gps_lat: exif.GPSLatitude?.toString() || '',
+                gps_lon: exif.GPSLongitude?.toString() || '',
+                camera: `${exif.Make || ''} ${exif.Model || ''}`.trim(),
+                software: exif.Software || '',
+              };
+            }
+          } catch (exifErr) {
+            console.warn('[Orchestrator] Metadata extraction bypassed for image:', exifErr);
+          }
+        }
+
+        // 2. Negotiation Phase
         const negRes = await fetch(`/api/p/${slug}/upload`, {
           method: 'POST',
           body: JSON.stringify({
             fileName: file.name,
             mimeType: file.type || 'application/octet-stream',
             fileSize: file.size,
-            variables: formData
+            variables: formData,
+            metadata
           })
         });
         const { uploadUrl, error } = await negRes.json();

@@ -127,6 +127,7 @@ export interface IntegrationAdapter {
     targetId: string, 
     fileName: string, 
     mimeType: string, 
-    totalSize: number
+    totalSize: number,
+    metadata?: { [key: string]: string }
   ): Promise<OperationResult<{ resumableUri: string; sessionId: string }>>;
 }

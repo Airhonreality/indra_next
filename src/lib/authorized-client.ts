@@ -2,35 +2,39 @@
  * 🗝️ ARTEFACTO: authorized-client.ts
  * ────────────
  * CAPA: Lib / Security (The Sovereign Gate)
- * VERSIÓN: 1.1.0-Auth
- * COMMIT: P2-M2.3-ADR-CLEAN-HTTP-BRIDGE
+ * VERSIÓN: 2.0.0
+ * COMMIT: P3-M7.1-SOVEREIGN-TRANSPORT-BYPASS
  * 
  * 🎯 FUNCTIONAL_SCOPE:
- * - Abstracción de peticiones HTTP autorizadas mediante Nango Proxy o Fetch Directo.
- * - Desacoplamiento de la lógica del adaptador de la infraestructura de transporte.
- * - Inyección de cabeceras de seguridad y versiones de API por integración.
+ * - Abstracción de peticiones HTTP autorizadas mediante Nango Proxy o Bypass Directo.
+ * - Resolución del "Punto Ciego" de cabeceras en entornos Edge/Serverless.
+ * - Gestión de la identidad soberana mediante tokens de Nango sin intermediación de transporte.
  * 
  * 🛡️ AXIOMATIC_CONTRACT:
- * - MUST: Ser agnóstico a la API final; el cliente solo entiende 'endpoint' y 'data'.
- * - NEVER: Hardcodear cabeceras específicas de proveedor (ej. 'Notion-Version') dentro de la clase genérica. Usar fábricas.
- * - NEVER: Exponer o loguear el 'Nango-Secret-Key' en ninguna capa del cliente.
- * - ALWAYS: Retornar errores tipados que el Core pueda interpretar sin conocer el código HTTP.
+ * - MUST: Priorizar el Bypass Directo para flujos de negociación de cabeceras críticas (Resumable Uploads).
+ * - NEVER: Exponer tokens de acceso en el cliente (lado del navegador).
+ * - ALWAYS: Garantizar la transparencia total de los headers mediante el "Polymorphic Reader".
  * 
- * 📜 ADR: [2026-05-08] UNIFIED_AUTHORIZED_TRANSPORT
- * - DECISIÓN: Implementar una interfaz común para Nango Proxy y Fetch para permitir testing y mocks.
- * - IMPACTO: Facilidad de migración entre proveedores de OAuth sin tocar lógica de adaptadores.
+ * 📜 ADR: [2026-05-14] SOVEREIGN_TRANSPORT_BYPASS
+ * - DECISIÓN: Implementar acceso directo a APIs de proveedores usando tokens de Nango vía 'nango.getToken()'.
+ * - MOTIVO: El Proxy de Nango oculta cabeceras vitales como 'Location' en ciertos entornos serverless, rompiendo el apretón de manos de subidas resumibles.
+ * - IMPACTO: Control absoluto sobre la materia (datos) y el transporte, eliminando dependencias de terceros en la capa de negociación.
  * 
- * 🔑 KEYWORDS: #AuthorizedClient #NangoProxy #DependencyInversion #SecurityGate
- * 🔗 RELATIONSHIPS: [IntegrationAdapter, NangoLib, API_Vault]
+ * 🔗 RELATIONSHIPS:
+ * - UPSTREAM: [Nango SDK, Google Drive API]
+ * - DOWNSTREAM: [IntegrationAdapter, IngestionOrchestrator]
  */
 
 import { nango } from '@/lib/nango';
+
 export interface RequestConfig {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
   endpoint: string;
   params?: Record<string, string>;
   data?: any;
   headers?: Record<string, string>;
+  bypassProxy?: boolean; // 🛰️ NEW: Sovereign Bypass Flag
+  baseUrl?: string;      // Required for bypass mode
 }
 
 export interface AuthorizedResponse<T = any> {
@@ -55,11 +59,43 @@ export class NangoAuthorizedClient implements AuthorizedClient {
   ) {}
 
   async request<T = any>(config: RequestConfig): Promise<AuthorizedResponse<T>> {
-    // 🛠️ CANONICAL V2 PROXY ENFORCEMENT
     const cleanEndpoint = config.endpoint.startsWith('/') 
       ? config.endpoint.slice(1) 
       : config.endpoint;
 
+    // 🏛️ SOVEREIGN BYPASS LOGIC: Direct Fetch with Nango Token
+    if (config.bypassProxy && config.baseUrl) {
+      console.log(`[AuthorizedClient] Executing SOVEREIGN BYPASS to ${config.baseUrl}${cleanEndpoint}`);
+      
+      const token = await nango.getToken(this.providerConfigKey, this.connectionId);
+      
+      const url = new URL(config.baseUrl + (config.baseUrl.endsWith('/') ? '' : '/') + cleanEndpoint);
+      if (config.params) {
+        Object.entries(config.params).forEach(([k, v]) => url.searchParams.append(k, v));
+      }
+
+      const res = await fetch(url.toString(), {
+        method: config.method || 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          ...this.extraHeaders,
+          ...config.headers
+        },
+        body: config.data ? JSON.stringify(config.data) : undefined,
+      });
+
+      const data = (res.status === 204 || res.status === 201 && !res.headers.get('content-type')) 
+        ? {} 
+        : await res.json().catch(() => ({}));
+
+      const headers: Record<string, string> = {};
+      res.headers.forEach((v, k) => { headers[k.toLowerCase()] = v; });
+
+      return { data, headers, status: res.status };
+    }
+
+    // 🧪 TRADITIONAL NANGO PROXY LOGIC
     const response = await nango.proxy({
       method: config.method || 'GET',
       endpoint: cleanEndpoint,
@@ -73,17 +109,15 @@ export class NangoAuthorizedClient implements AuthorizedClient {
       },
     });
 
-    // 🏛️ AXIOMATIC POLYMORPHIC READER: Handle both POJO and Headers object
+    // 🏛️ AXIOMATIC POLYMORPHIC READER
     const headers: Record<string, string> = {};
     const rawHeaders = response.headers || {};
 
     if (typeof (rawHeaders as any).forEach === 'function') {
-      // It's a Headers instance (standard in Fetch/Edge runtimes)
       (rawHeaders as any).forEach((v: string, k: string) => {
         headers[k.toLowerCase()] = v;
       });
     } else {
-      // It's a plain object (standard in Axios/Node runtimes)
       Object.entries(rawHeaders).forEach(([k, v]) => {
         headers[k.toLowerCase()] = String(v);
       });
@@ -91,6 +125,10 @@ export class NangoAuthorizedClient implements AuthorizedClient {
 
     return {
       data: response.data,
+      headers,
+      status: response.status
+    };
+  }response.data,
       headers,
       status: response.status
     };

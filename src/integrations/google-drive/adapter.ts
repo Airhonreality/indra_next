@@ -121,10 +121,12 @@ export class GoogleDriveAdapter extends BaseAdapter {
         ...metadata,
       };
 
-      // 🧪 SCIENTIFIC STANDARD: Use Proxy for negotiation to handle auto-refresh
+      // 🏛️ SOVEREIGN BYPASS: Negotiate directly with Google to avoid Proxy header-stripping
       const response = await this.client.request({
         method: 'POST',
-        endpoint: '/upload/drive/v3/files?uploadType=resumable',
+        endpoint: '/drive/v3/files?uploadType=resumable',
+        baseUrl: 'https://www.googleapis.com/upload', // 🎯 Critical: Upload API base
+        bypassProxy: true,                             // 🛰️ Bypass Nango Proxy
         headers: {
           'X-Upload-Content-Type': mimeType,
           'X-Upload-Content-Length': String(totalSize),

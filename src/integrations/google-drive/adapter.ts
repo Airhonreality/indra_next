@@ -126,9 +126,14 @@ export class GoogleDriveAdapter extends BaseAdapter {
         },
       });
 
-      // Google returns the session URI in the 'location' header
-      const resumableUri = response.headers['location'];
-      if (!resumableUri) throw new Error('NO_LOCATION_HEADER_FROM_PROXY');
+      // Google returns the session URI in the 'location' header (can be capitalized)
+      const headers = response.headers || {};
+      const resumableUri = headers['location'] || headers['Location'];
+
+      if (!resumableUri) {
+        console.error('[GoogleDriveAdapter] Proxy response missing location header. Status:', response.status, 'Body:', response.data);
+        throw new Error(`NO_LOCATION_HEADER_FROM_PROXY (Status: ${response.status})`);
+      }
 
       return this.result({
         resumableUri,

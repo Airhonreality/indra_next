@@ -128,10 +128,6 @@ export class NangoAuthorizedClient implements AuthorizedClient {
       headers,
       status: response.status
     };
-  }response.data,
-      headers,
-      status: response.status
-    };
   }
 
   async get(endpoint: string) { 

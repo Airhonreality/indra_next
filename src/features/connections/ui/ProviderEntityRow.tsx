@@ -42,9 +42,7 @@ import {
   UploadCloud
 } from 'lucide-react';
 import { IngestionPortList } from './IngestionPortList';
-import { AgnosticDropzone } from '@/components/ui/agnostic-dropzone';
-import { TelemetryHUD } from '@/components/ingestion/telemetry-hud';
-import { useIngestionOrchestrator } from '@/hooks/use-ingestion-orchestrator';
+import { SovereignIngestor } from '@/components/ingestion/sovereign-ingestor';
 import { cn } from '@/lib/utils';
 import { ProviderManifest, Connection } from '../integration_types';
 import { SchemaManager } from '@/components/schema-manager';
@@ -102,7 +100,7 @@ export function ProviderEntityRow({
     setSearchQuery
   } = useInventory(isActive ? activeConnection.id : undefined);
 
-  const { processQueue, status: uploadStatus, telemetry } = useIngestionOrchestrator(activeConnection?.id || '');
+  // Ingestion is now handled by the Agnostic Block internally
 
   const addLog = (msg: string) => {
     setTerminalLogs(prev => [...prev.slice(-4), `[${new Date().toLocaleTimeString()}] ${msg}`]);
@@ -127,19 +125,7 @@ export function ProviderEntityRow({
     }
   };
 
-  const handleImmediateIngestion = async () => {
-    if (!activeConnection || selectedFiles.length === 0) return;
-    addLog(`Initiating sovereign ingestion via unified orchestrator...`);
-    
-    try {
-      // Reutilizamos la misma lógica de cola que el portal público
-      await processQueue(selectedFiles, { targetPath: '/' }); 
-      addLog(`Success: Assets injected into ${manifest.label}`);
-      setSelectedFiles([]);
-    } catch (err) {
-      addLog(`Error: Ingestion failed at domain level.`);
-    }
-  };
+  // Immediate Ingestion is handled by the block's own UI
 
   return (
     <div className={cn(
@@ -366,35 +352,7 @@ export function ProviderEntityRow({
                     <div className="md:col-span-3 flex flex-col gap-6">
                       
                       {/* UNIFIED INGESTION OPERATOR (AgnosticDropzone) */}
-                      {manifest.capabilities.includes('file_upload') && (
-                        <div className="space-y-4 animate-in slide-in-from-top-4 duration-500">
-                          <div className="flex items-center gap-2">
-                            <UploadCloud className="size-3 text-primary" />
-                            <h5 className="text-[10px] font-bold uppercase tracking-widest text-primary">Immediate Ingestion Operator</h5>
-                          </div>
-                          <AgnosticDropzone 
-                            onFilesAdded={(files) => setSelectedFiles(prev => [...prev, ...files])}
-                            files={selectedFiles}
-                            onRemoveFile={(idx) => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))}
-                            className="h-32 rounded-2xl"
-                          />
-
-                          <TelemetryHUD 
-                            telemetry={telemetry}
-                            status={uploadStatus}
-                            fileName={selectedFiles[telemetry.currentFileIndex]?.name || ''}
-                          />
-
-                          {selectedFiles.length > 0 && uploadStatus === 'idle' && (
-                            <button 
-                              onClick={handleImmediateIngestion}
-                              className="w-full py-2.5 bg-primary text-primary-foreground rounded-xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-all shadow-sm"
-                            >
-                              Inject {selectedFiles.length} Assets into {manifest.label}
-                            </button>
-                          )}
-                        </div>
-                      )}
+                          <SovereignIngestor slug={activeConnection.id} />
 
                       <div className="flex flex-col gap-4">
                         <div className="flex items-center gap-2">

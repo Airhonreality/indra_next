@@ -138,15 +138,15 @@ export interface TranscodeConfig {
 export type WorkerCommand =
   | {
       type: 'TRANSCODE';
-      payload: { fileId: string; buffer: ArrayBuffer; mimeType: string; config: TranscodeConfig };
+      payload: { fileId: string; buffer?: ArrayBufferLike; opfsFileName?: string; mimeType: string; config: TranscodeConfig };
     }
   | {
       type: 'EXTRACT_METADATA';
-      payload: { fileId: string; buffer: ArrayBuffer; mimeType: string; userAgent: string };
+      payload: { fileId: string; buffer: ArrayBufferLike; mimeType: string; userAgent: string };
     }
   | {
       type: 'BUILD_FRAME_INDEX';
-      payload: { fileId: string; buffer: ArrayBuffer };
+      payload: { fileId: string; buffer: ArrayBufferLike };
     }
   | {
       type: 'ABORT';
@@ -157,7 +157,7 @@ export type WorkerEvent =
   | { type: 'PROGRESS'; payload: { fileId: string; percent: number; stage: string } }
   | { type: 'METADATA_READY'; payload: { fileId: string; metadata: MediaMetadata } }
   | { type: 'FRAME_INDEX_READY'; payload: { fileId: string; frames: FrameDescriptor[] } }
-  | { type: 'TRANSCODE_COMPLETE'; payload: { fileId: string; buffer: ArrayBuffer } }
+  | { type: 'TRANSCODE_COMPLETE'; payload: { fileId: string; buffer: ArrayBufferLike } }
   | { type: 'ERROR'; payload: { fileId: string; error: MediaError } };
 
 // ─── Pipeline upload contract ────────────────────────────────────────────────

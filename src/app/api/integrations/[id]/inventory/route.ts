@@ -41,7 +41,7 @@ export async function GET(
     const { AgnosticQuerySchema } = await import('@/core/inventory/types');
     
     // Resolve adapter with the stored connectionId
-    const adapter = registry.resolve(integration.type, integration.connectionId);
+    const adapter = registry.resolveAdapter(integration.type, integration.connectionId);
     
     // 3. PARSE & VALIDATE AGNOSTIC QUERY
     const { searchParams } = new URL(req.url);

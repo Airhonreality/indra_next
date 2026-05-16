@@ -77,7 +77,7 @@ export async function POST(
     await import('@/integrations/register-all');
     const { registry } = await import('@/core/registry');
 
-    const adapter = registry.resolve(port.integration.type, port.integration.connectionId) as GoogleDriveAdapter;
+    const adapter = registry.resolveAdapter(port.integration.type, port.integration.connectionId) as GoogleDriveAdapter;
 
     if (!adapter.createResumableSession) {
       return NextResponse.json({ error: 'ADAPTER_CAPABILITY_MISSING:RESUMABLE_UPLOAD' }, { status: 501 });

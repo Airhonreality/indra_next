@@ -11,6 +11,9 @@
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
     "@base-ui/react": "^1.4.1",
+    "@ffmpeg/core": "^0.12.10",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@nangohq/frontend": "^0.70.1",
     "@nangohq/node": "^0.70.1",
     "@neondatabase/serverless": "^1.1.0",

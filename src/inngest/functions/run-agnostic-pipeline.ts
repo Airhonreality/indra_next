@@ -31,8 +31,8 @@ export const runAgnosticPipeline = inngest.createFunction(
       const sourceContext = { connectionId: source.connectionId, ...source.context };
       const targetContext = { connectionId: target.connectionId, ...target.context };
 
-      const sourceAdapter = registry.resolve(source.integration, sourceContext);
-      const targetAdapter = registry.resolve(target.integration, targetContext);
+      const sourceAdapter = registry.resolveAdapter(source.integration, sourceContext);
+      const targetAdapter = registry.resolveAdapter(target.integration, targetContext);
 
       const transformer = options.fieldMap
         ? makeFieldMapTransformer(options.fieldMap)

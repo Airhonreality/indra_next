@@ -13,14 +13,30 @@
  *   - Any reference to window.document
  */
 
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import type { WorkerCommand, WorkerEvent, MediaError, MediaMetadata } from '@/core/media/types';
 import { MetadataEngine } from '@/core/media/metadata';
+import { HardwareTranscoder } from '@/lib/hardware-transcoder';
 
 const engine = new MetadataEngine();
+let ffmpeg: FFmpeg | null = null;
+
+/**
+ * 🏛️ SOVEREIGN TRANSLATOR: Load FFmpeg only when needed
+ */
+async function loadFFmpeg() {
+  if (ffmpeg) return ffmpeg;
+  ffmpeg = new FFmpeg();
+  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+  });
+  return ffmpeg;
+}
 
 // In a DedicatedWorker, postMessage accepts (message, transfer[]).
-// TypeScript's dom lib types self as Window, so we cast once.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ctx = self as unknown as { addEventListener: typeof self.addEventListener; postMessage(msg: unknown, transfer?: Transferable[]): void };
 
 // ─── Message router ───────────────────────────────────────────────────────────
@@ -54,13 +70,13 @@ ctx.addEventListener('message', async (event: MessageEvent<WorkerCommand>) => {
 
 async function handleExtractMetadata(payload: {
   fileId: string;
-  buffer: ArrayBuffer;
+  buffer: ArrayBufferLike;
   mimeType: string;
   userAgent: string;
 }): Promise<void> {
   emitProgress(payload.fileId, 10, 'Parsing binary metadata');
 
-  const result = engine.extract(payload.buffer, payload.mimeType, payload.userAgent);
+  const result = engine.extract(payload.buffer as ArrayBuffer, payload.mimeType, payload.userAgent);
 
   if (!result.ok) {
     emitError(payload.fileId, result.error!);
@@ -78,36 +94,50 @@ async function handleExtractMetadata(payload: {
 
 async function handleTranscode(payload: {
   fileId: string;
-  buffer: ArrayBuffer;
+  buffer?: ArrayBufferLike;
+  opfsFileName?: string;
   mimeType: string;
   config: import('@/core/media/types').TranscodeConfig;
 }): Promise<void> {
-  const { fileId, buffer, mimeType, config } = payload;
+  const { fileId, buffer, opfsFileName, mimeType, config } = payload;
+
+  let sourceBuffer: ArrayBufferLike;
+  if (opfsFileName) {
+    emitProgress(fileId, 2, 'Recuperando Materia desde OPFS');
+    const root = await navigator.storage.getDirectory();
+    const handle = await root.getFileHandle(opfsFileName);
+    const file = await handle.getFile();
+    sourceBuffer = await file.arrayBuffer();
+  } else if (buffer) {
+    sourceBuffer = buffer;
+  } else {
+    throw new Error('TRANSCODE_ERROR: No source material provided.');
+  }
 
   if (mimeType.startsWith('image/')) {
-    await transcodeImage(fileId, buffer, mimeType, config);
+    await transcodeImage(fileId, sourceBuffer, mimeType, config);
   } else if (mimeType.startsWith('video/')) {
-    await transcodeVideo(fileId, buffer, mimeType, config);
+    await transcodeVideo(fileId, sourceBuffer, mimeType, config);
   } else {
     emitError(fileId, {
       code: 'WEBCODECS_UNSUPPORTED',
-      message: `MIME type "${mimeType}" is not supported for transcoding.`,
-      recoveryHint: 'Provide an image/* or video/* file.',
+      message: `MIME type "${mimeType}" is not supported.`,
+      recoveryHint: 'Provide image or video.',
     });
   }
 }
 
 async function transcodeImage(
   fileId: string,
-  buffer: ArrayBuffer,
+  buffer: ArrayBufferLike,
   mimeType: string,
   config: import('@/core/media/types').TranscodeConfig
 ): Promise<void> {
   if (typeof OffscreenCanvas === 'undefined') {
     emitError(fileId, {
       code: 'OFFSCREEN_CANVAS_UNSUPPORTED',
-      message: 'OffscreenCanvas is unavailable in this Worker context.',
-      recoveryHint: 'Use a Chromium-based browser with OffscreenCanvas support.',
+      message: 'OffscreenCanvas unavailable.',
+      recoveryHint: 'Use a modern browser.',
     });
     return;
   }
@@ -116,13 +146,13 @@ async function transcodeImage(
 
   let bitmap: ImageBitmap;
   try {
-    const blob = new Blob([buffer], { type: mimeType });
+    const blob = new Blob([buffer as any], { type: mimeType });
     bitmap = await createImageBitmap(blob);
   } catch (err) {
     emitError(fileId, {
       code: 'METADATA_EXTRACTION_FAILED',
       message: `createImageBitmap failed: ${String(err)}`,
-      recoveryHint: 'Verify the file is a valid, untruncated image.',
+      recoveryHint: 'Verify file integrity.',
     });
     return;
   }
@@ -135,8 +165,8 @@ async function transcodeImage(
   if (!canvasCtx) {
     emitError(fileId, {
       code: 'OFFSCREEN_CANVAS_UNSUPPORTED',
-      message: 'Could not acquire 2D context from OffscreenCanvas.',
-      recoveryHint: 'GPU context may be unavailable. Retry.',
+      message: 'Context unavailable.',
+      recoveryHint: 'Retry.',
     });
     return;
   }
@@ -148,85 +178,107 @@ async function transcodeImage(
 
   let outputBlob: Blob;
   try {
-    outputBlob = await canvas.convertToBlob({
-      type: 'image/jpeg',
-      quality: 0.92,
-    });
+    outputBlob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.92 });
   } catch (err) {
     emitError(fileId, {
       code: 'WEBCODECS_UNSUPPORTED',
-      message: `canvas.convertToBlob failed: ${String(err)}`,
-      recoveryHint: 'Try a different output format.',
+      message: `convertToBlob failed: ${String(err)}`,
+      recoveryHint: 'Try another format.',
     });
     return;
   }
 
   const outBuffer = await outputBlob.arrayBuffer();
-  emitProgress(fileId, 100, 'Image transcoded');
-
-  const event: WorkerEvent = {
-    type: 'TRANSCODE_COMPLETE',
-    payload: { fileId, buffer: outBuffer },
-  };
-  // Transfer ownership — zero copy
-  ctx.postMessage(event, [outBuffer]);
+  finishTranscode(fileId, outBuffer);
 }
 
 async function transcodeVideo(
   fileId: string,
-  _buffer: ArrayBuffer,
-  _mimeType: string,
+  buffer: ArrayBufferLike,
+  mimeType: string,
   config: import('@/core/media/types').TranscodeConfig
 ): Promise<void> {
-  // Hardware acceleration negotiation
-  if (typeof VideoEncoder === 'undefined') {
+  const isHardwareSupported = await HardwareTranscoder.checkSupport();
+  const isMassiveFile = buffer.byteLength > 2 * 1024 * 1024 * 1024;
+
+  if (isHardwareSupported) {
+    emitProgress(fileId, 5, 'Iniciando Pipeline de Hardware (GPU)');
+    try {
+      const transcoder = new HardwareTranscoder();
+      const blob = new Blob([buffer as any], { type: mimeType });
+      const result = await transcoder.transcode(blob as any, config, (pct) => {
+        emitProgress(fileId, pct, 'Transcodificando vía GPU');
+      });
+      if (result.byteLength > 0) {
+        finishTranscode(fileId, result);
+        return;
+      }
+    } catch (err) {
+      console.warn('[SME] Hardware Path fail, fallback to software.', err);
+    }
+  }
+
+  if (isMassiveFile) {
+    console.warn('[SME] Entropy Warning: Massive file on software path.');
+  }
+
+  emitProgress(fileId, 10, 'Iniciando Motor Universal (Software Fallback)');
+  
+  try {
+    const ffmpeg = await loadFFmpeg();
+    const inputName = `input_${fileId}`;
+    const outputName = `output_${fileId}.mp4`;
+
+    await ffmpeg.writeFile(inputName, new Uint8Array(buffer));
+
+    emitProgress(fileId, 25, 'Transcodificando Materia (Software HEVC)');
+
+    await ffmpeg.exec([
+      '-i', inputName,
+      '-c:v', 'libx265',
+      '-crf', '18',
+      '-preset', 'ultrafast',
+      '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac',
+      '-b:a', '192k',
+      outputName
+    ]);
+
+    const data = await ffmpeg.readFile(outputName);
+    const outBuffer = (data as Uint8Array).buffer;
+
+    await ffmpeg.deleteFile(inputName);
+    await ffmpeg.deleteFile(outputName);
+
+    finishTranscode(fileId, outBuffer);
+  } catch (err) {
     emitError(fileId, {
       code: 'WEBCODECS_UNSUPPORTED',
-      message: 'WebCodecs VideoEncoder is not available in this browser.',
-      recoveryHint: 'Use Chrome 94+ or Edge 94+. Safari requires version 16.4+.',
+      message: `Critical failure: ${String(err)}`,
+      recoveryHint: 'Device insufficient.',
     });
-    return;
   }
+}
 
-  const codec = config.codec ?? 'avc';
-  const codecString = codecToString(codec, config.profile ?? 'high');
-  const accel = config.hardwareAcceleration ?? 'prefer-hardware';
-
-  const support = await VideoEncoder.isConfigSupported({
-    codec: codecString,
-    width: config.targetWidth ?? 1920,
-    height: config.targetHeight ?? 1080,
-    bitrate: config.bitrate ?? 8_000_000,
-    hardwareAcceleration: accel,
-  });
-
-  if (!support.supported) {
-    emitError(fileId, {
-      code: 'HARDWARE_ACCEL_UNAVAILABLE',
-      message: `Codec "${codecString}" with "${accel}" is not supported on this device.`,
-      recoveryHint: 'Try codec "avc" with "prefer-software" as fallback.',
-    });
-    return;
+function finishTranscode(fileId: string, buffer: ArrayBufferLike) {
+  emitProgress(fileId, 100, 'Transcodificación Completada');
+  const event: WorkerEvent = {
+    type: 'TRANSCODE_COMPLETE',
+    payload: { fileId, buffer },
+  };
+  
+  if (buffer instanceof ArrayBuffer) {
+    ctx.postMessage(event, [buffer]);
+  } else {
+    ctx.postMessage(event);
   }
-
-  // Full video transcoding requires an MP4 demuxer (mp4box.js) to feed
-  // EncodedVideoChunk objects to VideoDecoder. Without it, we cannot
-  // process the container format.
-  emitError(fileId, {
-    code: 'WEBCODECS_UNSUPPORTED',
-    message: 'Video transcoding requires an MP4 demuxer. Add mp4box.js as a dependency.',
-    recoveryHint: 'Install mp4box.js: npm install mp4box. The WebCodecs pipeline is ready.',
-  });
 }
 
 async function handleBuildFrameIndex(payload: {
   fileId: string;
-  buffer: ArrayBuffer;
+  buffer: ArrayBufferLike;
 }): Promise<void> {
-  // Without mp4box.js we cannot walk the sample table (stbl/stts/ctts/stss).
-  // Emit an empty identity map so callers can gracefully degrade.
-  emitProgress(payload.fileId, 100, 'Frame index unavailable without demuxer');
-
+  emitProgress(payload.fileId, 100, 'Frame index unavailable.');
   const event: WorkerEvent = {
     type: 'FRAME_INDEX_READY',
     payload: { fileId: payload.fileId, frames: [] },
@@ -234,43 +286,14 @@ async function handleBuildFrameIndex(payload: {
   ctx.postMessage(event);
 }
 
-// ─── Emit helpers ─────────────────────────────────────────────────────────────
-
 function emitProgress(fileId: string, percent: number, stage: string): void {
-  const event: WorkerEvent = {
-    type: 'PROGRESS',
-    payload: { fileId, percent, stage },
-  };
+  const event: WorkerEvent = { type: 'PROGRESS', payload: { fileId, percent, stage } };
   ctx.postMessage(event);
 }
 
 function emitError(fileId: string, error: MediaError): void {
-  const event: WorkerEvent = {
-    type: 'ERROR',
-    payload: { fileId, error },
-  };
+  const event: WorkerEvent = { type: 'ERROR', payload: { fileId, error } };
   ctx.postMessage(event);
 }
 
-// ─── Codec string helpers ─────────────────────────────────────────────────────
-
-function codecToString(
-  codec: 'avc' | 'hevc' | 'vp9' | 'av1',
-  profile: 'baseline' | 'main' | 'high'
-): string {
-  // AVC codec strings per RFC 6381
-  const avcProfileMap: Record<string, string> = {
-    baseline: 'avc1.42E01E',
-    main: 'avc1.4D401E',
-    high: 'avc1.640028',
-  };
-  switch (codec) {
-    case 'avc': return avcProfileMap[profile] ?? avcProfileMap.high;
-    case 'hevc': return 'hvc1.1.6.L93.B0';
-    case 'vp9': return 'vp09.00.10.08';
-    case 'av1': return 'av01.0.04M.08';
-  }
-}
-
-// Required by TypeScript to treat this as a module
 export {};

@@ -60,7 +60,7 @@ export async function listSources(
   context: { connectionId?: string; basePath?: string } = {}
 ): Promise<SourceItem[]> {
   try {
-    const adapter = registry.resolve(integration, context);
+    const adapter = registry.resolveAdapter(integration, context);
     const result = await adapter.listSources();
     if (!result.ok) return [];
 
@@ -80,7 +80,7 @@ export async function getSourceSchema(
   context: { connectionId?: string; basePath?: string } = {}
 ) {
   try {
-    const adapter = registry.resolve(integration, context);
+    const adapter = registry.resolveAdapter(integration, context);
     const result = await adapter.getSchema(sourceId);
     const baseFields = result.ok ? result.data : [];
 

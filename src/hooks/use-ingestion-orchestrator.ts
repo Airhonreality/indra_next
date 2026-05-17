@@ -1,31 +1,30 @@
 /**
- * 🗝️ ARTEFACTO: use-ingestion-orchestrator.ts
+ * 🏛️ ARTEFACTO: use-ingestion-orchestrator.ts
  * ────────────
  * CAPA: Hooks (Application Logic)
- * VERSIÓN: 3.1.0
- * COMMIT: P3-M8.2-PERSISTENT-RESUMABLE-INGESTION
+ * VERSIÓN: 3.3.0
+ * COMMIT: P3-M11.5-QUEUE-TASK-DELETION
  * 
  * 🎯 FUNCTIONAL_SCOPE:
  * - Orquestación de subidas binarias resumibles (Resumable Uploads).
  * - Gestión de cola persistente en cliente (Client-Side Persistence).
  * - Detección de duplicados mediante heurística de fingerprinting.
- * - Recuperación automática de sesiones interrumpidas (State Hydration).
+ * - Soporte para operaciones de gestión de cola (remoción de tareas).
  * 
  * 🛡️ AXIOMATIC_CONTRACT:
  * - MUST: Sincronizar el estado de la cola con 'localStorage' en cada mutación.
  * - NEVER: Almacenar el contenido binario (Blob/File) en almacenamiento persistente.
  * - ALWAYS: Validar la integridad de la sesión contra el servidor antes de reanudar.
  * 
- * 📜 ADR: [2026-05-14] PERSISTENT_INGESTION_ORCHESTRATOR
- * - DECISIÓN: Evolucionar el orquestador hacia un modelo de estado persistente mediante 'localStorage' y fingerprinting débil.
- * - MOTIVO: Reducir la entropía del usuario ante fallos de conexión o cierres accidentales de pestaña en procesos de larga duración.
- * - IMPACTO: Resiliencia total del flujo de ingesta sin añadir infraestructura de servidor adicional.
+ * 📜 ADR: [2026-05-16] PERSISTENT_INGESTION_ORCHESTRATOR_DELETION
+ * - DECISIÓN: Añadir la capacidad de remover tareas individuales para el control manual de entropía.
+ * - MOTIVO: Permitir al usuario corregir errores en la selección de archivos antes de proyectar.
  * 
  * 🔗 RELATIONSHIPS:
  * - UPSTREAM: [IntegrationAdapter (API), exifr (Metadata)]
  * - DOWNSTREAM: [IngestionPortal (UI), GoogleDriveProvider]
  */
-
+ 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import exifr from 'exifr';
 
@@ -132,6 +131,13 @@ export function useIngestionOrchestrator(slug: string) {
   };
 
   /**
+   * 🗑️ ACTION: Remove Task
+   */
+  const removeTask = useCallback((id: string) => {
+    setTasks(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  /**
    * 🚀 PROCESS: Extended with Verification Phase
    */
   const executeQueue = useCallback(async (fileMap: Map<string, File>) => {
@@ -188,5 +194,5 @@ export function useIngestionOrchestrator(slug: string) {
 
   const clearQueue = () => { setTasks([]); localStorage.removeItem(STORAGE_KEY); };
 
-  return { tasks, ingest, executeQueue, clearQueue, resolveConflict, isProcessing };
+  return { tasks, ingest, executeQueue, clearQueue, resolveConflict, removeTask, isProcessing };
 }

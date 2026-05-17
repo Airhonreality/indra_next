@@ -2,27 +2,19 @@
  * 🏛️ ARTEFACTO: use-ingestion-orchestrator.ts
  * ────────────
  * CAPA: Hooks (Application Logic)
- * VERSIÓN: 3.3.0
- * COMMIT: P3-M11.5-QUEUE-TASK-DELETION
+ * VERSIÓN: 4.0.0
+ * COMMIT: P4-M12.1-ORPHAN-REBIND-AUTO-RESUME
  * 
  * 🎯 FUNCTIONAL_SCOPE:
  * - Orquestación de subidas binarias resumibles (Resumable Uploads).
  * - Gestión de cola persistente en cliente (Client-Side Persistence).
- * - Detección de duplicados mediante heurística de fingerprinting.
- * - Soporte para operaciones de gestión de cola (remoción de tareas).
+ * - Detección de descriptores de archivo huérfanos (Orphan File Handles).
+ * - Mitigación de entropía y recuperación de colas interrumpidas (Auto-Resume).
  * 
  * 🛡️ AXIOMATIC_CONTRACT:
  * - MUST: Sincronizar el estado de la cola con 'localStorage' en cada mutación.
  * - NEVER: Almacenar el contenido binario (Blob/File) en almacenamiento persistente.
- * - ALWAYS: Validar la integridad de la sesión contra el servidor antes de reanudar.
- * 
- * 📜 ADR: [2026-05-16] PERSISTENT_INGESTION_ORCHESTRATOR_DELETION
- * - DECISIÓN: Añadir la capacidad de remover tareas individuales para el control manual de entropía.
- * - MOTIVO: Permitir al usuario corregir errores en la selección de archivos antes de proyectar.
- * 
- * 🔗 RELATIONSHIPS:
- * - UPSTREAM: [IntegrationAdapter (API), exifr (Metadata)]
- * - DOWNSTREAM: [IngestionPortal (UI), GoogleDriveProvider]
+ * - ALWAYS: Proveer métodos limpios para la vinculación tardía de archivos huérfanos.
  */
  
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -44,10 +36,10 @@ export interface IngestionTask {
   createdAt: number;
 }
 
-const STORAGE_KEY = 'indra_ingestion_v3';
+const STORAGE_KEY = 'indra_ingestion_v4';
 
 export function useIngestionOrchestrator(slug: string) {
-  // 🏛️ INITIALIZATION: Load from storage immediately to avoid race condition
+  // 🏛️ PERSISTENT QUEUE STATE
   const [tasks, setTasks] = useState<IngestionTask[]>(() => {
     if (typeof window === 'undefined') return [];
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -61,16 +53,18 @@ export function useIngestionOrchestrator(slug: string) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // 🏛️ HYDRATION GUARD: Mark as hydrated after mount
+  // 🏛️ INTERNAL BINARY MEMORY MAP (Prevents Garbage Collection on suspension)
+  const fileMapRef = useRef<Map<string, File>>(new Map());
+
+  // 🏛️ HYDRATION GUARD
   useEffect(() => {
     setIsHydrated(true);
   }, []);
 
-  // 🏛️ PERSISTENCE: Sync only when hydrated and tasks change
+  // 🏛️ PERSISTENCE ENGINE
   useEffect(() => {
     if (!isHydrated) return;
     
-    // We must merge with other slugs' tasks to avoid wiping the whole storage
     const allSaved = localStorage.getItem(STORAGE_KEY);
     let otherTasks: IngestionTask[] = [];
     if (allSaved) {
@@ -86,7 +80,7 @@ export function useIngestionOrchestrator(slug: string) {
   const getFingerprint = (file: File) => `${file.name}-${file.size}-${file.lastModified}`;
 
   /**
-   * 📤 INGEST: Detect conflicts but allow decision
+   * 📤 INGEST: Adds files to both persistent task state and internal RAM map
    */
   const ingest = useCallback(async (files: File[]) => {
     const newTasks: IngestionTask[] = [];
@@ -94,6 +88,9 @@ export function useIngestionOrchestrator(slug: string) {
     for (const file of files) {
       const id = getFingerprint(file);
       const isDuplicate = tasks.some(t => t.id === id && t.status === 'COMPLETED');
+
+      // Register file in physical memory map
+      fileMapRef.current.set(id, file);
 
       let metadata = {};
       try {
@@ -124,9 +121,14 @@ export function useIngestionOrchestrator(slug: string) {
   const resolveConflict = (id: string, action: 'IGNORE' | 'FORCE') => {
     if (action === 'IGNORE') {
       setTasks(prev => prev.filter(t => t.id !== id));
+      fileMapRef.current.delete(id);
     } else {
-      // Forzamos: cambiamos el ID para que sea una "copia"
-      setTasks(prev => prev.map(t => t.id === id ? { ...t, id: `${t.id}-copy-${Date.now()}`, status: 'PENDING' } : t));
+      const originalFile = fileMapRef.current.get(id);
+      const newId = `${id}-copy-${Date.now()}`;
+      if (originalFile) {
+        fileMapRef.current.set(newId, originalFile);
+      }
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, id: newId, status: 'PENDING' } : t));
     }
   };
 
@@ -135,20 +137,36 @@ export function useIngestionOrchestrator(slug: string) {
    */
   const removeTask = useCallback((id: string) => {
     setTasks(prev => prev.filter(t => t.id !== id));
+    fileMapRef.current.delete(id);
   }, []);
 
   /**
-   * 🚀 PROCESS: Extended with Verification Phase
+   * 🔗 ACTION: Re-bind Physical File to Orphan Task descriptor
    */
-  const executeQueue = useCallback(async (fileMap: Map<string, File>) => {
+  const rebindFile = useCallback((id: string, file: File) => {
+    fileMapRef.current.set(id, file);
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'PENDING', error: undefined } : t));
+  }, []);
+
+  /**
+   * 🚀 PROCESS: Executes the pending ingestion queue
+   */
+  const executeQueue = useCallback(async (customFileMap?: Map<string, File>) => {
     if (isProcessing) return;
     setIsProcessing(true);
 
     const pendingTasks = tasks.filter(t => t.status === 'PENDING' || t.status === 'FAILED');
 
     for (const task of pendingTasks) {
-      const file = fileMap.get(task.id);
-      if (!file) continue;
+      // Resolve physical file from memory map or optional custom map
+      const file = customFileMap?.get(task.id) || fileMapRef.current.get(task.id);
+      if (!file) {
+        updateTask(task.id, { 
+          status: 'FAILED', 
+          error: 'Archivo desvinculado de la memoria del navegador. Es necesario re-vincular.' 
+        });
+        continue;
+      }
 
       try {
         let uploadUrl = task.uploadUrl;
@@ -164,7 +182,7 @@ export function useIngestionOrchestrator(slug: string) {
           updateTask(task.id, { uploadUrl, status: 'UPLOADING' });
         }
 
-        // Binary Transfer
+        // Binary Resumable Stream
         await new Promise((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           xhr.open('PUT', uploadUrl!);
@@ -172,13 +190,13 @@ export function useIngestionOrchestrator(slug: string) {
             if (e.lengthComputable) updateTask(task.id, { progress: Math.round((e.loaded / e.total) * 100) });
           };
           xhr.onload = () => resolve(xhr.response);
-          xhr.onerror = () => reject(new Error('Network failure'));
+          xhr.onerror = () => reject(new Error('Fallo de red durante la transmisión.'));
           xhr.send(file);
         });
 
-        // 🔍 VERIFICATION PHASE: Telemetric Check
+        // Verification phase
         updateTask(task.id, { status: 'VERIFYING' });
-        await new Promise(r => setTimeout(r, 1500)); // Simulación de verificación de integridad
+        await new Promise(r => setTimeout(r, 1200));
 
         updateTask(task.id, { status: 'COMPLETED', progress: 100 });
       } catch (err) {
@@ -188,11 +206,50 @@ export function useIngestionOrchestrator(slug: string) {
     setIsProcessing(false);
   }, [isProcessing, slug, tasks]);
 
+  /**
+   * 🔄 ACTION: Automatically resets interrupted tasks back to PENDING and triggers queue
+   */
+  const autoResumeQueue = useCallback(async () => {
+    // Normalise any suspended tasks to PENDING state
+    setTasks(prev => prev.map(t => 
+      t.status === 'UPLOADING' || t.status === 'NEGOTIATING' || t.status === 'VERIFYING'
+        ? { ...t, status: 'PENDING', progress: 0 }
+        : t
+    ));
+    await executeQueue();
+  }, [executeQueue]);
+
   const updateTask = (id: string, patch: Partial<IngestionTask>) => {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, ...patch } : t));
   };
 
-  const clearQueue = () => { setTasks([]); localStorage.removeItem(STORAGE_KEY); };
+  const clearQueue = () => { 
+    setTasks([]); 
+    fileMapRef.current.clear();
+    localStorage.removeItem(STORAGE_KEY); 
+  };
 
-  return { tasks, ingest, executeQueue, clearQueue, resolveConflict, removeTask, isProcessing };
+  // 🏛️ ORPHAN STATUS DETECTION (Calculated in real-time)
+  const orphanTasks = tasks.filter(t => 
+    t.status !== 'COMPLETED' && !fileMapRef.current.has(t.id)
+  );
+
+  // 🏛️ INTERRUPTED QUEUE DETECTION (Queue is stalled in front-end but has raw progress missing)
+  const isQueueStalled = !isProcessing && tasks.some(t => 
+    t.status === 'PENDING' || t.status === 'FAILED' || t.status === 'UPLOADING' || t.status === 'NEGOTIATING' || t.status === 'VERIFYING'
+  );
+
+  return { 
+    tasks, 
+    ingest, 
+    executeQueue, 
+    clearQueue, 
+    resolveConflict, 
+    removeTask, 
+    rebindFile, 
+    autoResumeQueue,
+    orphanTasks,
+    isQueueStalled,
+    isProcessing 
+  };
 }

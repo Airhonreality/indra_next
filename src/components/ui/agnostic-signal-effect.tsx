@@ -104,6 +104,27 @@ export const AgnosticSignalEffect: React.FC<AgnosticSignalEffectProps> = ({
     }
   }, [isActive]);
 
+  const [resolvedColor, setResolvedColor] = useState('120, 120, 120');
+
+  // 🏛️ DYNAMIC THEME COLOR RESOLVER (Resolves HSL/HEX CSS variables safely once on mount)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const temp = document.createElement('div');
+      temp.style.color = 'var(--primary)';
+      document.body.appendChild(temp);
+      const computed = getComputedStyle(temp).color;
+      document.body.removeChild(temp);
+      
+      const match = computed.match(/\d+,\s*\d+,\s*\d+/);
+      if (match) {
+        setResolvedColor(match[0]);
+      }
+    } catch (e) {
+      console.warn('[SME-V] Fallback to safe neutral color:', e);
+    }
+  }, []);
+
   // 🏛️ CABLES GL / KEEP-ALIVE CANVAS RENDERING LOOP
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -134,11 +155,11 @@ export const AgnosticSignalEffect: React.FC<AgnosticSignalEffectProps> = ({
         ctx.beginPath();
         ctx.lineWidth = 1;
         
-        // Dynamic primary color stroke
+        // Dynamic primary color stroke (Safe native rgb parsing)
         const gradient = ctx.createLinearGradient(0, 0, width, 0);
-        gradient.addColorStop(0, 'rgba(var(--primary-rgb, 120, 120, 120), 0.02)');
-        gradient.addColorStop(0.5, 'rgba(var(--primary-rgb, 120, 120, 120), 0.35)');
-        gradient.addColorStop(1, 'rgba(var(--primary-rgb, 120, 120, 120), 0.02)');
+        gradient.addColorStop(0, `rgba(${resolvedColor}, 0.02)`);
+        gradient.addColorStop(0.5, `rgba(${resolvedColor}, 0.35)`);
+        gradient.addColorStop(1, `rgba(${resolvedColor}, 0.02)`);
         ctx.strokeStyle = gradient;
 
         for (let x = 0; x < width; x++) {
@@ -156,7 +177,7 @@ export const AgnosticSignalEffect: React.FC<AgnosticSignalEffectProps> = ({
         const dotY = height / 2 + Math.sin(dotX * 0.08 + phase) * 3 * Math.sin(phase * 0.5);
         ctx.beginPath();
         ctx.arc(dotX, dotY, 1.5, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(var(--primary-rgb, 120, 120, 120), 0.8)';
+        ctx.fillStyle = `rgba(${resolvedColor}, 0.8)`;
         ctx.fill();
       }
 
@@ -171,7 +192,7 @@ export const AgnosticSignalEffect: React.FC<AgnosticSignalEffectProps> = ({
         cancelAnimationFrame(animationFrameId.current);
       }
     };
-  }, [isActive]);
+  }, [isActive, resolvedColor]);
 
   return (
     <div className={`agnostic-signal-wrapper flex items-center justify-between px-4 py-2.5 rounded-xl border bg-muted/20 border-border/80 ${className}`}>

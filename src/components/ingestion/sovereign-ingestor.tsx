@@ -300,8 +300,12 @@ export const SovereignIngestor: React.FC<SovereignIngestorProps> = ({ slug, view
 };
 
 // 🏛️ SUB-COMPONENT: ROBUST ORPHAN TASK VINCULATOR
-const OrphanTaskRow: React.FC<{ task: IngestionTask; onRebind: (file: File) => void }> = ({ task, onRebind }) => {
+const OrphanTaskRow: React.FC<{ 
+  task: IngestionTask; 
+  onRebind: (file: File) => { ok: boolean; error?: string };
+}> = ({ task, onRebind }) => {
   const [copied, setCopied] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCopy = async () => {
@@ -315,40 +319,54 @@ const OrphanTaskRow: React.FC<{ task: IngestionTask; onRebind: (file: File) => v
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
-      onRebind(files[0]);
+      const res = onRebind(files[0]);
+      if (!res.ok) {
+        setValidationError(res.error || 'El archivo no coincide.');
+        setTimeout(() => setValidationError(null), 6000);
+      } else {
+        setValidationError(null);
+      }
     }
   };
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-card/60 border border-border/80 rounded-xl">
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-bold text-foreground truncate">{task.fileName}</p>
-        <p className="text-[8px] font-mono text-muted-foreground uppercase tracking-widest mt-0.5">
-          {(task.fileSize / 1024 / 1024).toFixed(2)} MB
-        </p>
+    <div className="flex flex-col gap-2 p-3 bg-card/60 border border-border/80 rounded-xl transition-all">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold text-foreground truncate">{task.fileName}</p>
+          <p className="text-[8px] font-mono text-muted-foreground uppercase tracking-widest mt-0.5">
+            {(task.fileSize / 1024 / 1024).toFixed(2)} MB
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={handleCopy}
+            className="px-2.5 py-1.5 rounded-lg border border-border text-[9px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors flex items-center gap-1.5"
+            title="Copiar nombre al portapapeles"
+          >
+            <Clipboard className="size-3" />
+            <span>{copied ? 'Copiado' : 'Copiar Nombre'}</span>
+          </button>
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-[9px] font-bold uppercase tracking-widest hover:opacity-90 transition-all"
+          >
+            Re-vincular
+          </button>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            className="hidden" 
+          />
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <button 
-          onClick={handleCopy}
-          className="px-2.5 py-1.5 rounded-lg border border-border text-[9px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors flex items-center gap-1.5"
-          title="Copiar nombre al portapapeles"
-        >
-          <Clipboard className="size-3" />
-          <span>{copied ? 'Copiado' : 'Copiar Nombre'}</span>
-        </button>
-        <button 
-          onClick={() => fileInputRef.current?.click()}
-          className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-[9px] font-bold uppercase tracking-widest hover:opacity-90 transition-all"
-        >
-          Re-vincular
-        </button>
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          onChange={handleFileChange} 
-          className="hidden" 
-        />
-      </div>
+
+      {validationError && (
+        <div className="text-[9px] font-mono text-destructive uppercase tracking-wider border-t border-destructive/10 pt-2 animate-in slide-in-from-top-1 duration-200">
+          ⚠️ {validationError}
+        </div>
+      )}
     </div>
   );
 };

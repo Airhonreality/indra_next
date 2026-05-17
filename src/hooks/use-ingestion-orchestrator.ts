@@ -141,13 +141,28 @@ export function useIngestionOrchestrator(slug: string) {
   }, []);
 
   /**
-   * 🔗 ACTION: Re-bind Physical File to Orphan Task descriptor
+   * 🔗 ACTION: Re-bind Physical File to Orphan Task descriptor with strict validation
    */
-  const rebindFile = useCallback((id: string, file: File) => {
-    fileMapRef.current.set(id, file);
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'PENDING', error: undefined } : t));
-  }, []);
+  const rebindFile = useCallback((id: string, file: File): { ok: boolean; error?: string } => {
+    const fingerprint = getFingerprint(file);
+    const task = tasks.find(t => t.id === id);
+    if (!task) {
+      return { ok: false, error: 'La tarea original ya no existe en la cola.' };
+    }
 
+    const matchesNameAndSize = file.name === task.fileName && file.size === task.fileSize;
+
+    if (fingerprint === id || matchesNameAndSize) {
+      fileMapRef.current.set(id, file);
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'PENDING', error: undefined } : t));
+      return { ok: true };
+    } else {
+      return { 
+        ok: false, 
+        error: `El archivo seleccionado ("${file.name}", ${(file.size / 1024 / 1024).toFixed(2)} MB) no coincide con el original ("${task.fileName}", ${(task.fileSize / 1024 / 1024).toFixed(2)} MB).` 
+      };
+    }
+  }, [tasks]);
   /**
    * 🚀 PROCESS: Executes the pending ingestion queue
    */

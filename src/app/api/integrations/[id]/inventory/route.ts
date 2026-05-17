@@ -45,6 +45,19 @@ export async function GET(
     
     // 3. PARSE & VALIDATE AGNOSTIC QUERY
     const { searchParams } = new URL(req.url);
+    const resolveId = searchParams.get('resolveId');
+
+    if (resolveId) {
+      let path = ['root', resolveId];
+      if (typeof (adapter as any).resolvePath === 'function') {
+        const pathResult = await (adapter as any).resolvePath(resolveId);
+        if (pathResult.ok) {
+          path = pathResult.data;
+        }
+      }
+      return NextResponse.json({ path });
+    }
+
     const queryParams = Object.fromEntries(searchParams.entries());
     
     // Convert string numeric values to numbers for Zod

@@ -26,7 +26,7 @@ import {
 import { AgnosticTree } from '@/components/ui/agnostic-tree';
 import { IngestionFieldDesigner } from '@/components/ingestion/field-designer';
 import { IngestionOperator } from '@/components/ingestion/operator';
-import { RuleArchitect } from '@/components/routing/rule-architect';
+import { RuleArchitect, type RuleNode } from '@/components/routing/rule-architect';
 import { useConnections } from '@/hooks/use-connections';
 import { useIndraStore, type PortSchemaField } from '@/stores/indra-store';
 
@@ -51,15 +51,48 @@ export function PortCreator({ className }: PortCreatorProps) {
     targetPath: 'root',
     pattern: '/{year}/{month}/{project}',
   });
-
   const [schemaFields, setSchemaFields] = useState<PortSchemaField[]>([
     { key: 'project', type: 'string', label: 'Nombre del Proyecto', required: true },
   ]);
 
+  const [initialRules, setInitialRules] = useState<RuleNode[]>([]);
   const isEditMode = !!selectedPort;
 
   useEffect(() => {
+    const patternStr = selectedPort?.config?.pattern || '/{year}/{month}/{project}';
+    
+    const parsePatternToRules = (pStr: string, fields: PortSchemaField[]): RuleNode[] => {
+      const segments = pStr.split('/').filter((s) => s.startsWith('{') && s.endsWith('}'));
+      const dateLabels: Record<string, string> = {
+        '{year}': 'Año',
+        '{month}': 'Mes',
+        '{day}': 'Día',
+        '{hour}': 'Hora',
+        '{minute}': 'Minuto'
+      };
+
+      return segments.map((seg) => {
+        if (dateLabels[seg]) {
+          return {
+            id: Math.random().toString(36).substring(2, 9),
+            type: 'date',
+            value: seg,
+            label: dateLabels[seg]
+          };
+        }
+        const key = seg.slice(1, -1);
+        const matchedField = fields.find((f) => f.key === key);
+        return {
+          id: Math.random().toString(36).substring(2, 9),
+          type: matchedField ? 'variable' : 'custom',
+          value: seg,
+          label: matchedField?.label || key
+        };
+      });
+    };
+
     if (selectedPort) {
+      const fields = selectedPort.schema ?? [];
       setFormData({
         label: selectedPort.label,
         slug: selectedPort.slug,
@@ -67,7 +100,8 @@ export function PortCreator({ className }: PortCreatorProps) {
         targetPath: selectedPort.targetPath,
         pattern: selectedPort.config?.pattern || '/{year}/{month}/{project}',
       });
-      setSchemaFields(selectedPort.schema ?? []);
+      setSchemaFields(fields);
+      setInitialRules(parsePatternToRules(patternStr, fields));
     } else {
       setFormData({
         label: '',
@@ -76,10 +110,11 @@ export function PortCreator({ className }: PortCreatorProps) {
         targetPath: 'root',
         pattern: '/{year}/{month}/{project}',
       });
-      setSchemaFields([{ key: 'project', type: 'string', label: 'Nombre del Proyecto', required: true }]);
+      const defaultFields: PortSchemaField[] = [{ key: 'project', type: 'string', label: 'Nombre del Proyecto', required: true }];
+      setSchemaFields(defaultFields);
+      setInitialRules(parsePatternToRules('/{year}/{month}/{project}', defaultFields));
     }
   }, [selectedPort]);
-
   const handleNameChange = (val: string) => {
     if (isEditMode) {
       setFormData((prev) => ({ ...prev, label: val }));
@@ -218,6 +253,7 @@ export function PortCreator({ className }: PortCreatorProps) {
             </Label>
             <AgnosticTree
               integrationId={formData.integrationId}
+              initialSelectedId={formData.targetPath}
               onSelect={(atom) => setFormData({ ...formData, targetPath: atom.id })}
               className="h-[250px]"
             />
@@ -238,11 +274,14 @@ export function PortCreator({ className }: PortCreatorProps) {
               <Zap className="size-3" /> 2. Arquitectura de Namespace (Reglas)
             </Label>
             <RuleArchitect
-              initialRules={[]}
+              key={initialRules.map(r => r.value).join('-')}
+              initialRules={initialRules}
               basePath={formData.targetPath}
               availableFields={schemaFields.map((f) => ({ id: f.key, label: f.label }))}
+              schemaFields={schemaFields}
+              onSchemaFieldsChange={setSchemaFields}
               onChange={(nodes) => {
-                const pattern = nodes.map((n) => n.value).join('/');
+                const pattern = '/' + nodes.map((n) => n.value).join('/');
                 setFormData({ ...formData, pattern: pattern || '/' });
               }}
               className="mt-0"

@@ -2,19 +2,19 @@
  * 🏛️ ARTEFACTO: sovereign-ingestor.tsx
  * ────────────
  * CAPA: Components / Features (Agnostic Blocks)
- * VERSIÓN: 3.0.0
- * COMMIT: P4-M12.3-RESILIENT-INGESTION-FLOWS
+ * VERSIÓN: 3.1.0
+ * COMMIT: P4-M12.4-CONSOLIDATED-INLINE-REBIND
  * 
  * 🎯 FUNCTIONAL_SCOPE:
  * - Proyección visual del orquestador de ingesta persistente.
  * - Integración del guardián WakeLock y visualización de señalética activa (AgnosticSignalEffect).
- * - Gestión de archivos huérfanos con copia de nombre al portapapeles y vinculación tardía.
+ * - Gestión consolidada de archivos huérfanos inline en la cola, remarcados en destructivo (rojo sutil).
  * - Centinela de recuperación de transmisiones interrumpidas (Auto-Resume Queue).
  * 
  * 🛡️ AXIOMATIC_CONTRACT:
  * - MUST: Consumir el estado del orquestador a través de interfaces declarativas.
  * - NEVER: Forzar estilos cromáticos ajenos a los tokens de diseño de la aplicación.
- * - ALWAYS: Ofrecer herramientas visuales claras para la corrección de errores físicos de red/suspensión.
+ * - ALWAYS: Evitar duplicidades de información en pantalla consolidando controles en la misma cola.
  */
 
 'use client';
@@ -22,7 +22,7 @@
 import React, { useState, useRef } from 'react';
 import { useIngestionOrchestrator, IngestionTask } from '@/hooks/use-ingestion-orchestrator';
 import { AgnosticSignalEffect } from '@/components/ui/agnostic-signal-effect';
-import { Trash2, UploadCloud, Loader2, RefreshCw, ShieldAlert, Clipboard } from 'lucide-react';
+import { Trash2, UploadCloud, Loader2, RefreshCw, Clipboard } from 'lucide-react';
 
 interface SovereignIngestorProps {
   slug: string;
@@ -118,29 +118,6 @@ export const SovereignIngestor: React.FC<SovereignIngestorProps> = ({ slug, view
         />
       )}
 
-      {/* ORPHAN / DESVINCULADOS WARNING */}
-      {view === 'ACTIVE' && orphanTasks.length > 0 && (
-        <div className="p-5 border border-amber-500/20 bg-amber-500/5 rounded-2xl space-y-3 animate-in fade-in duration-300">
-          <div className="flex items-center gap-2 text-amber-600">
-            <ShieldAlert className="size-4" />
-            <h4 className="text-[10px] font-bold uppercase tracking-widest">Archivos Desvinculados Detectados</h4>
-          </div>
-          <p className="text-[10px] text-muted-foreground leading-relaxed italic">
-            El navegador perdió el acceso físico a los archivos debido a una recarga o suspensión de la pestaña. 
-            Copia el nombre y re-vincula cada archivo para continuar sin perder tu progreso.
-          </p>
-          <div className="space-y-2">
-            {orphanTasks.map((task) => (
-              <OrphanTaskRow 
-                key={task.id} 
-                task={task} 
-                onRebind={(file) => rebindFile(task.id, file)} 
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* CENTINELA DE COLA ESTANCADA / SUSPENDIDA */}
       {view === 'ACTIVE' && isQueueStalled && tasks.some(t => t.status === 'PENDING' || t.status === 'FAILED') && (
         <div className="p-4 border border-primary/20 bg-primary/5 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-in slide-in-from-top-2 duration-300">
@@ -173,108 +150,15 @@ export const SovereignIngestor: React.FC<SovereignIngestorProps> = ({ slug, view
           const isTaskOrphan = orphanTasks.some(ot => ot.id === task.id);
           
           return (
-            <div 
-              key={task.id} 
-              className={`p-4 rounded-xl border transition-all duration-300 bg-card/40 ${
-                task.status === 'CONFLICT' ? 'border-amber-500/30 bg-amber-500/5' : 
-                task.status === 'FAILED' ? 'border-destructive/30 bg-destructive/5' :
-                task.status === 'COMPLETED' ? 'border-emerald-500/20 bg-emerald-500/5' :
-                isTaskOrphan ? 'border-amber-500/20 bg-amber-500/5' :
-                'border-border/60 hover:border-border'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1 min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-foreground truncate block max-w-[280px]">
-                      {task.fileName}
-                    </span>
-                    <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border ${
-                      task.status === 'CONFLICT' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                      task.status === 'FAILED' ? 'bg-destructive/10 text-destructive border-destructive/20' :
-                      task.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
-                      isTaskOrphan ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                      'bg-muted text-muted-foreground border-border'
-                    }`}>
-                      {isTaskOrphan ? 'DESVINCULADO' : task.status}
-                    </span>
-                  </div>
-                  
-                  <p className="text-[9px] text-muted-foreground font-mono uppercase tracking-wider">
-                    {(task.fileSize / 1024 / 1024).toFixed(2)} MB • {task.mimeType}
-                  </p>
-                </div>
-
-                {/* CONTROLES DE LA TAREA */}
-                <div className="flex items-center gap-2">
-                  {task.status === 'CONFLICT' && (
-                    <div className="flex items-center gap-1.5">
-                      <button 
-                        onClick={() => resolveConflict(task.id, 'IGNORE')} 
-                        className="px-2.5 py-1 text-[8px] font-bold uppercase tracking-widest rounded bg-muted border border-border text-foreground hover:bg-muted/80 transition-colors"
-                      >
-                        Omitir
-                      </button>
-                      <button 
-                        onClick={() => resolveConflict(task.id, 'FORCE')} 
-                        className="px-2.5 py-1 text-[8px] font-bold uppercase tracking-widest rounded bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
-                      >
-                        Forzar
-                      </button>
-                    </div>
-                  )}
-
-                  {task.status === 'VERIFYING' && (
-                    <div className="flex items-center gap-1 text-[9px] font-mono font-bold text-primary tracking-widest uppercase">
-                      <Loader2 className="size-3 animate-spin" />
-                      <span>Verificando</span>
-                    </div>
-                  )}
-
-                  {task.status === 'COMPLETED' && (
-                    <span className="text-emerald-500 text-[9px] font-bold uppercase tracking-widest">
-                      ✓ Transmitido
-                    </span>
-                  )}
-
-                  {/* BOTÓN ELIMINAR (Para evitar archivos incorrectos en la cola) */}
-                  {task.status !== 'UPLOADING' && task.status !== 'VERIFYING' && (
-                    <button
-                      onClick={() => removeTask(task.id)}
-                      disabled={isProcessing}
-                      className="p-1.5 rounded-lg border border-border/80 text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:border-destructive/20 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
-                      title="Eliminar de la cola"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {task.status === 'FAILED' && !isTaskOrphan && (
-                <p className="text-destructive text-[9px] font-mono mt-2 pt-2 border-t border-destructive/10">
-                  {task.error || 'Fallo indeterminado en el pipeline.'}
-                </p>
-              )}
-
-              {/* PROGRESS VISUALIZATION */}
-              {(task.status === 'UPLOADING' || task.status === 'COMPLETED' || task.status === 'VERIFYING') && (
-                <div className="mt-3 space-y-1 animate-in fade-in duration-300">
-                  <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full bg-foreground transition-all duration-300 ${
-                        task.status === 'VERIFYING' ? 'animate-pulse' : ''
-                      }`} 
-                      style={{ width: `${task.progress}%` }} 
-                    />
-                  </div>
-                  <div className="flex justify-between text-[8px] font-mono text-muted-foreground">
-                    <span>PROGRESO</span>
-                    <span>{task.progress}%</span>
-                  </div>
-                </div>
-              )}
-            </div>
+            <SovereignTaskCard 
+              key={task.id}
+              task={task}
+              isOrphan={isTaskOrphan}
+              isProcessing={isProcessing}
+              onResolveConflict={resolveConflict}
+              onRemoveTask={removeTask}
+              onRebindFile={rebindFile}
+            />
           );
         })}
       </div>
@@ -299,11 +183,15 @@ export const SovereignIngestor: React.FC<SovereignIngestorProps> = ({ slug, view
   );
 };
 
-// 🏛️ SUB-COMPONENT: ROBUST ORPHAN TASK VINCULATOR
-const OrphanTaskRow: React.FC<{ 
-  task: IngestionTask; 
-  onRebind: (file: File) => { ok: boolean; error?: string };
-}> = ({ task, onRebind }) => {
+// 🏛️ SUB-COMPONENT: UNIFIED CONSOLIDATED TASK CARD
+const SovereignTaskCard: React.FC<{
+  task: IngestionTask;
+  isOrphan: boolean;
+  isProcessing: boolean;
+  onResolveConflict: (id: string, action: 'IGNORE' | 'FORCE') => void;
+  onRemoveTask: (id: string) => void;
+  onRebindFile: (id: string, file: File) => { ok: boolean; error?: string };
+}> = ({ task, isOrphan, isProcessing, onResolveConflict, onRemoveTask, onRebindFile }) => {
   const [copied, setCopied] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -319,10 +207,10 @@ const OrphanTaskRow: React.FC<{
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
-      const res = onRebind(files[0]);
+      const res = onRebindFile(task.id, files[0]);
       if (!res.ok) {
         setValidationError(res.error || 'El archivo no coincide.');
-        setTimeout(() => setValidationError(null), 6000);
+        setTimeout(() => setValidationError(null), 5000);
       } else {
         setValidationError(null);
       }
@@ -330,43 +218,141 @@ const OrphanTaskRow: React.FC<{
   };
 
   return (
-    <div className="flex flex-col gap-2 p-3 bg-card/60 border border-border/80 rounded-xl transition-all">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-bold text-foreground truncate">{task.fileName}</p>
-          <p className="text-[8px] font-mono text-muted-foreground uppercase tracking-widest mt-0.5">
-            {(task.fileSize / 1024 / 1024).toFixed(2)} MB
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={handleCopy}
-            className="px-2.5 py-1.5 rounded-lg border border-border text-[9px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors flex items-center gap-1.5"
-            title="Copiar nombre al portapapeles"
-          >
-            <Clipboard className="size-3" />
-            <span>{copied ? 'Copiado' : 'Copiar Nombre'}</span>
-          </button>
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-[9px] font-bold uppercase tracking-widest hover:opacity-90 transition-all"
-          >
-            Re-vincular
-          </button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            className="hidden" 
-          />
-        </div>
-      </div>
+    <div 
+      className={`p-4 rounded-xl border transition-all duration-300 bg-card/40 ${
+        task.status === 'CONFLICT' ? 'border-amber-500/30 bg-amber-500/5' : 
+        task.status === 'FAILED' && !isOrphan ? 'border-destructive/30 bg-destructive/5' :
+        task.status === 'COMPLETED' ? 'border-emerald-500/20 bg-emerald-500/5' :
+        isOrphan ? 'border-destructive/30 bg-destructive/5 animate-pulse' :
+        'border-border/60 hover:border-border'
+      }`}
+    >
+      <div className="flex flex-col gap-2">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1 min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-foreground truncate block max-w-[280px]">
+                {task.fileName}
+              </span>
+              <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border ${
+                task.status === 'CONFLICT' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                task.status === 'FAILED' && !isOrphan ? 'bg-destructive/10 text-destructive border-destructive/20' :
+                task.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                isOrphan ? 'bg-destructive/10 text-destructive border-destructive/20 font-black' :
+                'bg-muted text-muted-foreground border-border'
+              }`}>
+                {isOrphan ? 'DESVINCULADO' : task.status}
+              </span>
+            </div>
+            
+            <p className="text-[9px] text-muted-foreground font-mono uppercase tracking-wider">
+              {(task.fileSize / 1024 / 1024).toFixed(2)} MB • {task.mimeType}
+            </p>
+          </div>
 
-      {validationError && (
-        <div className="text-[9px] font-mono text-destructive uppercase tracking-wider border-t border-destructive/10 pt-2 animate-in slide-in-from-top-1 duration-200">
-          ⚠️ {validationError}
+          {/* CONTROLES DE LA TAREA */}
+          <div className="flex items-center gap-2">
+            {/* CONTROLES DE RE-VINCULACIÓN INLINE */}
+            {isOrphan && (
+              <div className="flex items-center gap-1.5">
+                <button 
+                  onClick={handleCopy}
+                  className="px-2 py-1 rounded border border-border text-[8px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors flex items-center gap-1.5"
+                  title="Copiar nombre al portapapeles"
+                >
+                  <Clipboard className="size-2.5" />
+                  <span>{copied ? 'Copiado' : 'Copiar'}</span>
+                </button>
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-2.5 py-1 rounded bg-primary text-primary-foreground text-[8px] font-bold uppercase tracking-widest hover:opacity-90 transition-all"
+                >
+                  Re-vincular
+                </button>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                  className="hidden" 
+                />
+              </div>
+            )}
+
+            {task.status === 'CONFLICT' && (
+              <div className="flex items-center gap-1.5">
+                <button 
+                  onClick={() => onResolveConflict(task.id, 'IGNORE')} 
+                  className="px-2.5 py-1 text-[8px] font-bold uppercase tracking-widest rounded bg-muted border border-border text-foreground hover:bg-muted/80 transition-colors"
+                >
+                  Omitir
+                </button>
+                <button 
+                  onClick={() => onResolveConflict(task.id, 'FORCE')} 
+                  className="px-2.5 py-1 text-[8px] font-bold uppercase tracking-widest rounded bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                >
+                  Forzar
+                </button>
+              </div>
+            )}
+
+            {task.status === 'VERIFYING' && (
+              <div className="flex items-center gap-1 text-[9px] font-mono font-bold text-primary tracking-widest uppercase">
+                <Loader2 className="size-3 animate-spin" />
+                <span>Verificando</span>
+              </div>
+            )}
+
+            {task.status === 'COMPLETED' && (
+              <span className="text-emerald-500 text-[9px] font-bold uppercase tracking-widest">
+                ✓ Transmitido
+              </span>
+            )}
+
+            {/* BOTÓN ELIMINAR */}
+            {task.status !== 'UPLOADING' && task.status !== 'VERIFYING' && (
+              <button
+                onClick={() => onRemoveTask(task.id)}
+                disabled={isProcessing}
+                className="p-1.5 rounded-lg border border-border/80 text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:border-destructive/20 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                title="Eliminar de la cola"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            )}
+          </div>
         </div>
-      )}
+
+        {/* INLINE VALIDATION ERROR */}
+        {validationError && (
+          <div className="text-[8px] font-mono text-destructive uppercase tracking-wide border-t border-destructive/10 pt-2 animate-in slide-in-from-top-1 duration-200">
+            ⚠️ {validationError}
+          </div>
+        )}
+
+        {task.status === 'FAILED' && !isOrphan && (
+          <p className="text-destructive text-[9px] font-mono mt-1 pt-1.5 border-t border-destructive/10">
+            {task.error || 'Fallo indeterminado en el pipeline.'}
+          </p>
+        )}
+
+        {/* PROGRESS VISUALIZATION */}
+        {(task.status === 'UPLOADING' || task.status === 'COMPLETED' || task.status === 'VERIFYING') && (
+          <div className="mt-2 space-y-1 animate-in fade-in duration-300">
+            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+              <div 
+                className={`h-full bg-foreground transition-all duration-300 ${
+                  task.status === 'VERIFYING' ? 'animate-pulse' : ''
+                }`} 
+                style={{ width: `${task.progress}%` }} 
+              />
+            </div>
+            <div className="flex justify-between text-[8px] font-mono text-muted-foreground">
+              <span>PROGRESO</span>
+              <span>{task.progress}%</span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

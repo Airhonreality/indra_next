@@ -27,12 +27,14 @@ export interface AgnosticAtom {
 interface AgnosticTreeProps {
   integrationId: string;
   onSelect: (atom: AgnosticAtom) => void;
+  initialSelectedId?: string;
   className?: string;
 }
 
 export function AgnosticTree({
   integrationId,
   onSelect,
+  initialSelectedId,
   className
 }: AgnosticTreeProps) {
   const [activePath, setActivePath] = useState<string[]>(['root']);
@@ -42,6 +44,38 @@ export function AgnosticTree({
   React.useEffect(() => {
     setActivePath(['root']);
   }, [integrationId]);
+
+  // 🌳 ANCESTRY PATH HYDRATOR: Resolves parent ancestry chain to prevent resetting to zero
+  React.useEffect(() => {
+    if (!integrationId || !initialSelectedId || initialSelectedId === 'root') {
+      return;
+    }
+
+    let active = true;
+    const resolveAncestry = async () => {
+      try {
+        const res = await fetch(`/api/integrations/${integrationId}/inventory?resolveId=${initialSelectedId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.path && Array.isArray(data.path) && active) {
+          setActivePath(data.path);
+          // Scroll smoothly to the right after rendering
+          setTimeout(() => {
+            if (scrollRef.current) {
+              scrollRef.current.scrollTo({ left: scrollRef.current.scrollWidth, behavior: 'smooth' });
+            }
+          }, 400);
+        }
+      } catch (err) {
+        console.error('[AgnosticTree] Ancestry resolution failed:', err);
+      }
+    };
+
+    resolveAncestry();
+    return () => {
+      active = false;
+    };
+  }, [integrationId, initialSelectedId]);
 
   const handleItemSelect = (atom: AgnosticAtom, columnIndex: number) => {
     // 1. Update path (truncate if needed)

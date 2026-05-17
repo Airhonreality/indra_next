@@ -209,6 +209,43 @@ export class GoogleDriveAdapter extends BaseAdapter {
       return this.error(`INVENTORY_ERR: ${err.message || 'Unknown error'}`);
     }
   }
+  
+  /**
+   * Resolves the full ancestry path from root to a given file/folder ID.
+   */
+  async resolvePath(id: string): Promise<OperationResult<string[]>> {
+    try {
+      const path: string[] = [];
+      let currentId = id;
+
+      while (currentId && currentId !== 'root') {
+        const response = await this.client.request({
+          endpoint: `/drive/v3/files/${currentId}`,
+          params: { 
+            fields: 'id, name, parents',
+            supportsAllDrives: 'true',
+            includeItemsFromAllDrives: 'true'
+          }
+        });
+
+        if (!response.data || !response.data.id) break;
+
+        path.unshift(response.data.id);
+        const parents = response.data.parents;
+        if (!parents || parents.length === 0) {
+          break;
+        }
+        currentId = parents[0];
+        if (currentId === response.data.id) break; // Avoid loop
+      }
+
+      return this.result(['root', ...path]);
+    } catch (err: any) {
+      console.error('[GoogleDriveAdapter] resolvePath failed:', err);
+      // Fallback: if resolve fails, just return root + target id
+      return this.result(['root', id]);
+    }
+  }
 
   /**
    * RECURSIVE FOLDER ENGINE

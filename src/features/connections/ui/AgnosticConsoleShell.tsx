@@ -18,14 +18,13 @@
 import { signOut } from 'next-auth/react';
 import {
   Shield, Loader2, Zap, Layers, Terminal,
-  Settings, Database, User, ExternalLink,
-  ChevronRight, ChevronLeft, LogOut,
+  Settings, User, ExternalLink,
+  ChevronRight, ChevronLeft, LogOut, HardDrive, Link2,
 } from 'lucide-react';
 import { i18n } from '@/lib/i18n';
 import { useIndraStore } from '@/stores/indra-store';
 import { useSessionSync } from '@/hooks/use-session-sync';
-import { NodesPanel } from './NodesPanel';
-import { ExplorerPanel } from './ExplorerPanel';
+import { ConnectionsPanel } from './ConnectionsPanel';
 import { MetricsPanel } from './MetricsPanel';
 import { IngestionPortList } from './IngestionPortList';
 import { PortCreator } from '@/components/ports/port-creator';
@@ -33,7 +32,11 @@ import { cn } from '@/lib/utils';
 
 const t = i18n.es;
 
-export function AgnosticConsoleShell() {
+interface AgnosticConsoleShellProps {
+  storageSlot?: React.ReactNode;
+}
+
+export function AgnosticConsoleShell({ storageSlot }: AgnosticConsoleShellProps) {
   const { session, status } = useSessionSync();
 
   const activeTab = useIndraStore((s) => s.activeTab);
@@ -91,8 +94,8 @@ export function AgnosticConsoleShell() {
             <SidebarItem
               active={activeTab === 'nodes'}
               onClick={() => setActiveTab('nodes')}
-              icon={<Database className="size-4" />}
-              label={t.connections.title}
+              icon={<Link2 className="size-4" />}
+              label="Conexiones"
               isCollapsed={isSidebarCollapsed}
             />
           </div>
@@ -109,8 +112,8 @@ export function AgnosticConsoleShell() {
             <SidebarItem
               active={activeTab === 'explorer'}
               onClick={() => setActiveTab('explorer')}
-              icon={<Layers className="size-4" />}
-              label={t.connections.explore}
+              icon={<HardDrive className="size-4" />}
+              label="Almacenamiento"
               isCollapsed={isSidebarCollapsed}
             />
             <SidebarItem
@@ -173,9 +176,9 @@ export function AgnosticConsoleShell() {
         <header className="h-16 border-b border-border flex items-center justify-between px-8 bg-card/20 backdrop-blur-sm">
           <div className="flex items-center gap-4">
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              {activeTab === 'nodes' && `Infraestructura / ${t.connections.title}`}
+              {activeTab === 'nodes' && 'Conexiones / Proveedores de Silos'}
               {activeTab === 'ingestion' && `Operaciones / ${t.portals.title}`}
-              {activeTab === 'explorer' && `Operaciones / ${t.connections.explore}`}
+              {activeTab === 'explorer' && 'Almacenamiento / Silos Soberanos'}
               {activeTab === 'workflows' && `Operaciones / ${t.workflow.title}`}
               {activeTab === 'settings' && `Sistema / ${t.common.settings}`}
             </h2>
@@ -196,10 +199,12 @@ export function AgnosticConsoleShell() {
             {activeTab === 'nodes' && (
               <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
                 <div className="space-y-1">
-                  <h3 className="text-2xl font-bold tracking-tighter">Infrastructure Catalog</h3>
-                  <p className="text-sm text-muted-foreground max-w-xl">Configure and authorize connection adapters to expose your sovereign infrastructure silos.</p>
+                  <h3 className="text-2xl font-bold tracking-tighter">Conexiones de Almacenamiento</h3>
+                  <p className="text-sm text-muted-foreground max-w-xl">
+                    Autoriza y gestiona todos tus proveedores. Estas conexiones alimentan el explorador de silos y el túnel de ingesta.
+                  </p>
                 </div>
-                <NodesPanel />
+                <ConnectionsPanel />
               </div>
             )}
 
@@ -207,10 +212,12 @@ export function AgnosticConsoleShell() {
             {activeTab === 'explorer' && (
               <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
                 <div className="space-y-1">
-                  <h3 className="text-2xl font-bold tracking-tighter">Silo Explorer</h3>
-                  <p className="text-sm text-muted-foreground">Direct resource discovery across authorized infrastructure nodes.</p>
+                  <h3 className="text-2xl font-bold tracking-tighter">Explorador de Silos</h3>
+                  <p className="text-sm text-muted-foreground max-w-xl">
+                    Navega y previsualiza archivos en tus silos autorizados.
+                  </p>
                 </div>
-                <ExplorerPanel />
+                {storageSlot}
               </div>
             )}
 

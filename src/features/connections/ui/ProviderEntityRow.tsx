@@ -239,12 +239,11 @@ export function ProviderEntityRow({
                         {!isNangoConfigured ? (
                           <div className="space-y-3">
                             <p className="text-[10px] text-muted-foreground italic">Client ID missing in sovereign bouncer (Nango).</p>
-                            <button
-                              onClick={() => window.open('https://app.nango.dev', '_blank')}
-                              className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-[9px] font-bold uppercase tracking-widest bg-muted text-foreground border border-border hover:bg-muted/80 transition-all"
-                            >
-                              Configure OAuth Client (Nango)
-                            </button>
+                            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-center">    
+                              <p className="text-[9px] text-amber-500/80 font-bold uppercase tracking-widest leading-normal">
+                                OAuth provider not provisioned — contact your system administrator
+                              </p>
+                            </div>
                           </div>
                         ) : (
                           <div className="space-y-3">

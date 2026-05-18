@@ -31,6 +31,13 @@ import type { AgnosticQuery } from '@/core/inventory/types';
 
 
 export class NotionAdapter extends BaseAdapter {
+  static readonly meta = {
+    color: 'text-zinc-900 dark:text-zinc-100',
+    icon: 'book-open',
+    label: 'Notion',
+    accentCss: 'bg-zinc-950 dark:bg-zinc-100',
+  };
+
   readonly id = 'notion';
   readonly label = 'Notion';
 

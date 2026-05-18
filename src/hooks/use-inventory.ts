@@ -51,7 +51,41 @@ export function useInventory(integrationId?: string, initialQuery: Partial<Agnos
         ...(searchQuery && { search: searchQuery })
       });
 
-      const res = await fetch(`/api/integrations/${integrationId}/inventory?${params.toString()}`);
+      // 🔐 Read secure encrypted MEGA credentials from IndexedDB
+      const openDb = (): Promise<IDBDatabase> => {
+        return new Promise((resolve, reject) => {
+          const req = indexedDB.open('indra-ipw-v1', 1);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      };
+
+      let encryptedMegaPayload: string | undefined = undefined;
+      try {
+        const db = await openDb();
+        const tx = db.transaction('sessions', 'readonly');
+        const req = tx.objectStore('sessions').get('mega-vault');
+        await new Promise<void>((resolve) => {
+          req.onsuccess = () => {
+            if (req.result && req.result.encryptedPayload) {
+              encryptedMegaPayload = req.result.encryptedPayload;
+            }
+            resolve();
+          };
+          req.onerror = () => resolve();
+        });
+      } catch (dbErr) {
+        // non-fatal, client sandbox access issues or empty vault
+      }
+
+      const headers: Record<string, string> = {};
+      if (encryptedMegaPayload) {
+        headers['x-mega-credentials'] = encryptedMegaPayload;
+      }
+
+      const res = await fetch(`/api/integrations/${integrationId}/inventory?${params.toString()}`, {
+        headers
+      });
       if (!res.ok) throw new Error('Failed to hydrate inventory');
       
       const data = await res.json();

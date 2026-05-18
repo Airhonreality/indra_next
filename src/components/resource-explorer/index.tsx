@@ -32,6 +32,7 @@ import { cn } from '@/lib/utils';
 import { listSources, getSourceSchema } from '@/app/actions/pipeline';
 import type { SourceItem } from '@/app/actions/pipeline';
 import type { FieldSchema } from '@/core/types/integration';
+import { registry } from '@/core/registry';
 
 // ── TYPES & INTERFACES ─────────────────────────────────────────────────────────
 
@@ -64,11 +65,7 @@ function ResourceIcon({ type, className }: { type: SourceItem['type'] | 'provide
  * Maps provider IDs to standardized UI colors.
  */
 function getProviderColor(integration: string) {
-  if (integration === 'notion')        return 'text-zinc-900 dark:text-zinc-100';
-  if (integration === 'google-drive')  return 'text-emerald-600 dark:text-emerald-400';
-  if (integration === 'google-sheets') return 'text-emerald-600 dark:text-emerald-400';
-  if (integration === 'storage')       return 'text-amber-600 dark:text-amber-400';
-  return 'text-muted-foreground';
+  return registry.getAdapterMeta(integration).color;
 }
 
 /**

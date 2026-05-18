@@ -15,6 +15,7 @@ import { ChevronRight, Folder, File, Loader2, Share2, Search, Database } from 'l
 import { cn } from '@/lib/utils';
 import { useInventory } from '@/hooks/use-inventory';
 import { Button } from '@/components/ui/button';
+import { ProviderBadge } from '@/components/storage/ProviderBadge';
 
 export interface AgnosticAtom {
   id: string;
@@ -22,6 +23,10 @@ export interface AgnosticAtom {
   type: 'file' | 'folder';
   rawMimeType?: string;
   isShared?: boolean;
+  provider?: string;
+  size?: number;
+  thumbnailUrl?: string;
+  streamUrl?: string;
 }
 
 interface AgnosticTreeProps {
@@ -200,13 +205,29 @@ function TreeColumn({
                 )}
               >
                 <div className="flex items-center gap-3 overflow-hidden">
-                  {atom.type === 'folder' ? (
+                  {atom.thumbnailUrl && atom.type === 'file' ? (
+                    <img
+                      src={atom.thumbnailUrl}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="size-8 rounded object-cover shrink-0 opacity-90 border border-border/20 animate-in fade-in duration-300"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
+                  ) : atom.type === 'folder' ? (
                     <Folder className={cn("size-4 shrink-0", isSelected ? "text-primary-foreground" : "text-primary/60")} />
+                  ) : atom.provider === 'mega' ? (
+                    <MegaColorBlock name={atom.name} />
                   ) : (
                     <File className="size-4 shrink-0 opacity-40" />
                   )}
                   <div className="flex flex-col overflow-hidden">
-                    <span className="text-xs font-medium truncate leading-tight">{atom.name}</span>
+                    <div className="flex items-center gap-1.5 overflow-hidden">
+                      <span className="text-xs font-medium truncate leading-tight">{atom.name}</span>
+                      {atom.provider && (
+                        <ProviderBadge provider={atom.provider} size="xs" />
+                      )}
+                    </div>
                     {atom.isShared && (
                       <div className="flex items-center gap-1 text-[7px] uppercase font-bold opacity-60">
                         <Share2 className="size-2" /> Shared
@@ -222,6 +243,18 @@ function TreeColumn({
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+function MegaColorBlock({ name }: { name: string }) {
+  const hue = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) * 137 % 360;
+  return (
+    <div
+      className="size-8 rounded shrink-0 flex items-center justify-center text-[9px] font-black text-white border border-white/10 select-none animate-in fade-in duration-300 shadow-md"
+      style={{ backgroundColor: `hsl(${hue}, 65%, 40%)` }}
+    >
+      {name.slice(0, 2).toUpperCase()}
     </div>
   );
 }

@@ -11,6 +11,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  
+  // 🔗 Proxy intercept for virtual storage union to prevent 404 database lookups
+  if (id === 'storage-union') {
+    const { GET: unionGET } = await import('@/app/api/storage/union/route');
+    return unionGET(req);
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

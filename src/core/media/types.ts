@@ -124,6 +124,7 @@ export interface UploadSession {
 }
 
 export interface TranscodeConfig {
+  /** 'avc' = H.264 (default, YouTube-safe); 'hevc' = H.265 (archival) */
   codec?: 'avc' | 'hevc' | 'vp9' | 'av1';
   profile?: 'baseline' | 'main' | 'high';
   hardwareAcceleration?: 'prefer-hardware' | 'prefer-software' | 'no-preference';
@@ -131,6 +132,8 @@ export interface TranscodeConfig {
   targetWidth?: number;
   targetHeight?: number;
   preserveMetadata: boolean;
+  /** Hint: force CFR + BT.709 + faststart — always true for web/YouTube targets */
+  webOptimized?: boolean;
 }
 
 // ─── Worker message protocol (structured-clone safe) ────────────────────────

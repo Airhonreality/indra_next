@@ -38,6 +38,13 @@ import type { AgnosticQuery } from '@/core/inventory/types';
  * sourceId = relative path from basePath to the file (e.g., "export.json", "data/users.json").
  */
 export class StorageAdapter extends BaseAdapter {
+  static readonly meta = {
+    color: 'text-amber-600 dark:text-amber-400',
+    icon: 'database',
+    label: 'Storage',
+    accentCss: 'bg-amber-500',
+  };
+
   readonly id = 'storage';
   readonly label = 'Storage';
 

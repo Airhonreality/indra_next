@@ -9,6 +9,13 @@ const SHEETS_BASE = 'https://sheets.googleapis.com/v4';
 const DEFAULT_SHEET = 'ATOMS';
 
 export class SheetsAdapter extends BaseAdapter {
+  static readonly meta = {
+    color: 'text-emerald-600 dark:text-emerald-400',
+    icon: 'table-2',
+    label: 'Google Sheets',
+    accentCss: 'bg-emerald-500',
+  };
+
   readonly id = 'google-sheets';
   readonly label = 'Google Sheets';
 

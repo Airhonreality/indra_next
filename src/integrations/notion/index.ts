@@ -6,4 +6,4 @@ registry.registerAdapter('notion', (context: any) => {
   const connectionId = typeof context === 'string' ? context : context.connectionId;
   const client = makeNotionClient(connectionId);
   return new NotionAdapter(client);
-});
+}, NotionAdapter.meta);

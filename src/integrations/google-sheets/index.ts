@@ -7,4 +7,4 @@ registry.registerAdapter('google-sheets', (context: any) => {
   const sheetName = typeof context === 'string' ? undefined : context.sheetName;
   const client = makeSheetsClient(connectionId);
   return new SheetsAdapter(client, sheetName);
-});
+}, SheetsAdapter.meta);

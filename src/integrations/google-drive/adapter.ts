@@ -29,6 +29,7 @@ import { AgnosticQuery, AgnosticInventoryItem } from '@/core/inventory/types';
 import type { 
   OperationResult, 
   FieldSchema,
+  IBlobCapable,
 } from '@/core/types/integration';
 
 /**
@@ -36,7 +37,14 @@ import type {
  * Implements the ISiloAdapter interface for Google Drive.
  * Handles real-time resource discovery and resumable uploads.
  */
-export class GoogleDriveAdapter extends BaseAdapter {
+export class GoogleDriveAdapter extends BaseAdapter implements IBlobCapable {
+  static readonly meta = {
+    color: 'text-emerald-600 dark:text-emerald-400',
+    icon: 'hard-drive',
+    label: 'Google Drive',
+    accentCss: 'bg-emerald-500',
+  };
+
   private client: AuthorizedClient;
   private connectionId: string;
   readonly id = 'google-drive';
@@ -183,7 +191,7 @@ export class GoogleDriveAdapter extends BaseAdapter {
         endpoint: '/drive/v3/files',
         params: {
           q,
-          fields: 'files(id, name, mimeType, shared, size, modifiedTime, fileExtension, capabilities, appProperties)',
+          fields: 'files(id, name, mimeType, shared, size, modifiedTime, fileExtension, capabilities, appProperties, thumbnailLink)',
           pageSize: query?.limit?.toString() || '50',
           ...(query?.cursor && { pageToken: query.cursor }),
           supportsAllDrives: 'true',
@@ -200,7 +208,8 @@ export class GoogleDriveAdapter extends BaseAdapter {
         updatedAt: f.modifiedTime,
         provider: 'google-drive',
         isShared: f.shared,
-        parentId: parentId
+        parentId: parentId,
+        thumbnailUrl: f.thumbnailLink ?? undefined
       }));
 
       return this.result(items);
@@ -298,5 +307,55 @@ export class GoogleDriveAdapter extends BaseAdapter {
 
   async pushRecords(targetId: string, records: any[]): Promise<OperationResult<any>> {
     return this.error('Not implemented for Drive. Use createResumableSession instead.');
+  }
+
+  async downloadBlob(fileId: string, rangeHeader?: string): Promise<OperationResult<ReadableStream>> {
+    try {
+      const token = await nango.getToken('google-drive', this.connectionId);
+      const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+      const res = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          ...(rangeHeader && { 'Range': rangeHeader }),
+        }
+      });
+      if (!res.ok) {
+        return this.error(`DOWNLOAD_ERR: HTTP ${res.status} ${res.statusText}`);
+      }
+      if (!res.body) {
+        return this.error('DOWNLOAD_ERR: Response body is null');
+      }
+
+      // Collect upstream headers to pass back
+      const headers: Record<string, string> = {};
+      res.headers.forEach((val, key) => {
+        headers[key.toLowerCase()] = val;
+      });
+
+      return {
+        ok: true,
+        data: res.body as any,
+        meta: {
+          headers
+        } as any
+      };
+    } catch (err) {
+      return this.error(`DOWNLOAD_ERR: ${(err as Error).message}`);
+    }
+  }
+
+  async getSpace(): Promise<OperationResult<{ used: number; total: number; free: number }>> {
+    try {
+      const response = await this.client.request({
+        endpoint: '/drive/v3/about',
+        params: { fields: 'storageQuota' },
+      });
+      const q = response.data.storageQuota;
+      const used = parseInt(q.usageInDrive || '0');
+      const total = parseInt(q.limit || '0');
+      return this.result({ used, total, free: total - used });
+    } catch (err) {
+      return this.error(`SPACE_ERR: ${(err as Error).message}`);
+    }
   }
 }

@@ -233,14 +233,21 @@ async function transcodeVideo(
 
     emitProgress(fileId, 25, 'Transcodificando Materia (Software HEVC)');
 
+    const codecLib = config.codec === 'hevc' ? 'libx265' : 'libx264';
+
     await ffmpeg.exec([
       '-i', inputName,
-      '-c:v', 'libx265',
+      '-c:v', codecLib,
       '-crf', '18',
-      '-preset', 'ultrafast',
+      '-preset', 'medium',
+      '-fps_mode', 'cfr',         // VFR→CFR: corrige stuttering de iPhone
       '-pix_fmt', 'yuv420p',
+      '-colorspace', 'bt709',     // Fuerza Rec.709 — estándar web/YouTube
+      '-color_primaries', 'bt709',
+      '-color_trc', 'bt709',
       '-c:a', 'aac',
       '-b:a', '192k',
+      '-movflags', '+faststart',  // moov al inicio — streaming web sin buffering
       outputName
     ]);
 

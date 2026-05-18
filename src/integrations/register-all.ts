@@ -8,3 +8,7 @@ import './google-drive';
 import './google-sheets';
 import './notion';
 import './storage';
+import './mega';
+import './youtube';
+import './onedrive';
+import './storage-union/register';

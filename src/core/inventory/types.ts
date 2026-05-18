@@ -52,6 +52,8 @@ export interface AgnosticInventoryItem {
   parentId: string;
   provider: string;
   metadata?: Record<string, any>;
+  thumbnailUrl?: string;
+  streamUrl?: string;
 }
 
 /**

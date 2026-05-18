@@ -131,3 +131,22 @@ export interface IntegrationAdapter {
     metadata?: { [key: string]: string }
   ): Promise<OperationResult<{ resumableUri: string; sessionId: string }>>;
 }
+
+export interface IBlobCapable {
+  downloadBlob(fileId: string, rangeHeader?: string): Promise<OperationResult<ReadableStream>>;
+  getSpace(): Promise<OperationResult<{ used: number; total: number; free: number }>>;
+}
+
+export function isBlobCapable(adapter: IntegrationAdapter): adapter is IntegrationAdapter & IBlobCapable {
+  return typeof (adapter as any).downloadBlob === 'function';
+}
+
+export interface MegaCredentials {
+  email?: string;
+  password?: string;
+  secondFactorCode?: string;
+  sessionId?: string;
+  masterKey?: string;
+  applicationKey: string;
+}
+

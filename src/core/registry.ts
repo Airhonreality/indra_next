@@ -27,24 +27,44 @@
 
 import type { IntegrationAdapter } from '@/core/types/integration';
 
+export interface AdapterMeta {
+  color: string;
+  icon: string;
+  label: string;
+  accentCss: string;
+}
+
 type AdapterFactory<C = unknown> = (context: C) => IntegrationAdapter;
 type BlockFactory<P = any> = () => Promise<React.ComponentType<P>>;
 
 class UniversalRegistry {
   private readonly adapterFactories = new Map<string, AdapterFactory>();
+  private readonly adapterMetas = new Map<string, AdapterMeta>();
   private readonly blockFactories = new Map<string, BlockFactory>();
 
   /**
    * 🏗️ ADAPTER REGISTRATION (Infrastructure Layer)
    */
-  registerAdapter<C>(id: string, factory: AdapterFactory<C>): void {
+  registerAdapter<C>(id: string, factory: AdapterFactory<C>, meta?: AdapterMeta): void {
     this.adapterFactories.set(id, factory as AdapterFactory);
+    if (meta) {
+      this.adapterMetas.set(id, meta);
+    }
   }
 
   resolveAdapter<C = unknown>(id: string, context?: C): IntegrationAdapter {
     const factory = this.adapterFactories.get(id);
     if (!factory) throw new Error(`Adapter '${id}' not found in Universal Registry.`);
     return factory(context);
+  }
+
+  getAdapterMeta(id: string): AdapterMeta {
+    return this.adapterMetas.get(id) ?? {
+      color: 'text-muted-foreground',
+      icon: 'database',
+      label: id,
+      accentCss: 'bg-muted-foreground',
+    };
   }
 
   /**

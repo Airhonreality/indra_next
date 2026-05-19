@@ -122,7 +122,7 @@ export async function GET(
       const [dedicated] = await db
         .select()
         .from(storageConnections)
-        .where(eq(storageConnections.id, id));
+        .where(eq(storageConnections.id, integration.id));
         
       if (dedicated && dedicated.encryptedCredentials) {
         const { decryptServerPayload } = await import('@/lib/server-crypto');

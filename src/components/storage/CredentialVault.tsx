@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Key, Eye, EyeOff, Check, Loader2, Trash2 } from 'lucide-react';
+import { Shield, Key, Eye, EyeOff, Check, Loader2, Trash2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface CredentialVaultProps {
@@ -14,34 +14,25 @@ export function CredentialVault({ userId, onSaved }: CredentialVaultProps) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [savedEmail, setSavedEmail] = useState('');
-  const [megaIntegrationId, setMegaIntegrationId] = useState<string | null>(null);
+  const [connections, setConnections] = useState<any[]>([]);
+  const [showAddForm, setShowAddForm] = useState(false);
 
-  // Check connection status from server (Neon Postgres)
-  const checkVault = async () => {
+  // Fetch all connections from server (Neon Postgres)
+  const fetchConnections = async () => {
     try {
       const res = await fetch('/api/integrations');
       if (!res.ok) throw new Error('Failed to fetch integrations');
       const data = await res.json();
       
-      const megaConn = data.integrations?.find((i: any) => i.type === 'mega');
-      if (megaConn) {
-        setIsConnected(true);
-        setSavedEmail(megaConn.config?.email || '');
-        setMegaIntegrationId(megaConn.id);
-      } else {
-        setIsConnected(false);
-        setSavedEmail('');
-        setMegaIntegrationId(null);
-      }
+      const megaConns = data.integrations?.filter((i: any) => i.type === 'mega') || [];
+      setConnections(megaConns);
     } catch (err) {
       console.error('[CredentialVault] Failed to retrieve server connections:', err);
     }
   };
 
   useEffect(() => {
-    checkVault();
+    fetchConnections();
   }, []);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -57,7 +48,7 @@ export function CredentialVault({ userId, onSaved }: CredentialVaultProps) {
         },
         body: JSON.stringify({
           type: 'mega',
-          label: 'MEGA Sovereign Storage',
+          label: `MEGA [${email}]`,
           config: {
             email,
             password
@@ -70,13 +61,13 @@ export function CredentialVault({ userId, onSaved }: CredentialVaultProps) {
         throw new Error(errorData.error || 'Failed to save credentials');
       }
 
-      const data = await res.json();
-      setIsConnected(true);
-      setSavedEmail(email);
-      setMegaIntegrationId(data.integration?.id || null);
       setEmail('');
       setPassword('');
+      setShowPassword(false);
+      setShowAddForm(false);
       setLoading(false);
+      
+      await fetchConnections();
       if (onSaved) onSaved();
     } catch (err) {
       console.error('[CredentialVault] Failed to save in Postgres vault:', err);
@@ -85,20 +76,17 @@ export function CredentialVault({ userId, onSaved }: CredentialVaultProps) {
     }
   };
 
-  const handleDisconnect = async () => {
-    if (!megaIntegrationId) return;
+  const handleDisconnect = async (id: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/integrations/${megaIntegrationId}`, {
+      const res = await fetch(`/api/integrations/${id}`, {
         method: 'DELETE'
       });
 
       if (!res.ok) throw new Error('Failed to disconnect');
 
-      setIsConnected(false);
-      setSavedEmail('');
-      setMegaIntegrationId(null);
       setLoading(false);
+      await fetchConnections();
       if (onSaved) onSaved();
     } catch (err) {
       console.error('[CredentialVault] Failed to delete connection:', err);
@@ -108,49 +96,68 @@ export function CredentialVault({ userId, onSaved }: CredentialVaultProps) {
 
   return (
     <div className="rounded-2xl border border-border/40 bg-background/20 backdrop-blur-md p-5 space-y-4 shadow-xl">
-      <div className="flex items-center gap-2.5">
-        <Shield className="size-4 text-red-500 animate-pulse" />
-        <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
-          Bóveda Criptográfica MEGA
-        </h3>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <Shield className="size-4 text-red-500 animate-pulse" />
+          <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
+            Bóveda Criptográfica MEGA
+          </h3>
+        </div>
+        {connections.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="h-7 px-2 text-[9px] uppercase tracking-wider rounded-lg border-red-500/20 text-red-400 hover:bg-red-500/10"
+          >
+            <Plus className="size-3 mr-1" /> {showAddForm ? 'Ocultar' : 'Agregar Cuenta'}
+          </Button>
+        )}
       </div>
 
-      {isConnected ? (
-        <div className="space-y-3 animate-in fade-in duration-300">
-          <div className="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-950/15 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <Check className="size-4 text-emerald-500 shrink-0" />
-              <div className="overflow-hidden">
-                <span className="block text-[8px] font-bold uppercase tracking-wider text-emerald-500 leading-tight">
-                  Conexión Activa (Neon Postgres)
-                </span>
-                <span className="text-[11px] font-mono text-zinc-300 truncate block" title={savedEmail}>
-                  {savedEmail}
-                </span>
-              </div>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              disabled={loading}
-              onClick={handleDisconnect}
-              className="size-8 rounded-full text-zinc-500 hover:text-red-500 hover:bg-red-500/10 shrink-0"
-              title="Desconectar cuenta"
+      {/* Connected Accounts List */}
+      {connections.length > 0 ? (
+        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+          {connections.map((conn) => (
+            <div
+              key={conn.id}
+              className="p-3 rounded-xl border border-emerald-500/20 bg-emerald-950/15 flex items-center justify-between gap-3 animate-in fade-in duration-300"
             >
-              {loading ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
+              <div className="flex items-center gap-2.5 overflow-hidden">
+                <Check className="size-4 text-emerald-500 shrink-0" />
+                <div className="overflow-hidden">
+                  <span className="block text-[8px] font-bold uppercase tracking-wider text-emerald-500 leading-tight">
+                    Conexión Activa (Neon Postgres)
+                  </span>
+                  <span className="text-[11px] font-mono text-zinc-300 truncate block" title={conn.config?.email}>
+                    {conn.config?.email}
+                  </span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={loading}
+                onClick={() => handleDisconnect(conn.id)}
+                className="size-8 rounded-full text-zinc-500 hover:text-red-500 hover:bg-red-500/10 shrink-0"
+                title="Desconectar cuenta"
+              >
                 <Trash2 className="size-3.5" />
-              )}
-            </Button>
-          </div>
-          <p className="text-[9px] text-zinc-500 leading-normal">
-            Tus credenciales están almacenadas de forma segura y encriptadas (AES-256-GCM) en Neon Postgres, garantizando aislamiento multi-tenant absoluto.
-          </p>
+              </Button>
+            </div>
+          ))}
         </div>
       ) : (
-        <form onSubmit={handleSave} className="space-y-3 animate-in fade-in duration-300">
+        !showAddForm && (
+          <p className="text-[10px] text-zinc-500 italic">No hay cuentas de MEGA conectadas actualmente.</p>
+        )
+      )}
+
+      {/* Add New Connection Form */}
+      {(showAddForm || connections.length === 0) && (
+        <form onSubmit={handleSave} className="space-y-3 border-t border-border/20 pt-3 animate-in slide-in-from-top-2 duration-300">
           <p className="text-[9px] text-zinc-500 leading-normal">
             MEGA no utiliza OAuth. Ingresa tus credenciales de acceso para persistir tu almacenamiento soberano de forma segura.
           </p>
@@ -190,23 +197,36 @@ export function CredentialVault({ userId, onSaved }: CredentialVaultProps) {
             </div>
           </div>
 
-          <Button
-            type="submit"
-            disabled={loading || !email || !password}
-            className="w-full bg-red-600 hover:bg-red-500 text-white font-bold text-[9px] uppercase tracking-wider h-9 rounded-xl transition-all shadow-lg shadow-red-600/10 mt-1"
-          >
-            {loading ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <>
-                <Key className="size-3 mr-1.5" /> Conectar MEGA
-              </>
+          <div className="flex gap-2 pt-1">
+            {connections.length > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowAddForm(false)}
+                className="flex-1 text-[9px] uppercase tracking-wider h-9 rounded-xl border border-border/40"
+              >
+                Cancelar
+              </Button>
             )}
-          </Button>
+            <Button
+              type="submit"
+              disabled={loading || !email || !password}
+              className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold text-[9px] uppercase tracking-wider h-9 rounded-xl transition-all shadow-lg shadow-red-600/10"
+            >
+              {loading ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <>
+                  <Key className="size-3 mr-1.5" /> Conectar MEGA
+                </>
+              )}
+            </Button>
+          </div>
         </form>
       )}
     </div>
   );
 }
 export default CredentialVault;
+
 

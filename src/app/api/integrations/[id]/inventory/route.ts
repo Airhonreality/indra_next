@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from "@/auth";
 import { db } from '@/lib/db';
-import { integrations } from '@/core/db/schema';
+import { integrations, storageConnections } from '@/core/db/schema';
 import { eq } from 'drizzle-orm';
 
 const NANGO_API_BASE = 'https://api.nango.dev';
@@ -29,11 +29,33 @@ export async function GET(
   }
 
   try {
-    // 1. Get the integration details from local DB
-    const [integration] = await db
+    // 1. Get the integration details from local DB (traditional or dedicated storage)
+    let integration: any = null;
+
+    const [traditional] = await db
       .select()
       .from(integrations)
       .where(eq(integrations.id, id));
+
+    if (traditional) {
+      integration = traditional;
+    } else {
+      const [dedicated] = await db
+        .select()
+        .from(storageConnections)
+        .where(eq(storageConnections.id, id));
+
+      if (dedicated) {
+        integration = {
+          id: dedicated.id,
+          type: dedicated.provider,
+          connectionId: dedicated.id,
+          config: dedicated.config,
+          isActive: dedicated.isActive,
+          userId: dedicated.userId
+        };
+      }
+    }
 
     if (!integration) {
       return NextResponse.json({ error: 'Integration not found' }, { status: 404 });
@@ -47,8 +69,26 @@ export async function GET(
     const { registry } = await import('@/core/registry');
     const { AgnosticQuerySchema } = await import('@/core/inventory/types');
     
-    // Resolve adapter with the stored connectionId
-    const adapter = registry.resolveAdapter(integration.type, integration.connectionId);
+    // Resolve adapter with the stored connectionId or decrypted credentials
+    let adapter: any = null;
+    if (integration.type === 'mega') {
+      const [dedicated] = await db
+        .select()
+        .from(storageConnections)
+        .where(eq(storageConnections.id, id));
+        
+      if (dedicated && dedicated.encryptedCredentials) {
+        const { decryptServerPayload } = await import('@/lib/server-crypto');
+        const creds = decryptServerPayload(dedicated.encryptedCredentials, session.user.id);
+        adapter = registry.resolveAdapter('mega', creds);
+      }
+    } else {
+      adapter = registry.resolveAdapter(integration.type, integration.connectionId);
+    }
+
+    if (!adapter) {
+      return NextResponse.json({ error: 'Failed to resolve storage adapter' }, { status: 500 });
+    }
     
     // 3. PARSE & VALIDATE AGNOSTIC QUERY
     const { searchParams } = new URL(req.url);

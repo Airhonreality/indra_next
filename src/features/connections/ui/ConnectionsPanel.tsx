@@ -174,7 +174,6 @@ function LocalVolumeInput({
 export function ConnectionsPanel() {
   const userId = useIndraStore((s) => s.userId);
   const [integrations, setIntegrations] = useState<any[]>([]);
-  const [isMegaConnected, setIsMegaConnected] = useState(false);
   const [localStoragePath, setLocalStoragePath] = useState('');
   const [jsonVaultPath, setJsonVaultPath] = useState('');
   const { actions, isProcessing } = useIntegrationState();
@@ -191,22 +190,7 @@ export function ConnectionsPanel() {
     }
   };
 
-  const checkMega = async () => {
-    try {
-      const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const r = indexedDB.open('indra-ipw-v1', 1);
-        r.onsuccess = () => resolve(r.result);
-        r.onerror = () => reject(r.error);
-      });
-      const tx = db.transaction('sessions', 'readonly');
-      const req = tx.objectStore('sessions').get('mega-vault');
-      req.onsuccess = () => setIsMegaConnected(!!(req.result?.encryptedPayload));
-    } catch { 
-      setIsMegaConnected(false); 
-    }
-  };
-
-  const refresh = () => Promise.all([fetchIntegrations(), checkMega()]);       
+  const refresh = () => fetchIntegrations();       
 
   useEffect(() => { 
     refresh(); 
@@ -215,6 +199,7 @@ export function ConnectionsPanel() {
   const google = integrations.find(i => i.type === 'google-drive' && i.isActive);
   const onedrive = integrations.find(i => i.type === 'onedrive' && i.isActive);
   const notion = integrations.find(i => i.type === 'notion' && i.isActive);    
+  const megaCount = integrations.filter(i => i.type === 'mega' && i.isActive).length;
 
   const connect = async (provider: string) => {
     try {
@@ -280,14 +265,14 @@ export function ConnectionsPanel() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-foreground uppercase tracking-wider">MEGA</span>  
-            {isMegaConnected && (
-              <span className="text-[8px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-bold uppercase">
-                Vault Activo
+            {megaCount > 0 && (
+              <span className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase">
+                {megaCount} {megaCount === 1 ? 'Cuenta Activa' : 'Cuentas Activas'}
               </span>
             )}
           </div>
           <p className="text-[10px] text-zinc-500 leading-relaxed">
-            Bóveda cifrada del lado del cliente. Las credenciales nunca llegan al servidor host.
+            Bóveda cifrada en el servidor (AES-256-GCM). Añade y unifica múltiples cuentas para crear un gran almacenamiento virtual.
           </p>
         </div>
         {userId && (

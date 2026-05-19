@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from "@/auth";
 import { db } from '@/lib/db';
 import { integrations, storageConnections } from '@/core/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 
 const NANGO_API_BASE = 'https://api.nango.dev';
 
@@ -32,28 +32,75 @@ export async function GET(
     // 1. Get the integration details from local DB (traditional or dedicated storage)
     let integration: any = null;
 
-    const [traditional] = await db
-      .select()
-      .from(integrations)
-      .where(eq(integrations.id, id));
+    // Check if ID is a provider name shortcut
+    const isProviderShortcut = ['google-drive', 'mega', 'onedrive', 'notion'].includes(id);
 
-    if (traditional) {
-      integration = traditional;
+    if (isProviderShortcut) {
+      if (id === 'mega') {
+        const [dedicated] = await db
+          .select()
+          .from(storageConnections)
+          .where(
+            and(
+              eq(storageConnections.userId, session.user.id),
+              eq(storageConnections.provider, 'mega'),
+              eq(storageConnections.isActive, true)
+            )
+          )
+          .limit(1);
+
+        if (dedicated) {
+          integration = {
+            id: dedicated.id,
+            type: dedicated.provider,
+            connectionId: dedicated.id,
+            config: dedicated.config,
+            isActive: dedicated.isActive,
+            userId: dedicated.userId
+          };
+        }
+      } else {
+        const [traditional] = await db
+          .select()
+          .from(integrations)
+          .where(
+            and(
+              eq(integrations.userId, session.user.id),
+              eq(integrations.type, id),
+              eq(integrations.isActive, true)
+            )
+          )
+          .limit(1);
+
+        if (traditional) {
+          integration = traditional;
+        }
+      }
     } else {
-      const [dedicated] = await db
+      // Direct UUID lookup
+      const [traditional] = await db
         .select()
-        .from(storageConnections)
-        .where(eq(storageConnections.id, id));
+        .from(integrations)
+        .where(eq(integrations.id, id));
 
-      if (dedicated) {
-        integration = {
-          id: dedicated.id,
-          type: dedicated.provider,
-          connectionId: dedicated.id,
-          config: dedicated.config,
-          isActive: dedicated.isActive,
-          userId: dedicated.userId
-        };
+      if (traditional) {
+        integration = traditional;
+      } else {
+        const [dedicated] = await db
+          .select()
+          .from(storageConnections)
+          .where(eq(storageConnections.id, id));
+
+        if (dedicated) {
+          integration = {
+            id: dedicated.id,
+            type: dedicated.provider,
+            connectionId: dedicated.id,
+            config: dedicated.config,
+            isActive: dedicated.isActive,
+            userId: dedicated.userId
+          };
+        }
       }
     }
 

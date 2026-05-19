@@ -25,7 +25,6 @@ export function StorageWidgetClient({ userId, connectionIds }: StorageWidgetClie
   const [spaceData, setSpaceData] = useState<SpaceData | null>(null);
   const [loadingSpace, setLoadingSpace] = useState(false);
   const [activeSilo, setActiveSilo] = useState<string>('storage-union'); // 'storage-union', 'google-drive', 'mega', etc.
-  const [isMegaConnected, setIsMegaConnected] = useState(false);
   const [activeProviders, setActiveProviders] = useState<string[]>([]);
 
   // 1. Fetch unified storage space quota
@@ -65,32 +64,10 @@ export function StorageWidgetClient({ userId, connectionIds }: StorageWidgetClie
     }
   };
 
-  // 3. Verify if MEGA is active in client IndexedDB
-  const checkMegaStatus = async () => {
-    try {
-      const openDb = (): Promise<IDBDatabase> => {
-        return new Promise((resolve, reject) => {
-          const req = indexedDB.open('indra-ipw-v1', 1);
-          req.onsuccess = () => resolve(req.result);
-          req.onerror = () => reject(req.error);
-        });
-      };
-      const db = await openDb();
-      const tx = db.transaction('sessions', 'readonly');
-      const req = tx.objectStore('sessions').get('mega-vault');
-      req.onsuccess = () => {
-        setIsMegaConnected(!!(req.result && req.result.encryptedPayload));
-      };
-    } catch {
-      setIsMegaConnected(false);
-    }
-  };
-
   const handleRefreshAll = async () => {
     await Promise.all([
       fetchSpaceInfo(),
-      fetchActiveProviders(),
-      checkMegaStatus()
+      fetchActiveProviders()
     ]);
   };
 
@@ -99,12 +76,7 @@ export function StorageWidgetClient({ userId, connectionIds }: StorageWidgetClie
   }, []);
 
   // Compute final aggregated list of upstreams
-  const allUpstreams = [
-    ...new Set([
-      ...activeProviders,
-      ...(isMegaConnected ? ['mega'] : [])
-    ])
-  ];
+  const allUpstreams = [...new Set(activeProviders)];
 
   const handleSiloChange = (siloId: string) => {
     setActiveSilo(siloId);

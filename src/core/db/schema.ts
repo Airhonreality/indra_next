@@ -165,3 +165,44 @@ export const jobs = pgTable("jobs", {
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+/**
+ * 📦 STORAGE CONNECTIONS
+ * Dedicated table to persist storage settings and encrypted passwords
+ */
+export const storageConnections = pgTable("storage_connections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(), // 'mega', 'google-drive', 'notion'
+  label: text("label").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  encryptedCredentials: text("encrypted_credentials"),
+  config: jsonb("config").$type<{
+    rootFolderId?: string;
+    [key: string]: any;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
+ * 📂 USER FILES (Inventory Cache)
+ * Dedicated table to index directories and file metadata per user for lightning-fast lookups
+ */
+export const userFiles = pgTable("user_files", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  connectionId: uuid("connection_id").references(() => storageConnections.id, { onDelete: "cascade" }),
+  externalId: text("external_id").notNull(), // ID inside the upstream provider
+  name: text("name").notNull(),
+  mimeType: text("mime_type"),
+  sizeBytes: integer("size_bytes"), // null for directories
+  parentId: text("parent_id"), // Parent directory external ID
+  path: text("path"), // Full visual folder path
+  metadata: jsonb("metadata").$type<{
+    megaHash?: string;
+    [key: string]: any;
+  }>(),
+  syncedAt: timestamp("synced_at").defaultNow().notNull(),
+});
+

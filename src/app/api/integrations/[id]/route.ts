@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from "@/auth";
 import { db } from '@/lib/db';
-import { integrations } from '@/core/db/schema';
+import { integrations, storageConnections } from '@/core/db/schema';
 import { eq, and } from 'drizzle-orm';
 
 export async function DELETE(
@@ -16,7 +16,7 @@ export async function DELETE(
   }
 
   try {
-    // Delete only if it belongs to the user
+    // 1. Intentar eliminar de las integraciones tradicionales (Notion, Sheets)
     const result = await db
       .delete(integrations)
       .where(
@@ -27,13 +27,28 @@ export async function DELETE(
       )
       .returning();
 
+    // 2. Si no se encontró nada, intentar eliminar de las conexiones dedicadas (MEGA)
     if (result.length === 0) {
-      return NextResponse.json({ error: 'Integration not found or not owned by user' }, { status: 404 });
+      const storageResult = await db
+        .delete(storageConnections)
+        .where(
+          and(
+            eq(storageConnections.id, id),
+            eq(storageConnections.userId, session.user.id)
+          )
+        )
+        .returning();
+
+      if (storageResult.length === 0) {
+        return NextResponse.json({ error: 'Integration not found or not owned by user' }, { status: 404 });
+      }
     }
 
     return NextResponse.json({ success: true });
+
   } catch (error) {
     console.error('[Integration Delete Error]:', error);
     return NextResponse.json({ error: 'Failed to delete integration' }, { status: 500 });
   }
 }
+

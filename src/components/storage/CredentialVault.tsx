@@ -16,45 +16,27 @@ export function CredentialVault({ userId, onSaved }: CredentialVaultProps) {
   const [loading, setLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [savedEmail, setSavedEmail] = useState('');
+  const [megaIntegrationId, setMegaIntegrationId] = useState<string | null>(null);
 
-  // Open IndexedDB connection
-  const openDb = (): Promise<IDBDatabase> => {
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open('indra-ipw-v1', 1);
-      req.onupgradeneeded = () => {
-        req.result.createObjectStore('sessions', { keyPath: 'sovereignId' });
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  };
-
-  // Check if MEGA credentials are already in IndexedDB
+  // Check connection status from server (Neon Postgres)
   const checkVault = async () => {
     try {
-      const db = await openDb();
-      const tx = db.transaction('sessions', 'readonly');
-      const req = tx.objectStore('sessions').get('mega-vault');
-      req.onsuccess = async () => {
-        const result = req.result;
-        if (result && result.encryptedPayload) {
-          try {
-            const { decryptPayload } = await import('@/lib/crypto-vault');
-            const decrypted = await decryptPayload(result.encryptedPayload, userId);
-            setIsConnected(true);
-            setSavedEmail(decrypted.email);
-          } catch (decErr) {
-            console.error('[CredentialVault] Failed to decrypt credentials:', decErr);
-            setIsConnected(false);
-            setSavedEmail('');
-          }
-        } else {
-          setIsConnected(false);
-          setSavedEmail('');
-        }
-      };
+      const res = await fetch('/api/integrations');
+      if (!res.ok) throw new Error('Failed to fetch integrations');
+      const data = await res.json();
+      
+      const megaConn = data.integrations?.find((i: any) => i.type === 'mega');
+      if (megaConn) {
+        setIsConnected(true);
+        setSavedEmail(megaConn.config?.email || '');
+        setMegaIntegrationId(megaConn.id);
+      } else {
+        setIsConnected(false);
+        setSavedEmail('');
+        setMegaIntegrationId(null);
+      }
     } catch (err) {
-      console.error('[CredentialVault] Failed to access IndexedDB:', err);
+      console.error('[CredentialVault] Failed to retrieve server connections:', err);
     }
   };
 
@@ -68,48 +50,56 @@ export function CredentialVault({ userId, onSaved }: CredentialVaultProps) {
 
     setLoading(true);
     try {
-      // Encrypt email and password on client side with AES-GCM using userId
-      const { encryptPayload } = await import('@/lib/crypto-vault');
-      const encryptedPayload = await encryptPayload({ email, password }, userId);
-
-      const db = await openDb();
-      const tx = db.transaction('sessions', 'readwrite');
-      const store = tx.objectStore('sessions');
-      
-      store.put({
-        sovereignId: 'mega-vault',
-        encryptedPayload,
-        savedAt: Date.now()
+      const res = await fetch('/api/integrations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'mega',
+          label: 'MEGA Sovereign Storage',
+          config: {
+            email,
+            password
+          }
+        })
       });
 
-      tx.oncomplete = () => {
-        setIsConnected(true);
-        setSavedEmail(email);
-        setEmail('');
-        setPassword('');
-        setLoading(false);
-        if (onSaved) onSaved();
-      };
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to save credentials');
+      }
+
+      const data = await res.json();
+      setIsConnected(true);
+      setSavedEmail(email);
+      setMegaIntegrationId(data.integration?.id || null);
+      setEmail('');
+      setPassword('');
+      setLoading(false);
+      if (onSaved) onSaved();
     } catch (err) {
-      console.error('[CredentialVault] Failed to save in vault:', err);
+      console.error('[CredentialVault] Failed to save in Postgres vault:', err);
+      alert('Error al conectar con MEGA. Verifica tus credenciales.');
       setLoading(false);
     }
   };
 
   const handleDisconnect = async () => {
+    if (!megaIntegrationId) return;
     setLoading(true);
     try {
-      const db = await openDb();
-      const tx = db.transaction('sessions', 'readwrite');
-      const store = tx.objectStore('sessions');
-      store.delete('mega-vault');
+      const res = await fetch(`/api/integrations/${megaIntegrationId}`, {
+        method: 'DELETE'
+      });
 
-      tx.oncomplete = () => {
-        setIsConnected(false);
-        setSavedEmail('');
-        setLoading(false);
-        if (onSaved) onSaved();
-      };
+      if (!res.ok) throw new Error('Failed to disconnect');
+
+      setIsConnected(false);
+      setSavedEmail('');
+      setMegaIntegrationId(null);
+      setLoading(false);
+      if (onSaved) onSaved();
     } catch (err) {
       console.error('[CredentialVault] Failed to delete connection:', err);
       setLoading(false);
@@ -132,7 +122,7 @@ export function CredentialVault({ userId, onSaved }: CredentialVaultProps) {
               <Check className="size-4 text-emerald-500 shrink-0" />
               <div className="overflow-hidden">
                 <span className="block text-[8px] font-bold uppercase tracking-wider text-emerald-500 leading-tight">
-                  Conexión Activa
+                  Conexión Activa (Neon Postgres)
                 </span>
                 <span className="text-[11px] font-mono text-zinc-300 truncate block" title={savedEmail}>
                   {savedEmail}
@@ -156,13 +146,13 @@ export function CredentialVault({ userId, onSaved }: CredentialVaultProps) {
             </Button>
           </div>
           <p className="text-[9px] text-zinc-500 leading-normal">
-            Tus credenciales están almacenadas localmente en tu navegador mediante IndexedDB. Nunca se guardan de forma persistente en el servidor.
+            Tus credenciales están almacenadas de forma segura y encriptadas (AES-256-GCM) en Neon Postgres, garantizando aislamiento multi-tenant absoluto.
           </p>
         </div>
       ) : (
         <form onSubmit={handleSave} className="space-y-3 animate-in fade-in duration-300">
           <p className="text-[9px] text-zinc-500 leading-normal">
-            MEGA no utiliza OAuth. Ingresa tus credenciales de acceso para instanciar la conexión cliente-servidor de forma segura.
+            MEGA no utiliza OAuth. Ingresa tus credenciales de acceso para persistir tu almacenamiento soberano de forma segura.
           </p>
 
           <div className="space-y-1">
@@ -219,3 +209,4 @@ export function CredentialVault({ userId, onSaved }: CredentialVaultProps) {
   );
 }
 export default CredentialVault;
+

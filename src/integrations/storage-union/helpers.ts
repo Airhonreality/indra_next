@@ -1,13 +1,14 @@
 import { db } from '@/lib/db';
-import { integrations } from '@/core/db/schema';
+import { integrations, storageConnections } from '@/core/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { registry } from '@/core/registry';
 import '@/integrations/register-all';
 import { IntegrationAdapter, IBlobCapable } from '@/core/types/integration';
 import crypto from 'crypto';
+import { decryptServerPayload } from '@/lib/server-crypto';
 
 /**
- * Decrypts MEGA credentials from client header.
+ * Decrypts MEGA credentials from client header (Deprecated fallback).
  * Supports AES-256-GCM (using sessionToken/userId as key), Base64, and plain JSON.
  */
 export function decryptMegaCredentials(encryptedData: string, sessionToken: string): any {
@@ -51,11 +52,13 @@ export function decryptMegaCredentials(encryptedData: string, sessionToken: stri
 
 /**
  * Instantiates all active and capable storage upstreams for a given user.
+ * Now queries Neon Postgres dedicated tables and decrypts credentials server-side.
  */
 export async function getActiveUpstreams(
   userId: string,
   megaCredentials?: any
 ): Promise<(IntegrationAdapter & Partial<IBlobCapable>)[]> {
+  // 1. Obtener integraciones tradicionales (Notion, Drive)
   const activeIntegrations = await db
     .select()
     .from(integrations)
@@ -66,20 +69,25 @@ export async function getActiveUpstreams(
       )
     );
 
+  // 2. Obtener conexiones de almacenamiento dedicadas (MEGA)
+  const activeStorage = await db
+    .select()
+    .from(storageConnections)
+    .where(
+      and(
+        eq(storageConnections.userId, userId),
+        eq(storageConnections.isActive, true)
+      )
+    );
+
   const upstreams: (IntegrationAdapter & Partial<IBlobCapable>)[] = [];
   const instantiatedTypes = new Set<string>();
 
+  // Procesar integraciones tradicionales (Notion, Drive)
   for (const integration of activeIntegrations) {
     try {
       instantiatedTypes.add(integration.type);
-      if (integration.type === 'mega') {
-        if (megaCredentials) {
-          const adapter = registry.resolveAdapter('mega', megaCredentials);
-          if (adapter) {
-            upstreams.push(adapter as any);
-          }
-        }
-      } else {
+      if (integration.type !== 'mega') {
         const adapter = registry.resolveAdapter(integration.type, integration.connectionId);
         if (adapter) {
           upstreams.push(adapter as any);
@@ -87,6 +95,28 @@ export async function getActiveUpstreams(
       }
     } catch (err) {
       console.error(`Failed to resolve adapter for ${integration.type}:`, err);
+    }
+  }
+
+  // Procesar conexiones de almacenamiento dedicadas (MEGA encriptado en Postgres)
+  for (const storage of activeStorage) {
+    try {
+      instantiatedTypes.add(storage.provider);
+      if (storage.provider === 'mega') {
+        let creds = megaCredentials;
+        if (!creds && storage.encryptedCredentials) {
+          // Si no se pasaron en cabeceras, las desencriptamos del servidor
+          creds = decryptServerPayload(storage.encryptedCredentials, userId);
+        }
+        if (creds) {
+          const adapter = registry.resolveAdapter('mega', creds);
+          if (adapter) {
+            upstreams.push(adapter as any);
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`Failed to resolve storage adapter for ${storage.provider}:`, err);
     }
   }
 
@@ -120,3 +150,4 @@ export async function getActiveUpstreams(
 
   return upstreams;
 }
+

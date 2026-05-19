@@ -83,20 +83,27 @@ export function AgnosticTree({
   }, [integrationId, initialSelectedId]);
 
   const handleItemSelect = (atom: AgnosticAtom, columnIndex: number) => {
-    // 1. Update path (truncate if needed)
-    const newPath = [...activePath.slice(0, columnIndex + 1), atom.id];
-    setActivePath(newPath);
+    // 1. Update path (truncate if folder, do not append if file)
+    if (atom.type === 'file') {
+      const newPath = activePath.slice(0, columnIndex + 1);
+      setActivePath(newPath);
+    } else {
+      const newPath = [...activePath.slice(0, columnIndex + 1), atom.id];
+      setActivePath(newPath);
+    }
 
     // 2. Emit selection event (Agnostic of type)
     onSelect(atom);
 
-    // 2. Scroll to right to show new column
-    setTimeout(() => {
-      if (scrollRef.current) {
-        const targetScroll = scrollRef.current.scrollWidth;
-        scrollRef.current.scrollTo({ left: targetScroll, behavior: 'smooth' });
-      }
-    }, 150);
+    // 3. Scroll to right to show new column
+    if (atom.type === 'folder') {
+      setTimeout(() => {
+        if (scrollRef.current) {
+          const targetScroll = scrollRef.current.scrollWidth;
+          scrollRef.current.scrollTo({ left: targetScroll, behavior: 'smooth' });
+        }
+      }, 150);
+    }
   };
 
   return (

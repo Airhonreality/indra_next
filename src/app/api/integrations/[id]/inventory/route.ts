@@ -168,12 +168,28 @@ export async function GET(
       return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
+    const mappedObjects = result.data.map((item: any) => {
+      const originalId = item.id.includes('::') ? item.id.split('::')[1] : item.id;
+      const streamUrl = `/api/storage/stream/${item.provider || integration.type}/${originalId}`;
+      let thumbnailUrl = item.thumbnailUrl;
+      
+      if (!thumbnailUrl && item.type === 'file') {
+        thumbnailUrl = `/api/storage/stream/${item.provider || integration.type}/${originalId}`;
+      }
+      
+      return {
+        ...item,
+        streamUrl,
+        thumbnailUrl
+      };
+    });
+
     return NextResponse.json({ 
-      objects: result.data,
+      objects: mappedObjects,
       provider: integration.type,
       diagnostics: {
         latencyMs,
-        totalCount: result.data.length
+        totalCount: mappedObjects.length
       }
     });
   } catch (error) {

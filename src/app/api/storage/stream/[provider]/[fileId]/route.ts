@@ -16,22 +16,14 @@ export async function GET(
 ) {
   const { provider, fileId } = await context.params;
 
-  // 1. Validate provider: only 'google-drive' and 'onedrive' are allowed via proxy
-  if (!['google-drive', 'onedrive'].includes(provider)) {
-    return NextResponse.json(
-      { error: `Provider "${provider}" not supported via server streaming proxy.` },
-      { status: 400 }
-    );
-  }
-
-  // 2. Validate session
+  // 1. Validate session
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    // 3. Resolve connection and instantiate authorized upstream client
+    // 2. Resolve connection and instantiate authorized upstream client
     const upstreams = await getActiveUpstreams(session.user.id);
     const upstream = upstreams.find((u) => u.id === provider);
 
@@ -42,7 +34,7 @@ export async function GET(
       );
     }
 
-    // 4. Ensure upstream supports downloading raw blobs/streams
+    // 3. Ensure upstream supports downloading raw blobs/streams
     const blobUpstream = upstream as any;
     if (typeof blobUpstream.downloadBlob !== 'function') {
       return NextResponse.json(

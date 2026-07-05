@@ -31,9 +31,10 @@ Basado en `docs/research/INS_Arnes agentico.md`:
 
 - **Planes = artefactos de primera clase**: todo trabajo nace como un plan versionado en
   `docs/plans/`, con estado explícito en frontmatter. No hay tareas "de palabra".
-- **Ejecución delegable, diseño no delegable**: los agentes livianos (Haiku/Sonnet)
-  ejecutan planes con rutas y criterios exactos. Los contratos, esquemas Zod, diseño de
-  DB y decisiones de arquitectura los produce el Orquestador Maestro.
+- **Ejecución delegable, diseño no delegable**: el ejecutor delegado (**Codex**, cuota
+  free de Javier — protocolo en `10_PLAN_orquestacion-maestra.md`) ejecuta planes con
+  rutas y criterios exactos. Los contratos, esquemas Zod, diseño de DB y decisiones de
+  arquitectura los produce el Orquestador Maestro (Claude).
 - **Verificación mecánica antes que auditoría**: cada plan define su sección
   `## Verificación` con comandos ejecutables. Un plan sin verificación mecánica no es
   delegable. La auditoría del Orquestador es la *última* compuerta, no la única.
@@ -57,7 +58,7 @@ BORRADOR → LISTO → EN_EJECUCION → EJECUTADO → AUDITADO ✅
 ---
 plan: NN_PLAN_slug
 estado: BORRADOR | LISTO | EN_EJECUCION | EJECUTADO | AUDITADO | RECHAZADO
-ejecutor: liviano | orquestador
+ejecutor: codex | orquestador
 depende_de: [NN, NN]
 ---
 ## Contexto        ← todo lo que un agente frío necesita saber
@@ -72,14 +73,14 @@ depende_de: [NN, NN]
 | # | Plan | Ejecutor | Compuerta de verificación | Estado |
 |---|------|----------|---------------------------|--------|
 | 01 | Reorganización del repo + índice de subsistemas | liviano | git status limpio de entropía, índice existe, cero referencias rotas | AUDITADO ✅ |
-| 10 | Plan de Orquestación Maestra (se redacta DESPUÉS de auditar 01, sobre el índice real) | orquestador | n/a (es diseño) | PENDIENTE |
-| 11 | Contrato `StorageAdapter` + manifiesto de capacidades + Zod | orquestador | suite de contrato en verde | PENDIENTE |
-| 12 | Consolidación Drive/Mega/R2 contra el contrato | liviano (por proveedor) | suite de contrato por proveedor | PENDIENTE |
-| 13 | Diagnóstico y reparación del transcoder (prerrequisito de portales) | orquestador diagnostica → liviano ejecuta | archivo de prueba sale optimizado, peso menor al origen | PENDIENTE |
-| 14 | BYODB: onboarding "pega tu link" + bootstrap y versionado de esquema | orquestador diseña esquema → liviano implementa UI | migración corre en DB Neon virgen | PENDIENTE |
-| 15 | Colecciones inter-storage (metadata-only) | liviano sobre spec del orquestador | CRUD de colecciones sin escrituras en storages | PENDIENTE |
-| 16 | Usabilidad: previews ligeras, renombrado en bloque, panel unificado | liviano | checklist visual + /verify | PENDIENTE |
-| 17 | Amplitud: nuevos proveedores (YouTube como publish-target con capacidades reducidas) | liviano (uno por proveedor) | suite de contrato | PENDIENTE |
+| 10 | Plan de Orquestación Maestra (protocolo Codex) | orquestador | n/a (es diseño) | AUDITADO ✅ |
+| 11 | Contrato `StorageAdapter` + manifiesto de capacidades + Zod | orquestador diseña → codex ejecuta | suite de contrato en verde | LISTO |
+| 12 | Consolidación Drive/Mega/R2 contra el contrato | codex (por proveedor) | suite de contrato por proveedor | PENDIENTE |
+| 13 | Diagnóstico y reparación del transcoder (prerrequisito de portales) | orquestador diagnostica → codex ejecuta | archivo de prueba sale optimizado, peso menor al origen | PENDIENTE |
+| 14 | BYODB: onboarding "pega tu link" + bootstrap y versionado de esquema | orquestador diseña esquema → codex implementa UI | migración corre en DB Neon virgen | PENDIENTE |
+| 15 | Colecciones inter-storage (metadata-only) | codex sobre spec del orquestador | CRUD de colecciones sin escrituras en storages | PENDIENTE |
+| 16 | Usabilidad: previews ligeras, renombrado en bloque, panel unificado | codex | checklist visual + /verify | PENDIENTE |
+| 17 | Amplitud: nuevos proveedores (YouTube como publish-target con capacidades reducidas) | codex (uno por proveedor) | suite de contrato | PENDIENTE |
 
 **Regla de dependencia**: 11 abarata todo lo posterior; 15 solo tiene sentido con 12 y 14
 auditados. 13 bloquea cualquier trabajo nuevo sobre portales de subida.
@@ -89,7 +90,7 @@ auditados. 13 bloquea cualquier trabajo nuevo sobre portales de subida.
 - **Orquestador Maestro** (Claude Fable/Opus): diseña planes y contratos, revisa el
   resultado de cada fase contra su verificación, emite auditoría final (AUDITADO o
   RECHAZADO con notas concretas).
-- **Ejecutores livianos** (Haiku/Sonnet): ejecutan un plan LISTO de principio a fin, marcan
-  EN_EJECUCION al empezar y EJECUTADO al terminar, corren su propia sección de
-  Verificación antes de reportar. Nunca improvisan fuera de `## Operaciones`.
+- **Ejecutor delegado** (Codex, cuota free de Javier): ejecuta un plan LISTO de principio
+  a fin, marca EN_EJECUCION al empezar y EJECUTADO al terminar, corre su propia sección de
+  Verificación antes de reportar salida literal. Nunca improvisa fuera de `## Operaciones`.
 - **Javier**: decide producto, aprueba mutaciones de esta doctrina, gate humano final.

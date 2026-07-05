@@ -1,6 +1,6 @@
 ---
 plan: 11_PLAN_storage-adapter-contract
-estado: EJECUTADO
+estado: AUDITADO
 ejecutor: codex
 depende_de: [01, 10]
 ---

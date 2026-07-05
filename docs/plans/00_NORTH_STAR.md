@@ -74,7 +74,7 @@ depende_de: [NN, NN]
 |---|------|----------|---------------------------|--------|
 | 01 | Reorganización del repo + índice de subsistemas | liviano | git status limpio de entropía, índice existe, cero referencias rotas | AUDITADO ✅ |
 | 10 | Plan de Orquestación Maestra (protocolo Codex) | orquestador | n/a (es diseño) | AUDITADO ✅ |
-| 11 | Contrato `StorageAdapter` + manifiesto de capacidades + Zod | orquestador diseña → codex ejecuta | suite de contrato en verde | LISTO |
+| 11 | Contrato `StorageAdapter` + manifiesto de capacidades + Zod | orquestador diseña → codex ejecuta | suite de contrato en verde | AUDITADO ✅ |
 | 12 | Consolidación Drive/Mega/R2 contra el contrato | codex (por proveedor) | suite de contrato por proveedor | PENDIENTE |
 | 13 | Diagnóstico y reparación del transcoder (prerrequisito de portales) | orquestador diagnostica → codex ejecuta | archivo de prueba sale optimizado, peso menor al origen | PENDIENTE |
 | 14 | BYODB: onboarding "pega tu link" + bootstrap y versionado de esquema | orquestador diseña esquema → codex implementa UI | migración corre en DB Neon virgen | PENDIENTE |

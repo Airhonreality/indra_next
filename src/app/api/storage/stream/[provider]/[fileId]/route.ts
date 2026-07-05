@@ -60,6 +60,27 @@ export async function GET(
     const contentRange = upstreamHeaders['content-range'];
     const contentLength = upstreamHeaders['content-length'];
 
+    // 🛡️ Safety Quota Guard: Enforce strict 2GB limit to protect MEGA/provider credentials from API blocks
+    let totalSize = 0;
+    if (contentLength) {
+      totalSize = parseInt(contentLength, 10);
+    }
+    if (contentRange && contentRange.includes('/')) {
+      const parts = contentRange.split('/');
+      const totalPart = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(totalPart)) {
+        totalSize = totalPart;
+      }
+    }
+
+    const TWO_GB = 2 * 1024 * 1024 * 1024;
+    if (totalSize > TWO_GB) {
+      return NextResponse.json(
+        { error: 'El archivo supera el límite de seguridad de 2GB para proteger la cuota de tu proveedor.' },
+        { status: 413 }
+      );
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': contentType,
       'Accept-Ranges': 'bytes',

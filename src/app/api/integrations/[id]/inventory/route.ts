@@ -169,6 +169,11 @@ export async function GET(
     }
 
     const mappedObjects = result.data.map((item: any) => {
+      // 🛡️ Zero-Entropy Agnosticism: YouTube uses native iframe embed streamUrl and direct thumbnails.
+      if (item.provider === 'youtube') {
+        return item;
+      }
+
       const originalId = item.id.includes('::') ? item.id.split('::')[1] : item.id;
       const streamUrl = `/api/storage/stream/${item.provider || integration.type}/${originalId}`;
       let thumbnailUrl = item.thumbnailUrl;

@@ -30,10 +30,11 @@ export async function GET(req: Request) {
       userId: item.userId,
       type: item.provider,
       label: item.label,
-      connectionId: 'mega-vault',
+      connectionId: item.provider === 'mega' ? 'mega-vault' : 's3-vault',
       config: {
         ...item.config,
         email: item.config?.email || '',
+        bucket: item.config?.bucket || '',
         isConnected: !!item.encryptedCredentials,
       },
       isActive: item.isActive,
@@ -86,6 +87,48 @@ export async function POST(req: Request) {
         connectionId: 'mega-vault',
         config: {
           email: result[0].config?.email || '',
+          isConnected: true,
+        },
+        isActive: result[0].isActive,
+        createdAt: result[0].createdAt,
+        updatedAt: result[0].updatedAt,
+      };
+
+      return NextResponse.json({ success: true, integration: mapped });
+    }
+
+    // Si es Cloudflare R2 / S3, procesamos de forma idéntica y segura
+    if (type === 's3') {
+      const { bucket, endpoint, accessKeyId, secretAccessKey } = config || {};
+      if (!bucket || !endpoint || !accessKeyId || !secretAccessKey) {
+        return NextResponse.json({ error: 'Todos los campos de S3/Cloudflare R2 son obligatorios.' }, { status: 400 });
+      }
+
+      // Encriptar credenciales privadas de S3 usando la clave segura del usuario
+      const encryptedCredentials = encryptServerPayload(
+        { bucket, endpoint, accessKeyId, secretAccessKey },
+        session.user.id
+      );
+
+      const result = await db.insert(storageConnections).values({
+        userId: session.user.id,
+        provider: 's3',
+        label: label || 'Cloudflare R2 Storage',
+        isActive: true,
+        encryptedCredentials,
+        config: {
+          bucket, // Almacenamos únicamente el nombre del bucket de forma pública para la UI
+        },
+      }).returning();
+
+      const mapped = {
+        id: result[0].id,
+        userId: result[0].userId,
+        type: result[0].provider,
+        label: result[0].label,
+        connectionId: 's3-vault',
+        config: {
+          bucket: result[0].config?.bucket || '',
           isConnected: true,
         },
         isActive: result[0].isActive,

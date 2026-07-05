@@ -23,7 +23,7 @@ export class YouTubeAdapter extends BaseAdapter {
     canMove: false,
     canThumbnail: true,
     canQuota: false,
-    canPublish: true,
+    canPublish: false, // TODO(plan-12): confirmar ruta real de publicación
   };
   private client: AuthorizedClient;
   readonly id = 'youtube';

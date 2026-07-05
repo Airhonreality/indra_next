@@ -75,8 +75,8 @@ depende_de: [NN, NN]
 | 01 | Reorganización del repo + índice de subsistemas | liviano | git status limpio de entropía, índice existe, cero referencias rotas | AUDITADO ✅ |
 | 10 | Plan de Orquestación Maestra (protocolo Codex) | orquestador | n/a (es diseño) | AUDITADO ✅ |
 | 11 | Contrato `StorageAdapter` + manifiesto de capacidades + Zod | orquestador diseña → codex ejecuta | suite de contrato en verde | AUDITADO ✅ |
-| 12 | Adaptador S3/R2 real + ops de gestión (delete/rename/move) en el contrato | orquestador diseña → codex ejecuta | suite de contrato incluyendo `s3` | LISTO |
-| 12B | Ops de gestión en Drive/Mega/OneDrive + wiring de rutas para `s3` | codex (por proveedor) | suite de contrato por proveedor | PENDIENTE |
+| 12 | Adaptador S3/R2 real + ops de gestión (delete/rename/move) en el contrato | orquestador diseña → codex ejecuta | suite de contrato incluyendo `s3` | AUDITADO ✅ |
+| 12B | Wiring de `s3` en getActiveUpstreams + ops de gestión en Drive/Mega/OneDrive | orquestador diseña → codex ejecuta | suite de contrato + upstreams generalizado | LISTO |
 | 13 | Diagnóstico y reparación del transcoder (prerrequisito de portales) | orquestador diagnostica → codex ejecuta | archivo de prueba sale optimizado, peso menor al origen | PENDIENTE |
 | 14 | BYODB: onboarding "pega tu link" + bootstrap y versionado de esquema | orquestador diseña esquema → codex implementa UI | migración corre en DB Neon virgen | PENDIENTE |
 | 15 | Colecciones inter-storage (metadata-only) | codex sobre spec del orquestador | CRUD de colecciones sin escrituras en storages | PENDIENTE |

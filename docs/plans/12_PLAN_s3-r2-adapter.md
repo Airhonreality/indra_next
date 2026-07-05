@@ -1,6 +1,6 @@
 ---
 plan: 12_PLAN_s3-r2-adapter
-estado: EJECUTADO
+estado: AUDITADO
 ejecutor: codex
 depende_de: [11]
 ---

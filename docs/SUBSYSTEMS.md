@@ -15,7 +15,7 @@
 | Components: Other | `src/components/{data-portal-preview,layouts,ports,resource-explorer,routing,widgets}` | Componentes especializados: preview de portales, layouts, explorador de recursos, enrutamiento, widgets compuestos. | EN_DESARROLLO | — |
 | Core: Database Schema | `src/core/db/schema.ts` | Esquema universal Drizzle ORM (integrations, storageConnections, files, collections, etc.). Define contrato de persistencia agnóstica. | ESTABLE | `docs/specs/STORAGE_MASTER_PLAN.md` |
 | Core: Inventory Service | `src/core/inventory` | Servicio de descubrimiento agnóstico de archivos. Consulta API de cada proveedor, normaliza a formato unificado, cacheable. | EN_DESARROLLO | `docs/specs/STORAGE_MASTER_PLAN.md` |
-| Core: Media & Transcoding | `src/core/media` | Motor de transcodificación de archivos (miniaturización, ultracompresión). TODO: auditar estado y dependencias. | ROTO | `docs/research/5_Scientific_Research_Papers/` |
+| Core: Media & Transcoding | `src/core/media` | Motor de transcodificación de archivos (miniaturización, ultracompresión). TODO: auditar estado y dependencias. | ROTO | `docs/research/invs_Metadata_transcode.md`, `docs/research/Video/` |
 | Core: Registry & Types | `src/core/types`, `src/core/registry.ts` | Registro dinámico de adaptadores, interfaces de contrato (StorageAdapter, IntegrationAdapter), tipos unificados. | ESTABLE | `docs/specs/MASTER_SPEC.md` |
 | Core: Engines | `src/core/engines` | Motores de procesamiento agnóstico (pipeline, data flow). Soportan dry-run, transformaciones, observabilidad. | EN_DESARROLLO | — |
 | Hooks | `src/hooks` | use-inventory (hidratador de archivos), use-ingestion-orchestrator (orquestador de subida), otros hooks de UI. | EN_DESARROLLO | — |

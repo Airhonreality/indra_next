@@ -21,10 +21,10 @@
  * 🔗 RELATIONSHIPS: [IntegrationAdapter, AgnosticQuery, GoogleDriveAdapter]
  */
 
-import { IntegrationAdapter, OperationResult, Record, FieldSchema } from '@/core/types/integration';
+import { OperationResult, Record, FieldSchema } from '@/core/types/integration';
 import { AgnosticQuery } from '@/core/inventory/types';
 
-export abstract class BaseAdapter implements IntegrationAdapter {
+export abstract class BaseAdapter {
   abstract readonly id: string;
   abstract readonly label: string;
 

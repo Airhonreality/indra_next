@@ -8,7 +8,7 @@ Phase 1 (chassis) was complete before my involvement. Phase 2 (adapter implement
 
 **Why:** User wants a universal data pipeline where all sources (Notion, Sheets, files) are treated symmetrically.
 
-**How to apply:** Always follow the Master Prompt (docs/CLAUDE_CODE_MASTER_PROMPT.md) for architectural decisions. Key rules: no if/else for adapter instantiation, adapters receive AuthorizedClient (not Nango directly), adapters must implement IntegrationAdapter.
+**How to apply:** Always follow the Master Prompt (docs/archive/CLAUDE_CODE_MASTER_PROMPT.md) for architectural decisions. Key rules: no if/else for adapter instantiation, adapters receive AuthorizedClient (not Nango directly), adapters must implement IntegrationAdapter.
 
 ## Completed as of 2026-05-03
 

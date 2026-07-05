@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# VSCode Local History extension
+.history/
+
+# scratch local
+/scratch/
+scratch_diagnose.js

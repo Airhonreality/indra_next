@@ -1,6 +1,6 @@
 ---
 plan: 01_PLAN_repo-organization
-estado: EJECUTADO
+estado: AUDITADO
 ejecutor: liviano
 depende_de: []
 ---

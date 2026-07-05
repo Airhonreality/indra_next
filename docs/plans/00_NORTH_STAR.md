@@ -71,7 +71,7 @@ depende_de: [NN, NN]
 
 | # | Plan | Ejecutor | Compuerta de verificación | Estado |
 |---|------|----------|---------------------------|--------|
-| 01 | Reorganización del repo + índice de subsistemas | liviano | git status limpio de entropía, índice existe, cero referencias rotas | LISTO |
+| 01 | Reorganización del repo + índice de subsistemas | liviano | git status limpio de entropía, índice existe, cero referencias rotas | AUDITADO ✅ |
 | 10 | Plan de Orquestación Maestra (se redacta DESPUÉS de auditar 01, sobre el índice real) | orquestador | n/a (es diseño) | PENDIENTE |
 | 11 | Contrato `StorageAdapter` + manifiesto de capacidades + Zod | orquestador | suite de contrato en verde | PENDIENTE |
 | 12 | Consolidación Drive/Mega/R2 contra el contrato | liviano (por proveedor) | suite de contrato por proveedor | PENDIENTE |

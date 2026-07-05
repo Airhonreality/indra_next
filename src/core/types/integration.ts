@@ -1,4 +1,5 @@
 import { AgnosticQuery } from '../inventory/types';
+import type { CapabilityManifest } from './capabilities';
 
 /**
  * SACRED CONTRACT: INTEGRATION & RECORDS
@@ -77,6 +78,8 @@ export function makeFieldMapTransformer(fieldMap: { [src: string]: string }): Tr
  * Every adapter (Notion, Sheets, JSON) MUST implement this interface.
  */
 export interface IntegrationAdapter {
+  readonly capabilities: CapabilityManifest;
+
   /** Unique identifier for the adapter type */
   readonly id: string;
 
@@ -137,6 +140,7 @@ export interface IBlobCapable {
   getSpace(): Promise<OperationResult<{ used: number; total: number; free: number }>>;
 }
 
+/** @deprecated Leer adapter.capabilities en su lugar. */
 export function isBlobCapable(adapter: IntegrationAdapter): adapter is IntegrationAdapter & IBlobCapable {
   return typeof (adapter as any).downloadBlob === 'function';
 }
@@ -149,4 +153,3 @@ export interface MegaCredentials {
   masterKey?: string;
   applicationKey: string;
 }
-

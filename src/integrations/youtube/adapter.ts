@@ -1,6 +1,7 @@
 import { BaseAdapter } from '../shared/base-adapter';
 import { AuthorizedClient, NangoAuthorizedClient } from '@/lib/authorized-client';
 import { AgnosticQuery, AgnosticInventoryItem } from '@/core/inventory/types';
+import type { CapabilityManifest } from '@/core/types/capabilities';
 import type { OperationResult, FieldSchema } from '@/core/types/integration';
 
 export class YouTubeAdapter extends BaseAdapter {
@@ -11,6 +12,19 @@ export class YouTubeAdapter extends BaseAdapter {
     accentCss: 'bg-red-500',
   };
 
+  readonly capabilities: CapabilityManifest = {
+    canListInventory: true,
+    canDownload: false,
+    canStream: false,
+    canUpload: false,
+    canResumableUpload: false,
+    canDelete: false,
+    canRename: false,
+    canMove: false,
+    canThumbnail: true,
+    canQuota: false,
+    canPublish: true,
+  };
   private client: AuthorizedClient;
   readonly id = 'youtube';
   readonly label = 'YouTube';

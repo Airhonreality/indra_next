@@ -2,6 +2,7 @@ import { BaseAdapter } from '../shared/base-adapter';
 import { AuthorizedClient, NangoAuthorizedClient } from '@/lib/authorized-client';
 import { nango } from '@/lib/nango';
 import { AgnosticQuery, AgnosticInventoryItem } from '@/core/inventory/types';
+import type { CapabilityManifest } from '@/core/types/capabilities';
 import type { OperationResult, FieldSchema, IBlobCapable } from '@/core/types/integration';
 
 export class OneDriveAdapter extends BaseAdapter implements IBlobCapable {
@@ -12,6 +13,19 @@ export class OneDriveAdapter extends BaseAdapter implements IBlobCapable {
     accentCss: 'bg-blue-500',
   };
 
+  readonly capabilities: CapabilityManifest = {
+    canListInventory: true,
+    canDownload: true,
+    canStream: true,
+    canUpload: false,
+    canResumableUpload: false,
+    canDelete: false,
+    canRename: false,
+    canMove: false,
+    canThumbnail: true,
+    canQuota: true,
+    canPublish: false,
+  };
   private client: AuthorizedClient;
   private connectionId: string;
   readonly id = 'onedrive';

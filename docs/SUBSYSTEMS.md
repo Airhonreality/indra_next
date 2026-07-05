@@ -16,7 +16,8 @@
 | Core: Database Schema | `src/core/db/schema.ts` | Esquema universal Drizzle ORM (integrations, storageConnections, files, collections, etc.). Define contrato de persistencia agnóstica. | ESTABLE | `docs/specs/STORAGE_MASTER_PLAN.md` |
 | Core: Inventory Service | `src/core/inventory` | Servicio de descubrimiento agnóstico de archivos. Consulta API de cada proveedor, normaliza a formato unificado, cacheable. | EN_DESARROLLO | `docs/specs/STORAGE_MASTER_PLAN.md` |
 | Core: Media & Transcoding | `src/core/media` | Motor de transcodificación de archivos (miniaturización, ultracompresión). TODO: auditar estado y dependencias. | ROTO | `docs/research/invs_Metadata_transcode.md`, `docs/research/Video/` |
-| Core: Registry & Types | `src/core/types`, `src/core/registry.ts` | Registro dinámico de adaptadores, interfaces de contrato (StorageAdapter, IntegrationAdapter), tipos unificados. | ESTABLE | `docs/specs/MASTER_SPEC.md` |
+| Core: Registry & Types | `src/core/types`, `src/core/registry.ts` | Registro dinámico de adaptadores, interfaces de contrato (StorageAdapter, IntegrationAdapter), tipos unificados. | ESTABLE | `docs/specs/MASTER_SPEC.md`, `docs/plans/11_PLAN_storage-adapter-contract.md` |
+| Contract Testing | `src/core/testing` | Suite de contrato de adaptadores (Vitest): valida manifiesto de capacidades y coherencia manifiesto→implementación. | ESTABLE | `docs/plans/11_PLAN_storage-adapter-contract.md` |
 | Core: Engines | `src/core/engines` | Motores de procesamiento agnóstico (pipeline, data flow). Soportan dry-run, transformaciones, observabilidad. | EN_DESARROLLO | — |
 | Hooks | `src/hooks` | use-inventory (hidratador de archivos), use-ingestion-orchestrator (orquestador de subida), otros hooks de UI. | EN_DESARROLLO | — |
 | Inngest Functions | `src/inngest/functions` | Funciones durables para workflows (run-agnostic-pipeline, etc.). Triggers Inngest v4, retry/observability nativa. | EN_DESARROLLO | — |

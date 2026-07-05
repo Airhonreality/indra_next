@@ -1,5 +1,6 @@
 import { BaseAdapter } from '@/integrations/shared/base-adapter';
 import type { AuthorizedClient } from '@/lib/authorized-client';
+import type { CapabilityManifest } from '@/core/types/capabilities';
 import type { FieldSchema, OperationResult } from '@/core/types/integration';
 import type { Record as IndraRecord } from '@/core/types/integration';
 import { RoutingService } from '@/core/services/routing';
@@ -16,6 +17,19 @@ export class SheetsAdapter extends BaseAdapter {
     accentCss: 'bg-emerald-500',
   };
 
+  readonly capabilities: CapabilityManifest = {
+    canListInventory: false, // TODO(plan-12): confirmar; listInventory hoy es un placeholder vacío
+    canDownload: false,
+    canStream: false,
+    canUpload: true,
+    canResumableUpload: false,
+    canDelete: false,
+    canRename: false,
+    canMove: false,
+    canThumbnail: false,
+    canQuota: false,
+    canPublish: false,
+  };
   readonly id = 'google-sheets';
   readonly label = 'Google Sheets';
 

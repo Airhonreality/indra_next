@@ -24,6 +24,7 @@
 
 import { BaseAdapter } from '@/integrations/shared/base-adapter';
 import type { AuthorizedClient } from '@/lib/authorized-client';
+import type { CapabilityManifest } from '@/core/types/capabilities';
 import type { FieldSchema, OperationResult } from '@/core/types/integration';
 import type { Record as IndraRecord } from '@/core/types/integration';
 import type { AgnosticQuery } from '@/core/inventory/types';
@@ -38,6 +39,19 @@ export class NotionAdapter extends BaseAdapter {
     accentCss: 'bg-zinc-950 dark:bg-zinc-100',
   };
 
+  readonly capabilities: CapabilityManifest = {
+    canListInventory: true,
+    canDownload: false,
+    canStream: false,
+    canUpload: true,
+    canResumableUpload: false,
+    canDelete: false,
+    canRename: false,
+    canMove: false,
+    canThumbnail: false,
+    canQuota: false,
+    canPublish: false,
+  };
   readonly id = 'notion';
   readonly label = 'Notion';
 

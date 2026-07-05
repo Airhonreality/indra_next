@@ -26,6 +26,7 @@ import { AuthorizedClient, NangoAuthorizedClient } from '@/lib/authorized-client
 import { nango } from '@/lib/nango';
 import { BaseAdapter } from '../shared/base-adapter';
 import { AgnosticQuery, AgnosticInventoryItem } from '@/core/inventory/types';
+import type { CapabilityManifest } from '@/core/types/capabilities';
 import type { 
   OperationResult, 
   FieldSchema,
@@ -47,6 +48,19 @@ export class GoogleDriveAdapter extends BaseAdapter implements IBlobCapable {
 
   private client: AuthorizedClient;
   private connectionId: string;
+  readonly capabilities: CapabilityManifest = {
+    canListInventory: true,
+    canDownload: true,
+    canStream: true,
+    canUpload: true,
+    canResumableUpload: true,
+    canDelete: false,
+    canRename: false,
+    canMove: false,
+    canThumbnail: true,
+    canQuota: true,
+    canPublish: false,
+  };
   readonly id = 'google-drive';
   readonly label = 'Google Drive';
 

@@ -1,5 +1,6 @@
 import { BaseAdapter } from '../shared/base-adapter';
 import { IBlobCapable, OperationResult, Record, FieldSchema, MegaCredentials } from '@/core/types/integration';
+import type { CapabilityManifest } from '@/core/types/capabilities';
 import { AgnosticQuery, AgnosticInventoryItem } from '@/core/inventory/types';
 import { Storage, MutableFile } from 'megajs';
 import { Readable } from 'stream';
@@ -28,6 +29,19 @@ export class MegaAdapter extends BaseAdapter implements IBlobCapable {
     accentCss: 'bg-rose-500',
   };
 
+  readonly capabilities: CapabilityManifest = {
+    canListInventory: true,
+    canDownload: true,
+    canStream: true,
+    canUpload: true,
+    canResumableUpload: true,
+    canDelete: false,
+    canRename: false,
+    canMove: false,
+    canThumbnail: false,
+    canQuota: true,
+    canPublish: false,
+  };
   readonly id = 'mega';
   readonly label = 'MEGA';
 

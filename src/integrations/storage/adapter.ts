@@ -29,6 +29,7 @@
 import { promises as fs } from 'node:fs';
 import { join, extname, basename } from 'node:path';
 import { BaseAdapter } from '@/integrations/shared/base-adapter';
+import type { CapabilityManifest } from '@/core/types/capabilities';
 import type { FieldSchema, OperationResult } from '@/core/types/integration';
 import type { Record as IndraRecord } from '@/core/types/integration';
 import type { AgnosticQuery } from '@/core/inventory/types';
@@ -45,6 +46,19 @@ export class StorageAdapter extends BaseAdapter {
     accentCss: 'bg-amber-500',
   };
 
+  readonly capabilities: CapabilityManifest = {
+    canListInventory: true,
+    canDownload: false,
+    canStream: false,
+    canUpload: true,
+    canResumableUpload: false,
+    canDelete: false,
+    canRename: false,
+    canMove: false,
+    canThumbnail: false,
+    canQuota: false,
+    canPublish: false,
+  };
   readonly id = 'storage';
   readonly label = 'Storage';
 

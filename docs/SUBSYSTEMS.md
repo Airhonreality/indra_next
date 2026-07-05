@@ -25,7 +25,12 @@
 | Integrations: Notion | `src/integrations/notion` | Adaptador para Notion (flattenProperties, resolveRelationNames, porting desde provider_notion.gs). | EN_DESARROLLO | — |
 | Integrations: Storage (FS) | `src/integrations/storage` | Adaptador para filesystem local (JSON + CSV). Upsert logic, configurable STORAGE_BASE_PATH. | EN_DESARROLLO | — |
 | Integrations: Mega | `src/integrations/mega` | TODO: auditar estado. Mega.nz provider bajo desarrollo. | TODO: auditar | — |
-| Integrations: R2/Cloudflare | `src/integrations/r2` | TODO: auditar estado. Cloudflare R2 provider bajo desarrollo. | TODO: auditar | — |
+| Integrations: OneDrive | `src/integrations/onedrive` | Adaptador OneDrive, registrado en `register-all.ts`. | TODO: auditar | — |
+| Integrations: YouTube | `src/integrations/youtube` | Adaptador YouTube (publish-target), registrado en `register-all.ts`. | TODO: auditar | — |
+| Integrations: Storage Union | `src/integrations/storage-union` | Meta-adaptador de unión de storages (registro vía `storage-union/register`). | TODO: auditar | — |
+| Integrations: JSON File | `src/integrations/json-file` | Adaptador JSON local. NO está importado en `register-all.ts` (posible legado). | TODO: auditar | — |
+| Integrations: R2/Cloudflare | (sin adaptador) | NO implementado. Solo existe captura de credenciales (CredentialVault + `api/integrations/route.ts`, trabajo en curso sin commitear). Corregido en auditoría: la ruta `src/integrations/r2` reportada por Plan 01 no existe. | PENDIENTE | — |
+| Integrations: Registry Bootstrap | `src/integrations/register-all.ts` | Fuente de verdad de qué adaptadores quedan registrados en el UniversalRegistry. | ESTABLE | — |
 | Lib: Authorized Client | `src/lib/authorized-client.ts` | Factory agnóstica de clientes HTTP autenticados (NangoAuthorizedClient, DirectFetchClient). Inyección de credenciales sin condicionales. | ESTABLE | `docs/specs/MASTER_SPEC.md` |
 | Features | `src/features` | Módulos de capacidades compuestas (connections, etc.). Organizan lógica por dominio. | EN_DESARROLLO | — |
 | Database Migrations | `drizzle/` | Historial de migraciones SQL (Drizzle). Versionado, auditables. | ESTABLE | — |

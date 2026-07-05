@@ -24,7 +24,14 @@ Este plan añade tres piezas SIN romper nada existente:
 3. **Suite de contrato** ejecutable por adaptador: el "linter mecánico" que convierte
    "añadir un proveedor" en "implementa la interfaz y pasa la suite".
 
-Adaptadores existentes a cubrir: `src/integrations/{google-drive,google-sheets,notion,storage,mega,r2}`.
+Adaptadores a cubrir — **exactamente los que importa `src/integrations/register-all.ts`**
+(fuente de verdad del registro): `google-drive`, `google-sheets`, `notion`, `storage`,
+`mega`, `youtube`, `onedrive`, y el meta-adaptador `storage-union`.
+
+Fuera de alcance (NO los toques): `json-file` (existe pero no está registrado — decisión
+pendiente en Plan 12) y R2/Cloudflare (**no existe adaptador**; solo hay captura de
+credenciales en UI/route con trabajo en curso sin commitear — su adaptador nace en
+Plan 12 o 17 ya contra este contrato).
 
 ## Operaciones
 
@@ -109,8 +116,9 @@ export function auditManifestCoherence(
 
 ### Paso 4 — Declarar el manifiesto en cada adaptador existente
 
-Para cada adaptador en `src/integrations/{google-drive,google-sheets,notion,storage,mega,r2}`:
-añade la propiedad `capabilities` con valores **honestos leídos de la implementación
+Para cada módulo importado por `src/integrations/register-all.ts` (`google-drive`,
+`google-sheets`, `notion`, `storage`, `mega`, `youtube`, `onedrive`, `storage-union`):
+añade al adaptador que registra la propiedad `capabilities` con valores **honestos leídos de la implementación
 real** (¿tiene `downloadBlob`? ¿`createResumableSession`? ¿maneja Range?). Si no puedes
 determinar una capacidad leyendo el código, declárala `false` y deja un comentario
 `// TODO(plan-12): confirmar` — **nunca declares true sin evidencia en el código**.
@@ -156,8 +164,8 @@ npm run test:contract            # → suite en verde
 git diff --cached --stat         # → solo archivos de este plan
 ```
 
-Y verificación de honestidad: `git grep -n "capabilities" src/integrations/ | wc -l`
-debe mostrar al menos una declaración por adaptador (6 mínimo).
+Y verificación de honestidad: `git grep -ln "capabilities" -- src/integrations/`
+debe listar al menos un archivo por cada uno de los 8 módulos del alcance.
 
 ## Commit
 

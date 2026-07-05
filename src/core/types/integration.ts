@@ -133,6 +133,15 @@ export interface IntegrationAdapter {
     totalSize: number,
     metadata?: { [key: string]: string }
   ): Promise<OperationResult<{ resumableUri: string; sessionId: string }>>;
+
+  /** Borrar un ítem (archivo) del proveedor. Requiere capabilities.canDelete. */
+  deleteItem?(itemId: string): Promise<OperationResult<boolean>>;
+
+  /** Renombrar un ítem manteniendo su ubicación. Requiere capabilities.canRename. */
+  renameItem?(itemId: string, newName: string): Promise<OperationResult<{ newId: string }>>;
+
+  /** Mover un ítem a otra carpeta/prefijo. Requiere capabilities.canMove. */
+  moveItem?(itemId: string, targetFolderId: string): Promise<OperationResult<{ newId: string }>>;
 }
 
 export interface IBlobCapable {

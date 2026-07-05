@@ -5,6 +5,7 @@ import { SheetsAdapter } from '@/integrations/google-sheets/adapter';
 import { NotionAdapter } from '@/integrations/notion/adapter';
 import { StorageAdapter } from '@/integrations/storage/adapter';
 import { MegaAdapter } from '@/integrations/mega/adapter';
+import { S3Adapter } from '@/integrations/s3/adapter';
 import { YouTubeAdapter } from '@/integrations/youtube/adapter';
 import { OneDriveAdapter } from '@/integrations/onedrive/adapter';
 import { StorageUnion } from '@/integrations/storage-union';
@@ -22,6 +23,12 @@ const adapters = [
   new NotionAdapter(mockClient as any),
   new StorageAdapter('C:\\tmp'),
   new MegaAdapter({ applicationKey: 'test-key' }),
+  new S3Adapter({
+    bucket: 'test',
+    endpoint: 'https://test.local',
+    accessKeyId: 'x',
+    secretAccessKey: 'y',
+  }),
   new YouTubeAdapter('test-connection'),
   new OneDriveAdapter('test-connection'),
   new StorageUnion([]),

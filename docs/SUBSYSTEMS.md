@@ -30,7 +30,7 @@
 | Integrations: YouTube | `src/integrations/youtube` | Adaptador YouTube (publish-target), registrado en `register-all.ts`. | TODO: auditar | — |
 | Integrations: Storage Union | `src/integrations/storage-union` | Meta-adaptador de unión de storages (registro vía `storage-union/register`). | TODO: auditar | — |
 | Integrations: JSON File | `src/integrations/json-file` | Adaptador JSON local. NO está importado en `register-all.ts` (posible legado). | TODO: auditar | — |
-| Integrations: R2/Cloudflare | (sin adaptador) | NO implementado. Solo existe captura de credenciales (CredentialVault + `api/integrations/route.ts`, trabajo en curso sin commitear). Corregido en auditoría: la ruta `src/integrations/r2` reportada por Plan 01 no existe. | PENDIENTE | — |
+| Integrations: S3/R2 | `src/integrations/s3` | Adaptador Cloudflare R2 / S3 (ListObjectsV2, GetObject+Range, PUT prefirmado, delete/rename/move vía Copy+Delete). Registrado como 's3' en `register-all.ts`. | EN_DESARROLLO | `docs/plans/12_PLAN_s3-r2-adapter.md` |
 | Integrations: Registry Bootstrap | `src/integrations/register-all.ts` | Fuente de verdad de qué adaptadores quedan registrados en el UniversalRegistry. | ESTABLE | — |
 | Lib: Authorized Client | `src/lib/authorized-client.ts` | Factory agnóstica de clientes HTTP autenticados (NangoAuthorizedClient, DirectFetchClient). Inyección de credenciales sin condicionales. | ESTABLE | `docs/specs/MASTER_SPEC.md` |
 | Features | `src/features` | Módulos de capacidades compuestas (connections, etc.). Organizan lógica por dominio. | EN_DESARROLLO | — |

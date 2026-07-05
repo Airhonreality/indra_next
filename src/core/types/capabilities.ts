@@ -49,6 +49,12 @@ export function auditManifestCoherence(
     v.push('canStream=true requiere canDownload=true');
   if (caps.canResumableUpload && typeof adapter.createResumableSession !== 'function')
     v.push('canResumableUpload=true pero createResumableSession no está implementado');
+  if (caps.canDelete && typeof adapter.deleteItem !== 'function')
+    v.push('canDelete=true pero deleteItem no está implementado');
+  if (caps.canRename && typeof adapter.renameItem !== 'function')
+    v.push('canRename=true pero renameItem no está implementado');
+  if (caps.canMove && typeof adapter.moveItem !== 'function')
+    v.push('canMove=true pero moveItem no está implementado');
   if (caps.canQuota && typeof adapter.getSpace !== 'function')
     v.push('canQuota=true pero getSpace no está implementado');
   return v;

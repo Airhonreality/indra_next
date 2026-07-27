@@ -114,6 +114,12 @@ export async function getActiveUpstreams(
             upstreams.push(adapter as any);
           }
         }
+      } else if (storage.encryptedCredentials) {
+        const creds = decryptServerPayload(storage.encryptedCredentials, userId);
+        if (creds) {
+          const adapter = registry.resolveAdapter(storage.provider, creds);
+          if (adapter) upstreams.push(adapter as any);
+        }
       }
     } catch (err) {
       console.error(`Failed to resolve storage adapter for ${storage.provider}:`, err);
@@ -150,4 +156,3 @@ export async function getActiveUpstreams(
 
   return upstreams;
 }
-

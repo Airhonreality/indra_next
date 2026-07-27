@@ -19,9 +19,9 @@ export class OneDriveAdapter extends BaseAdapter implements IBlobCapable {
     canStream: true,
     canUpload: false,
     canResumableUpload: false,
-    canDelete: false,
-    canRename: false,
-    canMove: false,
+    canDelete: true,
+    canRename: true,
+    canMove: true,
     canThumbnail: true,
     canQuota: true,
     canPublish: false,
@@ -64,6 +64,58 @@ export class OneDriveAdapter extends BaseAdapter implements IBlobCapable {
 
   async pushRecords(targetId: string, records: any[]): Promise<OperationResult<any>> {
     return this.error('OneDrive write operations are not active in this context.');
+  }
+
+  async deleteItem(itemId: string): Promise<OperationResult<boolean>> {
+    try {
+      await this.client.request({
+        method: 'DELETE',
+        endpoint: `/v1.0/me/drive/items/${itemId}`,
+        baseUrl: 'https://graph.microsoft.com',
+        bypassProxy: true,
+      });
+
+      return this.result(true);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return this.error(`DELETE_ERR: ${message}`);
+    }
+  }
+
+  async renameItem(itemId: string, newName: string): Promise<OperationResult<{ newId: string }>> {
+    try {
+      const response = await this.client.request<{ id?: string }>({
+        method: 'PATCH',
+        endpoint: `/v1.0/me/drive/items/${itemId}`,
+        baseUrl: 'https://graph.microsoft.com',
+        bypassProxy: true,
+        data: { name: newName },
+      });
+
+      return this.result({ newId: response.data?.id || itemId });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return this.error(`RENAME_ERR: ${message}`);
+    }
+  }
+
+  async moveItem(itemId: string, targetFolderId: string): Promise<OperationResult<{ newId: string }>> {
+    try {
+      const response = await this.client.request<{ id?: string }>({
+        method: 'PATCH',
+        endpoint: `/v1.0/me/drive/items/${itemId}`,
+        baseUrl: 'https://graph.microsoft.com',
+        bypassProxy: true,
+        data: {
+          parentReference: { id: targetFolderId },
+        },
+      });
+
+      return this.result({ newId: response.data?.id || itemId });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return this.error(`MOVE_ERR: ${message}`);
+    }
   }
 
   async listInventory(query?: AgnosticQuery): Promise<OperationResult<AgnosticInventoryItem[]>> {

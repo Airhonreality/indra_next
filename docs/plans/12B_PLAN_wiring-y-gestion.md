@@ -1,6 +1,6 @@
 ---
 plan: 12B_PLAN_wiring-y-gestion
-estado: LISTO
+estado: EJECUTADO
 ejecutor: codex
 depende_de: [12]
 ---

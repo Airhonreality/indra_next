@@ -28,7 +28,7 @@
 | Integrations: Mega | `src/integrations/mega` | TODO: auditar estado. Mega.nz provider bajo desarrollo. | TODO: auditar | — |
 | Integrations: OneDrive | `src/integrations/onedrive` | Adaptador OneDrive, registrado en `register-all.ts`. | TODO: auditar | — |
 | Integrations: YouTube | `src/integrations/youtube` | Adaptador YouTube (publish-target), registrado en `register-all.ts`. | TODO: auditar | — |
-| Integrations: Storage Union | `src/integrations/storage-union` | Meta-adaptador de unión de storages (registro vía `storage-union/register`). | TODO: auditar | — |
+| Integrations: Storage Union | `src/integrations/storage-union` | Meta-adaptador de unión de storages (registro vía `storage-union/register`). `getActiveUpstreams` generalizado: resuelve cualquier provider de `storage_connections` vía registry (mega conserva ruta de credenciales por cabecera). | TODO: auditar | — |
 | Integrations: JSON File | `src/integrations/json-file` | Adaptador JSON local. NO está importado en `register-all.ts` (posible legado). | TODO: auditar | — |
 | Integrations: S3/R2 | `src/integrations/s3` | Adaptador Cloudflare R2 / S3 (ListObjectsV2, GetObject+Range, PUT prefirmado, delete/rename/move vía Copy+Delete). Registrado como 's3' en `register-all.ts`. | EN_DESARROLLO | `docs/plans/12_PLAN_s3-r2-adapter.md` |
 | Integrations: Registry Bootstrap | `src/integrations/register-all.ts` | Fuente de verdad de qué adaptadores quedan registrados en el UniversalRegistry. | ESTABLE | — |

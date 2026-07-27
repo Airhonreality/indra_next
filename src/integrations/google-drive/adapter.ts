@@ -54,9 +54,9 @@ export class GoogleDriveAdapter extends BaseAdapter implements IBlobCapable {
     canStream: true,
     canUpload: true,
     canResumableUpload: true,
-    canDelete: false,
-    canRename: false,
-    canMove: false,
+    canDelete: true,
+    canRename: true,
+    canMove: true,
     canThumbnail: true,
     canQuota: true,
     canPublish: false,
@@ -321,6 +321,63 @@ export class GoogleDriveAdapter extends BaseAdapter implements IBlobCapable {
 
   async pushRecords(targetId: string, records: any[]): Promise<OperationResult<any>> {
     return this.error('Not implemented for Drive. Use createResumableSession instead.');
+  }
+
+  async deleteItem(itemId: string): Promise<OperationResult<boolean>> {
+    try {
+      await this.client.request({
+        method: 'DELETE',
+        endpoint: `/drive/v3/files/${itemId}`,
+        params: { supportsAllDrives: 'true' },
+      });
+
+      return this.result(true);
+    } catch (err: any) {
+      return this.error(`DELETE_ERR: ${err.message || 'Unknown error'}`);
+    }
+  }
+
+  async renameItem(itemId: string, newName: string): Promise<OperationResult<{ newId: string }>> {
+    try {
+      await this.client.request({
+        method: 'PATCH',
+        endpoint: `/drive/v3/files/${itemId}`,
+        params: { supportsAllDrives: 'true' },
+        data: { name: newName },
+      });
+
+      return this.result({ newId: itemId });
+    } catch (err: any) {
+      return this.error(`RENAME_ERR: ${err.message || 'Unknown error'}`);
+    }
+  }
+
+  async moveItem(itemId: string, targetFolderId: string): Promise<OperationResult<{ newId: string }>> {
+    try {
+      const current = await this.client.request({
+        endpoint: `/drive/v3/files/${itemId}`,
+        params: {
+          fields: 'parents',
+          supportsAllDrives: 'true',
+        },
+      });
+      const currentParents = current.data?.parents || [];
+      const parentsToRemove = currentParents.filter((parentId: string) => parentId !== targetFolderId);
+
+      await this.client.request({
+        method: 'PATCH',
+        endpoint: `/drive/v3/files/${itemId}`,
+        params: {
+          ...(currentParents.includes(targetFolderId) ? {} : { addParents: targetFolderId }),
+          ...(parentsToRemove.length > 0 && { removeParents: parentsToRemove.join(',') }),
+          supportsAllDrives: 'true',
+        },
+      });
+
+      return this.result({ newId: itemId });
+    } catch (err: any) {
+      return this.error(`MOVE_ERR: ${err.message || 'Unknown error'}`);
+    }
   }
 
   async downloadBlob(fileId: string, rangeHeader?: string): Promise<OperationResult<ReadableStream>> {

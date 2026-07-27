@@ -35,9 +35,9 @@ export class MegaAdapter extends BaseAdapter implements IBlobCapable {
     canStream: true,
     canUpload: true,
     canResumableUpload: true,
-    canDelete: false,
-    canRename: false,
-    canMove: false,
+    canDelete: true,
+    canRename: true,
+    canMove: true,
     canThumbnail: false,
     canQuota: true,
     canPublish: false,
@@ -200,6 +200,61 @@ export class MegaAdapter extends BaseAdapter implements IBlobCapable {
     } catch (err: any) {
       console.error('[MegaAdapter] downloadBlob failed:', err);
       return this.error(`DOWNLOAD_ERR: ${err.message || 'Unknown error'}`);
+    }
+  }
+
+  async deleteItem(itemId: string): Promise<OperationResult<boolean>> {
+    try {
+      const storage = await this.getStorage();
+      const node = storage.files[itemId];
+      if (!node) {
+        return this.error(`Item ${itemId} not found`);
+      }
+
+      await node.delete(false);
+      return this.result(true);
+    } catch (err: unknown) {
+      console.error('[MegaAdapter] deleteItem failed:', err);
+      return this.error(`DELETE_ERR: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  }
+
+  async renameItem(itemId: string, newName: string): Promise<OperationResult<{ newId: string }>> {
+    try {
+      const storage = await this.getStorage();
+      const node = storage.files[itemId];
+      if (!node) {
+        return this.error(`Item ${itemId} not found`);
+      }
+
+      await node.rename(newName);
+      return this.result({ newId: itemId });
+    } catch (err: unknown) {
+      console.error('[MegaAdapter] renameItem failed:', err);
+      return this.error(`RENAME_ERR: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  }
+
+  async moveItem(itemId: string, targetFolderId: string): Promise<OperationResult<{ newId: string }>> {
+    try {
+      const storage = await this.getStorage();
+      const node = storage.files[itemId];
+      if (!node) {
+        return this.error(`Item ${itemId} not found`);
+      }
+
+      const targetNode = targetFolderId === 'root'
+        ? storage.root
+        : storage.files[targetFolderId];
+      if (!targetNode) {
+        return this.error(`Target folder ${targetFolderId} not found`);
+      }
+
+      await node.moveTo(targetNode);
+      return this.result({ newId: itemId });
+    } catch (err: unknown) {
+      console.error('[MegaAdapter] moveItem failed:', err);
+      return this.error(`MOVE_ERR: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   }
 

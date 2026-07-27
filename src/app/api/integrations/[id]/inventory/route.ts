@@ -3,8 +3,24 @@ import { auth } from "@/auth";
 import { db } from '@/lib/db';
 import { integrations, storageConnections } from '@/core/db/schema';
 import { eq, and } from 'drizzle-orm';
+import type { AgnosticInventoryItem, AgnosticQuery } from '@/core/inventory/types';
+import type { IntegrationAdapter } from '@/core/types/integration';
 
-const NANGO_API_BASE = 'https://api.nango.dev';
+type InventoryIntegration = {
+  id: string;
+  type: string;
+  connectionId: string;
+  config?: {
+    basePath?: string;
+    [key: string]: unknown;
+  } | null;
+  isActive: boolean | null;
+  userId: string;
+};
+
+type InventoryAdapter = IntegrationAdapter & {
+  resolvePath?: (sourceId: string) => Promise<{ ok: boolean; data: string[]; error?: string }>;
+};
 
 export async function GET(
   req: Request,
@@ -25,10 +41,10 @@ export async function GET(
 
   try {
     // 1. Get the integration details from local DB (traditional or dedicated storage)
-    let integration: any = null;
+    let integration: InventoryIntegration | null = null;
 
     // Check if ID is a provider name shortcut
-    const isProviderShortcut = ['google-drive', 'mega', 'onedrive', 'notion', 'storage'].includes(id);
+    const isProviderShortcut = ['google-drive', 'mega', 'onedrive', 'notion', 'storage', 'claro'].includes(id);
 
     if (isProviderShortcut) {
       if (id === 'mega') {
@@ -39,6 +55,29 @@ export async function GET(
             and(
               eq(storageConnections.userId, session.user.id),
               eq(storageConnections.provider, 'mega'),
+              eq(storageConnections.isActive, true)
+            )
+          )
+          .limit(1);
+
+        if (dedicated) {
+          integration = {
+            id: dedicated.id,
+            type: dedicated.provider,
+            connectionId: dedicated.id,
+            config: dedicated.config,
+            isActive: dedicated.isActive,
+            userId: dedicated.userId
+          };
+        }
+      } else if (id === 'claro') {
+        const [dedicated] = await db
+          .select()
+          .from(storageConnections)
+          .where(
+            and(
+              eq(storageConnections.userId, session.user.id),
+              eq(storageConnections.provider, 'claro'),
               eq(storageConnections.isActive, true)
             )
           )
@@ -112,8 +151,8 @@ export async function GET(
     const { AgnosticQuerySchema } = await import('@/core/inventory/types');
     
     // Resolve adapter with the stored connectionId or decrypted credentials
-    let adapter: any = null;
-    if (integration.type === 'mega') {
+    let adapter: InventoryAdapter | null = null;
+    if (integration.type === 'mega' || integration.type === 'claro') {
       const [dedicated] = await db
         .select()
         .from(storageConnections)
@@ -122,7 +161,7 @@ export async function GET(
       if (dedicated && dedicated.encryptedCredentials) {
         const { decryptServerPayload } = await import('@/lib/server-crypto');
         const creds = decryptServerPayload(dedicated.encryptedCredentials, session.user.id);
-        adapter = registry.resolveAdapter('mega', creds);
+        adapter = registry.resolveAdapter(integration.type, creds);
       }
     } else if (integration.type === 'storage') {
       adapter = registry.resolveAdapter('storage', {
@@ -146,8 +185,8 @@ export async function GET(
 
     if (resolveId) {
       let path = ['root', resolveId];
-      if (typeof (adapter as any).resolvePath === 'function') {
-        const pathResult = await (adapter as any).resolvePath(resolveId);
+      if (typeof adapter.resolvePath === 'function') {
+        const pathResult = await adapter.resolvePath(resolveId);
         if (pathResult.ok) {
           path = pathResult.data;
         }
@@ -155,13 +194,13 @@ export async function GET(
       return NextResponse.json({ path });
     }
 
-    const queryParams = Object.fromEntries(searchParams.entries());
+    const queryParams: Record<string, string | number> = Object.fromEntries(searchParams.entries());
     
     // Convert string numeric values to numbers for Zod
-    if (queryParams.limit) queryParams.limit = parseInt(queryParams.limit as string) as any;
-    if (queryParams.depth) queryParams.depth = parseInt(queryParams.depth as string) as any;
+    if (queryParams.limit) queryParams.limit = parseInt(queryParams.limit as string);
+    if (queryParams.depth) queryParams.depth = parseInt(queryParams.depth as string);
 
-    const validatedQuery = AgnosticQuerySchema.parse(queryParams);
+    const validatedQuery = AgnosticQuerySchema.parse(queryParams) as AgnosticQuery;
     
     const startTime = Date.now();
     const result = await adapter.listInventory(validatedQuery);
@@ -171,7 +210,7 @@ export async function GET(
       return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
-    const mappedObjects = result.data.map((item: any) => {
+    const mappedObjects = (result.data as AgnosticInventoryItem[]).map((item) => {
       // 🛡️ Zero-Entropy Agnosticism: YouTube uses native iframe embed streamUrl and direct thumbnails.
       if (item.provider === 'youtube') {
         return item;

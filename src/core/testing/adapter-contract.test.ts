@@ -4,6 +4,7 @@ import { GoogleDriveAdapter } from '@/integrations/google-drive/adapter';
 import { SheetsAdapter } from '@/integrations/google-sheets/adapter';
 import { NotionAdapter } from '@/integrations/notion/adapter';
 import { StorageAdapter } from '@/integrations/storage/adapter';
+import { ClaroAdapter } from '@/integrations/claro/adapter';
 import { MegaAdapter } from '@/integrations/mega/adapter';
 import { S3Adapter } from '@/integrations/s3/adapter';
 import { YouTubeAdapter } from '@/integrations/youtube/adapter';
@@ -19,9 +20,14 @@ const mockClient = {
 
 const adapters = [
   new GoogleDriveAdapter('test-connection'),
-  new SheetsAdapter(mockClient as any),
-  new NotionAdapter(mockClient as any),
+  new SheetsAdapter(mockClient as never),
+  new NotionAdapter(mockClient as never),
   new StorageAdapter('C:\\tmp'),
+  new ClaroAdapter({
+    baseUrl: 'https://example.com',
+    username: 'user@example.com',
+    password: 'app-password',
+  }),
   new MegaAdapter({ applicationKey: 'test-key' }),
   new S3Adapter({
     bucket: 'test',
@@ -39,7 +45,9 @@ describe('Storage adapter contract', () => {
     const parsed = CapabilityManifestSchema.safeParse(adapter.capabilities);
     expect(parsed.success, `${adapter.id}: invalid capabilities manifest`).toBe(true);
 
-    const violations = auditManifestCoherence(adapter as any);
+    const violations = auditManifestCoherence(
+      adapter as unknown as Parameters<typeof auditManifestCoherence>[0]
+    );
     expect(violations, `${adapter.id}: ${violations.join('; ')}`).toEqual([]);
 
     expect(adapter.id, `${adapter.id}: id must be non-empty`).toBeTruthy();

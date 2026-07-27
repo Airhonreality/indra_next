@@ -9,6 +9,7 @@ import './google-sheets';
 import './notion';
 import './storage';
 import './mega';
+import './claro';
 import './s3';
 import './youtube';
 import './onedrive';

@@ -8,7 +8,7 @@ import { promises as fs } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { constants as fsConstants } from 'node:fs';
 
-export async function GET(req: Request) {
+export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
       .from(integrations)
       .where(eq(integrations.userId, session.user.id));
       
-    // 2. Obtener conexiones de almacenamiento dedicadas (MEGA)
+    // 2. Obtener conexiones de almacenamiento dedicadas (MEGA / Claro / S3)
     const storageList = await db
       .select()
       .from(storageConnections)
@@ -33,11 +33,20 @@ export async function GET(req: Request) {
       userId: item.userId,
       type: item.provider,
       label: item.label,
-      connectionId: item.provider === 'mega' ? 'mega-vault' : 's3-vault',
+      connectionId:
+        item.provider === 'mega'
+          ? 'mega-vault'
+          : item.provider === 's3'
+            ? 's3-vault'
+            : item.provider === 'claro'
+              ? 'claro-vault'
+              : item.id,
       config: {
         ...item.config,
         email: item.config?.email || '',
         bucket: item.config?.bucket || '',
+        baseUrl: item.config?.baseUrl || '',
+        username: item.config?.username || '',
         isConnected: !!item.encryptedCredentials,
       },
       isActive: item.isActive,
@@ -153,6 +162,69 @@ export async function POST(req: Request) {
         connectionId: 'mega-vault',
         config: {
           email: result[0].config?.email || '',
+          isConnected: true,
+        },
+        isActive: result[0].isActive,
+        createdAt: result[0].createdAt,
+        updatedAt: result[0].updatedAt,
+      };
+
+      return NextResponse.json({ success: true, integration: mapped });
+    }
+
+    // Claro Drive compatible with Nextcloud WebDAV + application passwords
+    if (type === 'claro') {
+      const { baseUrl, username, password } = config || {};
+      if (!baseUrl || !username || !password) {
+        return NextResponse.json(
+          { error: 'Base URL, username and app password are required for Claro Drive.' },
+          { status: 400 }
+        );
+      }
+
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(baseUrl);
+      } catch {
+        return NextResponse.json(
+          { error: 'The Claro Drive base URL must be a valid absolute URL.' },
+          { status: 400 }
+        );
+      }
+
+      if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+        return NextResponse.json(
+          { error: 'The Claro Drive base URL must use http or https.' },
+          { status: 400 }
+        );
+      }
+
+      const encryptedCredentials = encryptServerPayload(
+        { baseUrl: parsedUrl.toString().replace(/\/+$/, ''), username, password },
+        session.user.id
+      );
+
+      const result = await db.insert(storageConnections).values({
+        userId: session.user.id,
+        provider: 'claro',
+        label: label || `Claro Drive [${username}]`,
+        isActive: true,
+        encryptedCredentials,
+        config: {
+          baseUrl: parsedUrl.toString().replace(/\/+$/, ''),
+          username,
+        },
+      }).returning();
+
+      const mapped = {
+        id: result[0].id,
+        userId: result[0].userId,
+        type: result[0].provider,
+        label: result[0].label,
+        connectionId: 'claro-vault',
+        config: {
+          baseUrl: result[0].config?.baseUrl || '',
+          username: result[0].config?.username || '',
           isConnected: true,
         },
         isActive: result[0].isActive,

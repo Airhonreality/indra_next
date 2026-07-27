@@ -68,20 +68,31 @@ export function useIntegrationState() {
   };
 
   const mountLocalProvider = async (providerId: string, path: string) => {
-    if (!userId || !path) return;
+    const normalizedPath = path.trim();
+    if (!userId || !normalizedPath) return;
     setIsProcessing(providerId);
 
     try {
-      await fetch('/api/integrations', {
+      const response = await fetch('/api/integrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: providerId,
-          label: `${providerId.toUpperCase()} [${path}]`,
+          label: `${providerId.toUpperCase()} [${normalizedPath}]`,
           connectionId: `local-${providerId}-${userId}`,
+          config: { basePath: normalizedPath },
         }),
       });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || 'No se pudo montar la carpeta local');
+      }
+      setLocalPaths((prev) => ({ ...prev, [providerId]: normalizedPath }));
       invalidate('connections');
+      return true;
+    } catch (err) {
+      console.error('[Local Mount Error]:', err);
+      throw err;
     } finally {
       setIsProcessing(null);
     }

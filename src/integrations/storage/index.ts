@@ -4,5 +4,5 @@ import { StorageAdapter } from './adapter';
 const DEFAULT_BASE = process.env.STORAGE_BASE_PATH ?? './data';
 
 registry.registerAdapter('storage', (context?: { basePath?: string }) => {
-  return new StorageAdapter(context?.basePath ?? DEFAULT_BASE);
+  return new StorageAdapter(context?.basePath || DEFAULT_BASE);
 }, StorageAdapter.meta);

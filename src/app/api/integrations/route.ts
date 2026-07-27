@@ -4,6 +4,9 @@ import { integrations, storageConnections } from '@/core/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { auth } from "@/auth";
 import { encryptServerPayload } from '@/lib/server-crypto';
+import { promises as fs } from 'node:fs';
+import { isAbsolute } from 'node:path';
+import { constants as fsConstants } from 'node:fs';
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -57,6 +60,69 @@ export async function POST(req: Request) {
 
   try {
     const { type, label, connectionId, config } = await req.json();
+
+    if (type === 'storage') {
+      const basePath = typeof config?.basePath === 'string' ? config.basePath.trim() : '';
+      if (!basePath || !isAbsolute(basePath)) {
+        return NextResponse.json(
+          { error: 'La carpeta local debe ser una ruta absoluta.' },
+          { status: 400 }
+        );
+      }
+
+      try {
+        const stats = await fs.stat(basePath);
+        if (!stats.isDirectory()) {
+          return NextResponse.json(
+            { error: 'La ruta local debe apuntar a una carpeta.' },
+            { status: 400 }
+          );
+        }
+        await fs.access(basePath, fsConstants.R_OK | fsConstants.W_OK);
+      } catch {
+        return NextResponse.json(
+          { error: 'La carpeta local no existe o no tiene permisos de lectura y escritura.' },
+          { status: 400 }
+        );
+      }
+
+      const existing = await db
+        .select()
+        .from(integrations)
+        .where(
+          and(
+            eq(integrations.userId, session.user.id),
+            eq(integrations.type, 'storage'),
+            eq(integrations.connectionId, connectionId || `local-storage-${session.user.id}`)
+          )
+        )
+        .limit(1);
+
+      const storedConfig = { ...(config || {}), basePath };
+      if (existing[0]) {
+        const result = await db
+          .update(integrations)
+          .set({
+            label: label || `STORAGE [${basePath}]`,
+            config: storedConfig,
+            isActive: true,
+            updatedAt: new Date(),
+          })
+          .where(eq(integrations.id, existing[0].id))
+          .returning();
+        return NextResponse.json({ success: true, integration: result[0] });
+      }
+
+      const result = await db.insert(integrations).values({
+        userId: session.user.id,
+        type: 'storage',
+        label: label || `STORAGE [${basePath}]`,
+        connectionId: connectionId || `local-storage-${session.user.id}`,
+        config: storedConfig,
+        isActive: true,
+      }).returning();
+      return NextResponse.json({ success: true, integration: result[0] });
+    }
 
     // Si es MEGA, procesamos el guardado en la tabla dedicada storage_connections con encriptación at-rest
     if (type === 'mega') {
@@ -155,4 +221,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Failed to create integration' }, { status: 500 });
   }
 }
-

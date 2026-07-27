@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { ChevronRight, Folder, File, Loader2, Share2, Search, Database } from 'lucide-react';
+import { ChevronRight, Folder, File, Loader2, Share2, Search, Database, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useInventory } from '@/hooks/use-inventory';
 import { Button } from '@/components/ui/button';
@@ -27,12 +27,23 @@ export interface AgnosticAtom {
   size?: number;
   thumbnailUrl?: string;
   streamUrl?: string;
+  updatedAt?: string;
+  parentId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AgnosticBreadcrumb {
+  id: string;
+  name: string;
 }
 
 interface AgnosticTreeProps {
   integrationId: string;
   onSelect: (atom: AgnosticAtom) => void;
   initialSelectedId?: string;
+  searchQuery?: string;
+  typeFilter?: 'all' | 'file' | 'folder';
+  onPathChange?: (path: AgnosticBreadcrumb[]) => void;
   className?: string;
 }
 
@@ -40,15 +51,29 @@ export function AgnosticTree({
   integrationId,
   onSelect,
   initialSelectedId,
+  searchQuery = '',
+  typeFilter = 'all',
+  onPathChange,
   className
 }: AgnosticTreeProps) {
   const [activePath, setActivePath] = useState<string[]>(['root']);
+  const [breadcrumbPath, setBreadcrumbPath] = useState<AgnosticBreadcrumb[]>([
+    { id: 'root', name: 'Raíz de infraestructura' }
+  ]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 🛡️ AXIOMATIC FIX: Reset path when integration changes to avoid "Ghost Columns"
   React.useEffect(() => {
-    setActivePath(['root']);
+    const resetTimer = window.setTimeout(() => {
+      setActivePath(['root']);
+      setBreadcrumbPath([{ id: 'root', name: 'Raíz de infraestructura' }]);
+    }, 0);
+    return () => window.clearTimeout(resetTimer);
   }, [integrationId]);
+
+  React.useEffect(() => {
+    onPathChange?.(breadcrumbPath);
+  }, [breadcrumbPath, onPathChange]);
 
   // 🌳 ANCESTRY PATH HYDRATOR: Resolves parent ancestry chain to prevent resetting to zero
   React.useEffect(() => {
@@ -64,6 +89,12 @@ export function AgnosticTree({
         const data = await res.json();
         if (data.path && Array.isArray(data.path) && active) {
           setActivePath(data.path);
+          setBreadcrumbPath(
+            data.path.map((segment: string, index: number) => ({
+              id: segment,
+              name: index === 0 ? 'Raíz de infraestructura' : segment.split('/').pop() ?? segment,
+            }))
+          );
           // Scroll smoothly to the right after rendering
           setTimeout(() => {
             if (scrollRef.current) {
@@ -87,9 +118,14 @@ export function AgnosticTree({
     if (atom.type === 'file') {
       const newPath = activePath.slice(0, columnIndex + 1);
       setActivePath(newPath);
+      setBreadcrumbPath((current) => current.slice(0, columnIndex + 1));
     } else {
       const newPath = [...activePath.slice(0, columnIndex + 1), atom.id];
       setActivePath(newPath);
+      setBreadcrumbPath((current) => [
+        ...current.slice(0, columnIndex + 1),
+        { id: atom.id, name: atom.name }
+      ]);
     }
 
     // 2. Emit selection event (Agnostic of type)
@@ -106,14 +142,36 @@ export function AgnosticTree({
     }
   };
 
+  const handleBreadcrumbClick = (index: number) => {
+    setActivePath(activePath.slice(0, index + 1));
+    setBreadcrumbPath(breadcrumbPath.slice(0, index + 1));
+    onSelect({ id: breadcrumbPath[index].id, name: breadcrumbPath[index].name, type: 'folder' });
+  };
+
   return (
-    <div 
-      ref={scrollRef}
-      className={cn(
-        "flex h-[400px] w-full overflow-x-auto overflow-y-hidden custom-scrollbar gap-px bg-border/20 rounded-xl border border-border glass-card relative",
-        className
-      )}
-    >
+    <div className={cn("flex min-h-0 w-full flex-col rounded-xl border border-border bg-border/20 glass-card relative", className)}>
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-border/40 bg-background/60 px-3 py-2 custom-scrollbar">
+        {breadcrumbPath.map((crumb, index) => (
+          <React.Fragment key={`${crumb.id}-${index}`}>
+            {index > 0 && <ChevronRight className="size-3 shrink-0 text-muted-foreground/50" />}
+            <button
+              type="button"
+              onClick={() => handleBreadcrumbClick(index)}
+              className={cn(
+                "flex max-w-[220px] shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold transition-colors",
+                index === breadcrumbPath.length - 1
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+              title={crumb.name}
+            >
+              {index === 0 && <Home className="size-3" />}
+              <span className="truncate">{crumb.name}</span>
+            </button>
+          </React.Fragment>
+        ))}
+      </div>
+      <div ref={scrollRef} className="flex min-h-[380px] flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar gap-px">
       {!integrationId && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[2px] z-20">
            <Database className="size-8 text-muted-foreground opacity-20 mb-2" />
@@ -129,9 +187,12 @@ export function AgnosticTree({
           isActive={idx === activePath.length - 1}
           selectedId={activePath[idx + 1]}
           onItemClick={(atom) => handleItemSelect(atom, idx)}
+          searchQuery={searchQuery}
+          typeFilter={typeFilter}
           level={idx}
         />
       ))}
+      </div>
     </div>
   );
 }
@@ -144,17 +205,26 @@ function TreeColumn({
   integrationId, 
   parentId, 
   onItemClick, 
-  selectedId, 
+  selectedId,
+  searchQuery,
+  typeFilter,
   level 
 }: { 
   integrationId: string; 
   parentId: string; 
   onItemClick: (atom: AgnosticAtom) => void; 
   selectedId?: string;
+  searchQuery: string;
+  typeFilter: 'all' | 'file' | 'folder';
   isActive: boolean;
   level: number;
 }) {
-  const { items, isLoading, error, refresh } = useInventory(integrationId, { parentId });
+  const { items, isLoading, error, refresh } = useInventory(integrationId, {
+    parentId,
+    search: searchQuery.trim() || undefined,
+    type: typeFilter,
+  });
+  const visibleItems = items;
 
   return (
     <div className="min-w-[240px] w-[240px] h-full bg-background/40 backdrop-blur-sm border-r border-border/50 flex flex-col animate-in slide-in-from-left-2">
@@ -189,15 +259,17 @@ function TreeColumn({
           </div>
         )}
         
-        {!isLoading && !error && items.length === 0 && (
+        {!isLoading && !error && visibleItems.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center opacity-20 animate-in fade-in duration-500">
             <Search className="size-8 mb-2" />
-            <span className="text-[8px] uppercase font-bold tracking-widest">Nodo Vacío</span>
+            <span className="text-center text-[8px] uppercase font-bold tracking-widest">
+              {items.length === 0 ? 'Nodo vacío' : 'Sin coincidencias'}
+            </span>
           </div>
         )}
 
         <div className={cn("space-y-1 transition-opacity duration-300", isLoading ? "opacity-30 pointer-events-none" : "opacity-100")}>
-          {items.map((atom) => {
+          {visibleItems.map((atom) => {
             const isSelected = selectedId === atom.id;
             return (
               <button
@@ -205,7 +277,7 @@ function TreeColumn({
                 key={atom.id}
                 onClick={() => onItemClick(atom as AgnosticAtom)}
                 className={cn(
-                  "w-full flex items-center justify-between p-2 rounded-lg text-left transition-all group",
+                  "w-full flex items-center justify-between rounded-md px-2 py-1.5 text-left transition-all group",
                   isSelected 
                     ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02] z-10" 
                     : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
@@ -218,7 +290,7 @@ function TreeColumn({
                       alt=""
                       loading="lazy"
                       decoding="async"
-                      className="size-8 rounded object-cover shrink-0 opacity-90 border border-border/20 animate-in fade-in duration-300"
+                      className="size-7 rounded object-cover shrink-0 opacity-90 border border-border/20 animate-in fade-in duration-300"
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                     />
                   ) : atom.type === 'folder' ? (

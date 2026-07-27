@@ -183,7 +183,14 @@ export function ConnectionsPanel() {
       const res = await fetch('/api/integrations');
       if (res.ok) {
         const data = await res.json();
-        setIntegrations(data.integrations || []);
+        const nextIntegrations = data.integrations || [];
+        setIntegrations(nextIntegrations);
+        const localStorage = nextIntegrations.find(
+          (integration: any) => integration.type === 'storage' && integration.isActive
+        );
+        if (localStorage?.config?.basePath) {
+          setLocalStoragePath(localStorage.config.basePath);
+        }
       }
     } catch (err) {
       console.error('[ConnectionsPanel] Failed to fetch integrations:', err);
@@ -292,7 +299,7 @@ export function ConnectionsPanel() {
             value={localStoragePath}
             onChange={setLocalStoragePath}
             onMount={async () => { 
-              await actions.mountLocalProvider('storage', localStoragePath); 
+              await actions.mountLocalProvider('storage', localStoragePath);
               await refresh(); 
             }}
             isProcessing={isProcessing === 'storage'}

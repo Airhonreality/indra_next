@@ -23,17 +23,12 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const nangoSecret = process.env.NANGO_SECRET_KEY;
-  if (!nangoSecret) {
-    return NextResponse.json({ error: 'Nango secret missing' }, { status: 500 });
-  }
-
   try {
     // 1. Get the integration details from local DB (traditional or dedicated storage)
     let integration: any = null;
 
     // Check if ID is a provider name shortcut
-    const isProviderShortcut = ['google-drive', 'mega', 'onedrive', 'notion'].includes(id);
+    const isProviderShortcut = ['google-drive', 'mega', 'onedrive', 'notion', 'storage'].includes(id);
 
     if (isProviderShortcut) {
       if (id === 'mega') {
@@ -129,7 +124,15 @@ export async function GET(
         const creds = decryptServerPayload(dedicated.encryptedCredentials, session.user.id);
         adapter = registry.resolveAdapter('mega', creds);
       }
+    } else if (integration.type === 'storage') {
+      adapter = registry.resolveAdapter('storage', {
+        basePath: integration.config?.basePath,
+      });
     } else {
+      const nangoSecret = process.env.NANGO_SECRET_KEY;
+      if (!nangoSecret) {
+        return NextResponse.json({ error: 'Nango secret missing' }, { status: 500 });
+      }
       adapter = registry.resolveAdapter(integration.type, integration.connectionId);
     }
 

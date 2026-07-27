@@ -91,6 +91,9 @@ export function ProviderEntityRow({
   const [isExecuting, setIsExecuting] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const isActive = !!activeConnection;
+  const persistedLocalPath = (activeConnection as Connection & {
+    config?: { basePath?: string };
+  } | undefined)?.config?.basePath;
 
   const { 
     items: filteredInventory, 
@@ -291,7 +294,7 @@ export function ProviderEntityRow({
                             type="text" 
                             placeholder="/mnt/indra/data/vault" 
                             className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono"
-                            value={isActive ? '/var/lib/indra/data' : localPathValue}
+                            value={isActive ? (persistedLocalPath || localPathValue) : localPathValue}
                             onChange={(e) => onSetLocalPath(e.target.value)}
                             disabled={isActive || isProcessing}
                           />

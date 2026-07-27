@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { X, FileText, Download } from 'lucide-react';
+import { X, FileText, Download, Folder, Clock3, Route, UserRound } from 'lucide-react';
 import { AgnosticAtom } from '@/components/ui/agnostic-tree';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ export function MediaPreview({ atom, connectionId, onClose }: MediaPreviewProps)
   const isImage = atom.rawMimeType?.startsWith('image/');
   const isVideo = atom.rawMimeType?.startsWith('video/') || atom.provider === 'youtube';
   const provider = atom.provider || 'unknown';
+  const isFolder = atom.type === 'folder';
 
   // Get unified streaming/download URL from contract
   const mediaSrc = atom.streamUrl || '';
@@ -111,8 +112,8 @@ export function MediaPreview({ atom, connectionId, onClose }: MediaPreviewProps)
           {/* Fallback Icon for other files */}
           {!isImage && !isVideo && (
             <div className="flex flex-col items-center justify-center space-y-2 opacity-55">
-              <FileText className="size-12 text-muted-foreground" />
-              <span className="text-[9px] uppercase font-bold tracking-widest">Sin vista previa</span>
+              {isFolder ? <Folder className="size-12 text-primary/70" /> : <FileText className="size-12 text-muted-foreground" />}
+              <span className="text-[9px] uppercase font-bold tracking-widest">{isFolder ? 'Carpeta seleccionada' : 'Sin vista previa'}</span>
             </div>
           )}
         </div>
@@ -152,6 +153,22 @@ export function MediaPreview({ atom, connectionId, onClose }: MediaPreviewProps)
                 {atom.isShared ? 'Sí (Soberano/Ingesta)' : 'No (Privado)'}
               </span>
             </div>
+            <div>
+              <span className="block text-muted-foreground font-bold uppercase text-[8px] tracking-wider mb-0.5">Tipo</span>
+              <span className="font-medium text-foreground">{isFolder ? 'Carpeta' : 'Archivo'}</span>
+            </div>
+            <div>
+              <span className="flex items-center gap-1 text-muted-foreground font-bold uppercase text-[8px] tracking-wider mb-0.5"><Clock3 className="size-2.5" /> Actualizado</span>
+              <span className="font-medium text-foreground">{atom.updatedAt ? formatDate(atom.updatedAt) : 'No disponible'}</span>
+            </div>
+            <div>
+              <span className="flex items-center gap-1 text-muted-foreground font-bold uppercase text-[8px] tracking-wider mb-0.5"><Route className="size-2.5" /> Ruta</span>
+              <span className="block truncate font-medium text-foreground" title={getMetadata(atom, 'path')}>{getMetadata(atom, 'path')}</span>
+            </div>
+            <div>
+              <span className="flex items-center gap-1 text-muted-foreground font-bold uppercase text-[8px] tracking-wider mb-0.5"><UserRound className="size-2.5" /> Cuenta</span>
+              <span className="block truncate font-medium text-foreground" title={getMetadata(atom, 'account')}>{getMetadata(atom, 'account')}</span>
+            </div>
           </div>
         </div>
 
@@ -178,7 +195,7 @@ export function MediaPreview({ atom, connectionId, onClose }: MediaPreviewProps)
           type="button"
           className="flex-1 font-bold text-[10px] uppercase tracking-wider h-10 rounded-xl"
           onClick={handleDownloadFile}
-          disabled={provider === 'youtube'}
+          disabled={provider === 'youtube' || isFolder || !mediaSrc}
         >
           <Download className="size-3.5 mr-2" /> Descargar Archivo
         </Button>
@@ -193,4 +210,14 @@ function formatBytes(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function formatDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function getMetadata(atom: AgnosticAtom, key: string): string {
+  const value = atom.metadata?.[key];
+  return typeof value === 'string' && value.length > 0 ? value : 'No disponible';
 }

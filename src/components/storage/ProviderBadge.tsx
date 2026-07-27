@@ -24,7 +24,7 @@ export function ProviderBadge({
 
   const meta = registry.getAdapterMeta(provider);
   // Dynamically lookup lucide icon name
-  const IconComponent = (LucideIcons as any)[meta.icon] || LucideIcons.Database;
+  const IconComponent = (LucideIcons as unknown as Record<string, React.ElementType>)[meta.icon] || LucideIcons.Database;
 
   const sizeClasses = {
     xs: 'text-[8px] px-1 py-0.5 gap-1 rounded',
@@ -50,6 +50,7 @@ export function ProviderBadge({
         className
       )}
       title={`${meta.label} ${formattedSpace}`}
+      aria-label={`${meta.label}${formattedSpace ? ` ${formattedSpace}` : ''}`}
     >
       {/* Visual active state dot */}
       <span className={cn("rounded-full size-1.5 shrink-0 animate-pulse", meta.accentCss)} />

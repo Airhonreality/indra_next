@@ -13,10 +13,12 @@
 
 import { Loader2 } from 'lucide-react';
 import { useConnections } from '@/hooks/use-connections';
-import { ResourceExplorer } from '@/components/resource-explorer';
+import { useIndraStore } from '@/stores/indra-store';
+import { StorageWidgetClient } from '@/components/storage/StorageWidgetClient';
 
 export function ExplorerPanel() {
   const { activeConnections, isLoading } = useConnections();
+  const userId = useIndraStore((state) => state.userId);
 
   if (isLoading) {
     return (
@@ -26,17 +28,11 @@ export function ExplorerPanel() {
     );
   }
 
-  const connectionConfigs = activeConnections.map((c) => ({
-    id: c.id,
-    label: c.label,
-    integration: c.type,
-    type: c.type,
-    connectionId: c.id,
-  }));
+  const connectionIds = Object.fromEntries(activeConnections.map((connection) => [connection.type, connection.id]));
 
   return (
-    <div className="bg-card border border-border p-8 rounded-2xl shadow-sm">
-      <ResourceExplorer connections={connectionConfigs} />
+    <div className="w-full">
+      <StorageWidgetClient userId={userId ?? ''} connectionIds={connectionIds} />
     </div>
   );
 }

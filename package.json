@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:contract": "vitest run src/core/testing"
+    "test:contract": "vitest run src/core/testing",
+    "claro:list": "node scripts/clarodrive/list.mjs",
+    "claro:download": "node scripts/clarodrive/download.mjs"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",

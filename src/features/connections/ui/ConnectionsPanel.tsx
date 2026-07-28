@@ -20,6 +20,16 @@ type IntegrationRow = {
   };
 };
 
+const ACTIVE_LABELS: Record<string, string> = {
+  'google-drive': 'Google Drive',
+  onedrive: 'OneDrive',
+  notion: 'Notion',
+  mega: 'MEGA',
+  s3: 'Cloudflare R2',
+  claro: 'Claro Drive',
+  storage: 'Local Storage',
+};
+
 interface ProviderCardProps {
   title: string;
   description: string;
@@ -240,6 +250,17 @@ export function ConnectionsPanel() {
   const megaCount = integrations.filter(i => i.type === 'mega' && i.isActive).length;
   const s3Count = integrations.filter(i => i.type === 's3' && i.isActive).length;
   const claroCount = integrations.filter(i => i.type === 'claro' && i.isActive).length;
+  const activeSummary = integrations
+    .filter((integration) => integration.isActive)
+    .reduce<Array<{ type: string; count: number }>>((acc, integration) => {
+      const current = acc.find((item) => item.type === integration.type);
+      if (current) {
+        current.count += 1;
+      } else {
+        acc.push({ type: integration.type, count: 1 });
+      }
+      return acc;
+    }, []);
 
   const openVault = (tab: StorageTab) => {
     setVaultTab(tab);
@@ -269,6 +290,30 @@ export function ConnectionsPanel() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl w-full">
+      <div className="md:col-span-2 rounded-2xl border border-border/40 bg-background/60 p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Conexiones activas</p>
+            <p className="text-xs text-muted-foreground">Vista completa de los proveedores conectados en esta cuenta.</p>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            {activeSummary.length > 0 ? (
+              activeSummary.map((item) => (
+                <span
+                  key={item.type}
+                  className="inline-flex items-center gap-2 rounded-full border border-border/40 bg-muted/40 px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-foreground"
+                >
+                  <span className="size-2 rounded-full bg-primary/70" />
+                  {ACTIVE_LABELS[item.type] ?? item.type}
+                  {item.count > 1 ? ` x${item.count}` : ''}
+                </span>
+              ))
+            ) : (
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Sin conexiones activas</span>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Google Family */}
       <ProviderCard

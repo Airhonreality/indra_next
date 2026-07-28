@@ -7,6 +7,7 @@ import { encryptServerPayload } from '@/lib/server-crypto';
 import { promises as fs } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { constants as fsConstants } from 'node:fs';
+import { ClaroAdapter } from '@/integrations/claro/adapter';
 
 export async function GET() {
   const session = await auth();
@@ -196,6 +197,19 @@ export async function POST(req: Request) {
         return NextResponse.json(
           { error: 'The Claro Drive base URL must use http or https.' },
           { status: 400 }
+        );
+      }
+
+      const probe = new ClaroAdapter({
+        baseUrl: parsedUrl.toString().replace(/\/+$/, ''),
+        username,
+        password,
+      });
+      const connectionCheck = await probe.testConnection();
+      if (!connectionCheck.ok) {
+        return NextResponse.json(
+          { error: connectionCheck.error || 'Claro Drive credentials could not be validated.' },
+          { status: 401 }
         );
       }
 

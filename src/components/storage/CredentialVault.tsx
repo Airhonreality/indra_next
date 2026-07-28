@@ -44,6 +44,9 @@ export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultPr
   const [loading, setLoading] = useState(false);
   const [connections, setConnections] = useState<StoredConnection[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [claroFlowMessage, setClaroFlowMessage] = useState('');
+  const [claroFlowError, setClaroFlowError] = useState('');
+  const [claroFlowUrl, setClaroFlowUrl] = useState('');
 
   const fetchConnections = async () => {
     try {
@@ -162,41 +165,152 @@ export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultPr
     }
   };
 
+  const persistClaroConnection = async (input: {
+    baseUrl: string;
+    username: string;
+    password: string;
+  }) => {
+    const res = await fetch('/api/integrations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'claro',
+        label: `Claro Drive [${input.username}]`,
+        config: {
+          baseUrl: input.baseUrl,
+          username: input.username,
+          password: input.password,
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to save Claro Drive credentials');
+    }
+
+    setClaroBaseUrl('https://www.clarodrive.com');
+    setClaroUsername('');
+    setClaroAppPassword('');
+    setShowClaroPassword(false);
+    setShowAddForm(false);
+    await fetchConnections();
+    onSaved?.();
+  };
+
   const handleSaveClaro = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!claroBaseUrl || !claroUsername || !claroAppPassword) return;
 
     setLoading(true);
+    setClaroFlowError('');
+    setClaroFlowMessage('Guardando credenciales Claro Drive...');
     try {
-      const res = await fetch('/api/integrations', {
+      await persistClaroConnection({
+        baseUrl: claroBaseUrl,
+        username: claroUsername,
+        password: claroAppPassword,
+      });
+      setClaroFlowMessage('Claro Drive conectado correctamente.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error al conectar con Claro Drive';
+      console.error('[CredentialVault] Failed to save Claro Drive in Postgres:', err);
+      setClaroFlowError(message);
+      alert('Error al conectar con Claro Drive. Verifica tus credenciales.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pollClaroLoginFlow = async (params: {
+    endpoint: string;
+    token: string;
+    baseUrl: string;
+  }) => {
+    const maxAttempts = 60;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const response = await fetch('/api/integrations/claro/login/poll', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'claro',
-          label: `Claro Drive [${claroUsername}]`,
-          config: {
-            baseUrl: claroBaseUrl,
-            username: claroUsername,
-            password: claroAppPassword,
-          },
+          endpoint: params.endpoint,
+          token: params.token,
+          baseUrl: params.baseUrl,
         }),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to save Claro Drive credentials');
+      if (response.status === 202) {
+        setClaroFlowMessage(`Esperando confirmación del SMS en Claro Drive... intento ${attempt + 1}/${maxAttempts}`);
+        await new Promise((resolve) => window.setTimeout(resolve, 2500));
+        continue;
       }
 
-      setClaroBaseUrl('https://www.clarodrive.com');
-      setClaroUsername('');
-      setClaroAppPassword('');
-      setShowClaroPassword(false);
-      setShowAddForm(false);
-      await fetchConnections();
-      onSaved?.();
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error || 'No se pudo completar el login de Claro Drive');
+      }
+
+      const payload = await response.json();
+      if (!payload?.appPassword || !payload?.loginName || !payload?.server) {
+        throw new Error('El flujo de Claro no devolvió appPassword, loginName o server.');
+      }
+
+      return payload;
+    }
+
+    throw new Error('El login de Claro expiró esperando la validación SMS.');
+  };
+
+  const handleStartClaroLoginFlow = async () => {
+    if (!claroBaseUrl) return;
+
+    setLoading(true);
+    setClaroFlowError('');
+    setClaroFlowMessage('Iniciando login interactivo de Claro Drive...');
+    try {
+      const res = await fetch('/api/integrations/claro/login/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ baseUrl: claroBaseUrl }),
+      });
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || 'No se pudo iniciar el flujo de Claro Drive');
+      }
+
+      const payload = await res.json();
+      if (!payload?.login || !payload?.poll?.token || !payload?.poll?.endpoint || !payload?.server) {
+        throw new Error('El flujo de login de Claro no devolvió login o token.');
+      }
+
+      setClaroFlowUrl(payload.login);
+      setClaroFlowMessage('Se abrió el portal oficial. Completa el SMS para continuar.');
+
+      const popup = window.open(payload.login, '_blank', 'noopener,noreferrer');
+      if (!popup) {
+        setClaroFlowMessage('Abre manualmente el portal oficial y completa el SMS.');
+      }
+
+      const loginResult = await pollClaroLoginFlow({
+        endpoint: payload.poll.endpoint,
+        token: payload.poll.token,
+        baseUrl: payload.server,
+      });
+
+      setClaroFlowMessage('SMS validado. Guardando la sesión de Claro Drive...');
+      await persistClaroConnection({
+        baseUrl: loginResult.server,
+        username: loginResult.loginName,
+        password: loginResult.appPassword,
+      });
+      setClaroFlowMessage('Claro Drive conectado por login interactivo.');
     } catch (err) {
-      console.error('[CredentialVault] Failed to save Claro Drive in Postgres:', err);
-      alert('Error al conectar con Claro Drive. Verifica tus credenciales.');
+      const message = err instanceof Error ? err.message : 'Error al iniciar el login de Claro';
+      console.error('[CredentialVault] Failed to start Claro login flow:', err);
+      setClaroFlowError(message);
+      alert('No se pudo iniciar el login de Claro Drive.');
     } finally {
       setLoading(false);
     }
@@ -243,6 +357,10 @@ export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultPr
           </Button>
         )}
       </div>
+
+      <p className="text-[10px] leading-relaxed text-muted-foreground">
+        Este vault administra sólo silos de credenciales directas: MEGA, Cloudflare R2 y Claro Drive. Las cuentas OAuth de Google, Microsoft y Notion se conectan desde sus tarjetas de familia.
+      </p>
 
       {connections.length > 0 ? (
         <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
@@ -509,12 +627,33 @@ export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultPr
           {activeTab === 'claro' && (
             <form onSubmit={handleSaveClaro} className="space-y-3 animate-in slide-in-from-top-2 duration-300">
               <p className="text-[9px] leading-normal text-zinc-500">
-                Claro Drive is integrated as a Nextcloud-compatible WebDAV silo. Use your account username and an app password.
+                Claro Drive can be connected with an app password, or through the official SMS login flow if the portal gives you a reusable app password after validation.
               </p>
               <div className="space-y-1 rounded-lg border border-sky-500/20 bg-sky-950/15 p-2 text-[9px] leading-normal text-sky-400">
-                <span className="block text-[8px] font-bold uppercase tracking-wider text-sky-500">WebDAV login</span>
-                If your account is protected by 2FA or external auth, generate an app password from the web portal first.
+                <span className="block text-[8px] font-bold uppercase tracking-wider text-sky-500">Login flow v2</span>
+                Open the official portal, complete the SMS challenge, and let Indra poll for the app password returned by Claro.
               </div>
+
+              {(claroFlowMessage || claroFlowError) && (
+                <div className={claroFlowError ? 'space-y-1 rounded-lg border border-red-500/20 bg-red-950/15 p-2 text-[9px] leading-normal text-red-400' : 'space-y-1 rounded-lg border border-emerald-500/20 bg-emerald-950/15 p-2 text-[9px] leading-normal text-emerald-400'}>
+                  <span className="block text-[8px] font-bold uppercase tracking-wider">
+                    {claroFlowError ? 'Login error' : 'Login status'}
+                  </span>
+                  <span>{claroFlowError || claroFlowMessage}</span>
+                </div>
+              )}
+
+              {claroFlowUrl && (
+                <a
+                  href={claroFlowUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[9px] uppercase tracking-wider text-sky-400 hover:text-sky-300"
+                >
+                  <ExternalLink className="size-3" />
+                  Open Claro login again
+                </a>
+              )}
 
               <div className="space-y-1">
                 <label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Server URL</label>
@@ -527,6 +666,20 @@ export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultPr
                   placeholder="https://www.clarodrive.com"
                   className="w-full rounded-lg border border-border/40 bg-muted/20 px-3 py-2 font-mono text-[11px] placeholder-zinc-600 transition-all focus:border-sky-500/60 focus:outline-none"
                 />
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    void handleStartClaroLoginFlow();
+                  }}
+                  disabled={loading || !claroBaseUrl}
+                  className="h-9 flex-1 rounded-xl border-sky-500/30 text-[9px] uppercase tracking-wider text-sky-500"
+                >
+                  {loading ? <Loader2 className="mx-auto size-3.5 animate-spin" /> : 'Iniciar sesión con SMS'}
+                </Button>
               </div>
 
               <div className="space-y-1">
@@ -593,6 +746,9 @@ export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultPr
                   {loading ? <Loader2 className="mx-auto size-3.5 animate-spin" /> : 'Connect Claro Drive'}
                 </Button>
               </div>
+              <p className="text-[9px] text-zinc-500">
+                Manual mode still works if you already have an app password. The SMS flow just tries to obtain one from the official portal.
+              </p>
             </form>
           )}
         </div>

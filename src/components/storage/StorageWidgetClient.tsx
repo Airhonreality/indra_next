@@ -90,6 +90,7 @@ export function StorageWidgetClient({ userId, connectionIds }: StorageWidgetClie
 
   // Compute final aggregated list of upstreams
   const allUpstreams = [...new Set(activeProviders)];
+  const hasActiveUpstreams = allUpstreams.length > 0;
 
   const handleSiloChange = (siloId: string) => {
     setActiveSilo(siloId);
@@ -203,6 +204,12 @@ export function StorageWidgetClient({ userId, connectionIds }: StorageWidgetClie
               </select>
             </div>
           </div>
+
+          {!hasActiveUpstreams && (
+            <div className="rounded-xl border border-amber-500/20 bg-amber-950/10 px-3 py-2 text-[10px] leading-relaxed text-amber-400">
+              No hay silos activos todavía. Conecta una familia desde la pantalla de conexiones para poblar la unión unificada y conservar la trazabilidad de origen.
+            </div>
+          )}
         </div>
 
         {/* Space Usage Quota Gauge */}

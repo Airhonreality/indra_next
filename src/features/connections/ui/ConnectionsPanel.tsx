@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, Trash2, Link2 } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import type { ReactNode } from 'react';
+import { Loader2, Trash2, Link2, Shield, Database, FolderCog, Users, Cloud, HardDrive } from 'lucide-react';
 import { useIntegrationState } from '../logic/useIntegrationState';
 import { CredentialVault, type StorageTab } from '@/components/storage/CredentialVault';
 import { useIndraStore } from '@/stores/indra-store';
@@ -10,6 +11,8 @@ import { cn } from '@/lib/utils';
 type IntegrationRow = {
   id: string;
   type: string;
+  label?: string;
+  connectionId?: string;
   isActive?: boolean | null;
   config?: {
     basePath?: string;
@@ -18,6 +21,21 @@ type IntegrationRow = {
     baseUrl?: string;
     username?: string;
   };
+};
+
+type FamilyKey = 'google-drive' | 'onedrive' | 'notion' | 's3' | 'claro' | 'mega';
+
+type FamilyDescriptor = {
+  key: FamilyKey;
+  title: string;
+  subtitle: string;
+  description: string;
+  tone: 'emerald' | 'blue' | 'zinc';
+  kind: 'oauth' | 'vault';
+  providers: string[];
+  actionLabel: (count: number) => string;
+  vaultTab?: StorageTab;
+  icon: ReactNode;
 };
 
 const ACTIVE_LABELS: Record<string, string> = {
@@ -30,120 +48,236 @@ const ACTIVE_LABELS: Record<string, string> = {
   storage: 'Local Storage',
 };
 
-interface ProviderCardProps {
-  title: string;
-  description: string;
-  tags?: string[];
-  isConnected: boolean;
+const FAMILY_CATALOG: FamilyDescriptor[] = [
+  {
+    key: 'google-drive',
+    title: 'Familia Google',
+    subtitle: 'OAuth multicuenta',
+    description: 'Cada cuenta entra por su propio inicio de sesión y queda listada como una fila independiente.',
+    tone: 'emerald',
+    kind: 'oauth',
+    providers: ['google-drive', 'google-sheets', 'youtube'],
+    actionLabel: (count) => (count > 0 ? 'Añadir otra cuenta' : 'Conectar cuenta'),
+    icon: <Users className="size-3.5" />,
+  },
+  {
+    key: 'onedrive',
+    title: 'Familia Microsoft',
+    subtitle: 'OAuth multicuenta',
+    description: 'OneDrive se conecta con cuentas separadas y se administra una por una.',
+    tone: 'blue',
+    kind: 'oauth',
+    providers: ['onedrive'],
+    actionLabel: (count) => (count > 0 ? 'Añadir otra cuenta' : 'Conectar cuenta'),
+    icon: <Cloud className="size-3.5" />,
+  },
+  {
+    key: 'notion',
+    title: 'Notion',
+    subtitle: 'OAuth multicuenta',
+    description: 'Bases y páginas se conectan por sesión; el panel muestra cada conexión activa de forma explícita.',
+    tone: 'zinc',
+    kind: 'oauth',
+    providers: ['notion'],
+    actionLabel: (count) => (count > 0 ? 'Añadir otra cuenta' : 'Conectar cuenta'),
+    icon: <FolderCog className="size-3.5" />,
+  },
+  {
+    key: 's3',
+    title: 'Cloudflare R2',
+    subtitle: 'Vault de credenciales',
+    description: 'Buckets S3/R2 se guardan en el vault unificado con credenciales directas y cuentas múltiples.',
+    tone: 'blue',
+    kind: 'vault',
+    providers: ['s3'],
+    actionLabel: (count) => (count > 0 ? 'Abrir vault' : 'Abrir vault'),
+    vaultTab: 's3',
+    icon: <Database className="size-3.5" />,
+  },
+  {
+    key: 'claro',
+    title: 'Claro Drive',
+    subtitle: 'Vault de credenciales',
+    description: 'WebDAV con URL, usuario y app password validados antes de guardarse.',
+    tone: 'zinc',
+    kind: 'vault',
+    providers: ['claro'],
+    actionLabel: (count) => (count > 0 ? 'Abrir vault' : 'Abrir vault'),
+    vaultTab: 'claro',
+    icon: <Shield className="size-3.5" />,
+  },
+  {
+    key: 'mega',
+    title: 'MEGA',
+    subtitle: 'Vault de credenciales',
+    description: 'Bóveda cifrada con límite respetuoso para cuentas gratuitas y varias cuentas en paralelo.',
+    tone: 'emerald',
+    kind: 'vault',
+    providers: ['mega'],
+    actionLabel: (count) => (count > 0 ? 'Abrir vault' : 'Abrir vault'),
+    vaultTab: 'mega',
+    icon: <HardDrive className="size-3.5" />,
+  },
+];
+
+interface FamilyCardProps {
+  family: FamilyDescriptor;
+  accounts: IntegrationRow[];
   isProcessing: boolean;
   onConnect: () => void;
-  onDisconnect: () => void;
-  accentColor: 'emerald' | 'blue' | 'zinc';
-  connectLabel?: string;
-  disconnectLabel?: string;
+  onOpenVault: (tab: StorageTab) => void;
+  onDisconnect: (id: string) => void;
 }
 
-function ProviderCard({
-  title,
-  description,
-  tags,
-  isConnected,
+function FamilyCard({
+  family,
+  accounts,
   isProcessing,
   onConnect,
+  onOpenVault,
   onDisconnect,
-  accentColor,
-  connectLabel = 'Conectar',
-  disconnectLabel = 'Desconectar',
-}: ProviderCardProps) {
+}: FamilyCardProps) {
+  const activeAccounts = accounts.filter((integration) => integration.isActive);
+  const count = activeAccounts.length;
+
   const accentStyles = {
     emerald: {
       border: 'hover:border-emerald-500/30',
       glow: 'bg-emerald-500/5',
       badge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       btnConnect: 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/20',
-      btnActive: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+      btnActive: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      rowBorder: 'border-emerald-500/20 bg-emerald-950/10',
+      rowText: 'text-emerald-400',
     },
     blue: {
       border: 'hover:border-blue-500/30',
       glow: 'bg-blue-500/5',
       badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
       btnConnect: 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-950/20',
-      btnActive: 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+      btnActive: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+      rowBorder: 'border-blue-500/20 bg-blue-950/10',
+      rowText: 'text-blue-400',
     },
     zinc: {
       border: 'hover:border-zinc-500/30',
       glow: 'bg-zinc-500/5',
       badge: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
       btnConnect: 'bg-zinc-700 hover:bg-zinc-600 text-white shadow-zinc-950/20',
-      btnActive: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
-    }
-  }[accentColor];
+      btnActive: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
+      rowBorder: 'border-zinc-500/20 bg-zinc-950/10',
+      rowText: 'text-zinc-400',
+    },
+  }[family.tone];
 
   return (
     <div className={cn(
-      "group relative p-5 rounded-2xl border border-border/40 bg-muted/10 backdrop-blur-md transition-all duration-300 flex flex-col justify-between gap-4 overflow-hidden hover:scale-[1.01] hover:shadow-lg",
+      'group relative flex min-h-[320px] flex-col justify-between gap-4 overflow-hidden rounded-2xl border border-border/40 bg-muted/10 p-5 backdrop-blur-md transition-all duration-300 hover:scale-[1.01] hover:shadow-lg',
       accentStyles.border
     )}>
-      {/* Decorative Glow */}
-      <div className={cn("absolute -top-12 -right-12 w-32 h-32 rounded-full blur-[60px] pointer-events-none transition-all duration-500 group-hover:scale-125", accentStyles.glow)} />
+      <div className={cn('pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full blur-[60px] transition-all duration-500 group-hover:scale-125', accentStyles.glow)} />
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-foreground uppercase tracking-wider">{title}</span>
-          {isConnected && (
-            <span className={cn("text-[8px] font-bold uppercase px-2 py-0.5 rounded-lg border", accentStyles.btnActive)}>
-              Conectado
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex size-7 items-center justify-center rounded-lg border border-border/40 bg-background/70 text-foreground">
+                {family.icon}
+              </span>
+              <div>
+                <span className="block text-sm font-bold uppercase tracking-wider text-foreground">{family.title}</span>
+                <span className="block text-[9px] font-semibold uppercase tracking-[0.3em] text-muted-foreground">{family.subtitle}</span>
+              </div>
+            </div>
+            <p className="max-w-[92%] text-[10px] leading-relaxed text-zinc-500">{family.description}</p>
+          </div>
+
+          <span className={cn('text-[8px] font-bold uppercase px-2 py-0.5 rounded-lg border shrink-0', count > 0 ? accentStyles.btnActive : 'bg-muted/30 text-muted-foreground border-border/20')}>
+            {count > 0 ? `${count} cuenta${count === 1 ? '' : 's'} activa${count === 1 ? '' : 's'}` : 'Sin cuentas'}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {family.kind === 'oauth' ? (
+            <>
+              {family.providers.map((provider) => (
+                <span key={provider} className={cn('rounded-md border px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider', accentStyles.badge)}>
+                  {ACTIVE_LABELS[provider] ?? provider}
+                </span>
+              ))}
+            </>
+          ) : (
+            <span className={cn('rounded-md border px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider', accentStyles.badge)}>
+              Vault unificado
             </span>
           )}
         </div>
-        <p className="text-[10px] text-zinc-500 leading-relaxed max-w-[90%]">{description}</p>
-        
-        {tags && tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 pt-1">
-            {tags.map(t => (
-              <span key={t} className={cn("text-[8px] px-1.5 py-0.5 rounded font-bold uppercase border", accentStyles.badge)}>
-                {t}
-              </span>
-            ))}
+
+        {activeAccounts.length > 0 ? (
+          <div className="space-y-2 pt-1">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Cuentas activas</p>
+            <div className="max-h-36 space-y-2 overflow-y-auto pr-1">
+              {activeAccounts.map((account) => (
+                <div
+                  key={account.id}
+                  className={cn('flex items-center justify-between gap-3 rounded-xl border p-3', accentStyles.rowBorder)}
+                >
+                  <div className="min-w-0 overflow-hidden">
+                    <span className={cn('block text-[8px] font-bold uppercase tracking-wider', accentStyles.rowText)}>
+                      {account.label || ACTIVE_LABELS[account.type] || account.type}
+                    </span>
+                    <span className="block truncate font-mono text-[11px] text-zinc-300" title={connectionDetail(account)}>
+                      {connectionDetail(account)}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={() => onDisconnect(account.id)}
+                    className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-red-400 transition-all hover:bg-red-500/10 hover:text-red-300 disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    <Trash2 className="size-3" />
+                    Quitar
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
+        ) : (
+          <p className="pt-1 text-[10px] italic text-zinc-500">
+            {family.kind === 'oauth'
+              ? 'Todavía no hay cuentas conectadas. Cada inicio de sesión añade una nueva fila.'
+              : 'Todavía no hay credenciales guardadas en el vault unificado.'}
+          </p>
         )}
       </div>
 
       <div className="flex items-center justify-end">
-        {isConnected ? (
-          <button
-            type="button"
-            disabled={isProcessing}
-            onClick={onDisconnect}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all"
-          >
-            {isProcessing ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <>
-                  <Trash2 className="size-3" />
-                  {disconnectLabel}
-                </>
-              )}
-            </button>
-        ) : (
+        {family.kind === 'oauth' ? (
           <button
             type="button"
             disabled={isProcessing}
             onClick={onConnect}
             className={cn(
-              "flex items-center gap-1.5 px-4 py-2 text-[9px] font-bold uppercase tracking-wider rounded-lg transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none",
+              'flex items-center gap-1.5 rounded-lg px-4 py-2 text-[9px] font-bold uppercase tracking-wider transition-all active:scale-95 disabled:pointer-events-none disabled:opacity-50',
               accentStyles.btnConnect
             )}
           >
-            {isProcessing ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : (
-              <>
-                <Link2 className="size-3" />
-                {connectLabel}
-              </>
+            {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <Link2 className="size-3" />}
+            {family.actionLabel(count)}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={isProcessing}
+            onClick={() => onOpenVault(family.vaultTab ?? 'mega')}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg px-4 py-2 text-[9px] font-bold uppercase tracking-wider transition-all active:scale-95 disabled:pointer-events-none disabled:opacity-50',
+              accentStyles.btnConnect
             )}
+          >
+            {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <Link2 className="size-3" />}
+            {family.actionLabel(count)}
           </button>
         )}
       </div>
@@ -166,11 +300,11 @@ function LocalVolumeInput({
   value,
   onChange,
   onMount,
-  isProcessing
+  isProcessing,
 }: LocalVolumeInputProps) {
   return (
-    <div className="space-y-1.5 bg-background/25 border border-border/20 p-4 rounded-xl">
-      <label className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold">
+    <div className="space-y-1.5 rounded-xl border border-border/20 bg-background/25 p-4">
+      <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
         {label}
       </label>
       <div className="flex gap-2">
@@ -179,23 +313,37 @@ function LocalVolumeInput({
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 bg-background/50 border border-border/40 rounded-lg px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 transition-all"
+          className="flex-1 rounded-lg border border-border/40 bg-background/50 px-3 py-2 font-mono text-xs text-foreground transition-all focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
         />
         <button
           type="button"
           onClick={onMount}
           disabled={!value || isProcessing}
-          className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-[9px] font-bold uppercase tracking-widest disabled:opacity-50 disabled:pointer-events-none transition-all active:scale-95 flex items-center justify-center min-w-[70px]"
+          className="flex min-w-[70px] items-center justify-center rounded-lg bg-primary px-4 py-2 text-[9px] font-bold uppercase tracking-widest text-primary-foreground transition-all active:scale-95 disabled:pointer-events-none disabled:opacity-50"
         >
-          {isProcessing ? (
-            <Loader2 className="size-3 animate-spin" />
-          ) : (
-            'Montar'
-          )}
+          {isProcessing ? <Loader2 className="size-3 animate-spin" /> : 'Montar'}
         </button>
       </div>
     </div>
   );
+}
+
+function connectionDetail(integration: IntegrationRow) {
+  if (integration.type === 'mega') {
+    return integration.config?.email || integration.label || 'Cuenta MEGA';
+  }
+  if (integration.type === 'claro') {
+    const username = integration.config?.username || 'usuario';
+    const baseUrl = integration.config?.baseUrl || 'https://www.clarodrive.com';
+    return `${username} @ ${baseUrl}`;
+  }
+  if (integration.type === 's3') {
+    return `bucket: ${integration.config?.bucket || 'sin bucket'}`;
+  }
+  if (integration.type === 'storage') {
+    return integration.config?.basePath || 'volumen local';
+  }
+  return integration.connectionId || integration.label || integration.type;
 }
 
 export function ConnectionsPanel() {
@@ -229,7 +377,7 @@ export function ConnectionsPanel() {
 
   const refresh = useCallback(() => fetchIntegrations(), [fetchIntegrations]);
 
-  useEffect(() => { 
+  useEffect(() => {
     const timer = window.setTimeout(() => {
       void fetchIntegrations();
     }, 0);
@@ -242,25 +390,28 @@ export function ConnectionsPanel() {
     }
   }, [vaultOpen]);
 
-  const google = integrations.find(i => i.type === 'google-drive' && i.isActive);
-  const onedrive = integrations.find(i => i.type === 'onedrive' && i.isActive);
-  const notion = integrations.find(i => i.type === 'notion' && i.isActive);    
-  const s3 = integrations.find(i => i.type === 's3' && i.isActive);
-  const claro = integrations.find(i => i.type === 'claro' && i.isActive);
-  const megaCount = integrations.filter(i => i.type === 'mega' && i.isActive).length;
-  const s3Count = integrations.filter(i => i.type === 's3' && i.isActive).length;
-  const claroCount = integrations.filter(i => i.type === 'claro' && i.isActive).length;
-  const activeSummary = integrations
-    .filter((integration) => integration.isActive)
-    .reduce<Array<{ type: string; count: number }>>((acc, integration) => {
-      const current = acc.find((item) => item.type === integration.type);
-      if (current) {
-        current.count += 1;
-      } else {
-        acc.push({ type: integration.type, count: 1 });
-      }
-      return acc;
-    }, []);
+  const families = useMemo(() => {
+    return FAMILY_CATALOG.map((family) => ({
+      ...family,
+      accounts: integrations.filter(
+        (integration) => integration.isActive && family.providers.includes(integration.type)
+      ),
+    }));
+  }, [integrations]);
+
+  const activeSummary = useMemo(() => {
+    return integrations
+      .filter((integration) => integration.isActive)
+      .reduce<Array<{ type: string; count: number }>>((acc, integration) => {
+        const current = acc.find((item) => item.type === integration.type);
+        if (current) {
+          current.count += 1;
+        } else {
+          acc.push({ type: integration.type, count: 1 });
+        }
+        return acc;
+      }, []);
+  }, [integrations]);
 
   const openVault = (tab: StorageTab) => {
     setVaultTab(tab);
@@ -276,27 +427,26 @@ export function ConnectionsPanel() {
     }
   };
 
-  const disconnect = async (provider: string) => {
-    const integration = integrations.find(i => i.type === provider);
-    if (integration) { 
-      try {
-        await actions.disconnectIntegration(integration.id);    
-        await refresh(); 
-      } catch (err) {
-        console.error(`[ConnectionsPanel] Disconnect failed for ${provider}:`, err);
-      }
+  const disconnect = async (id: string) => {
+    try {
+      await actions.disconnectIntegration(id);
+      await refresh();
+    } catch (err) {
+      console.error(`[ConnectionsPanel] Disconnect failed for ${id}:`, err);
     }
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl w-full">
-      <div className="md:col-span-2 rounded-2xl border border-border/40 bg-background/60 p-4 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Conexiones activas</p>
-            <p className="text-xs text-muted-foreground">Vista completa de los proveedores conectados en esta cuenta.</p>
+    <div className="w-full max-w-6xl space-y-6">
+      <div className="rounded-2xl border border-border/40 bg-background/60 p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-1">
+            <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Mapa de conexiones</p>
+            <p className="text-sm text-muted-foreground">
+              Las cuentas OAuth se agregan desde su familia. MEGA, Cloudflare R2 y Claro Drive se gestionan en el vault unificado de credenciales.
+            </p>
           </div>
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="flex flex-wrap gap-2">
             {activeSummary.length > 0 ? (
               activeSummary.map((item) => (
                 <span
@@ -315,99 +465,76 @@ export function ConnectionsPanel() {
         </div>
       </div>
 
-      {/* Google Family */}
-      <ProviderCard
-        title="Familia Google"
-        description="Un inicio de sesión activa Drive, Sheets y YouTube."      
-        tags={google ? ['Drive', 'Sheets', 'YouTube'] : undefined}
-        isConnected={!!google}
-        isProcessing={isProcessing === 'google-drive'}
-        onConnect={() => connect('google-drive')}
-        onDisconnect={() => disconnect('google-drive')}
-        accentColor="emerald"
-      />
-
-      {/* Microsoft Family */}
-      <ProviderCard
-        title="Familia Microsoft"
-        description="Activa el almacenamiento OneDrive con tu cuenta Microsoft."
-        isConnected={!!onedrive}
-        isProcessing={isProcessing === 'onedrive'}
-        onConnect={() => connect('onedrive')}
-        onDisconnect={() => disconnect('onedrive')}
-        accentColor="blue"
-      />
-
-      {/* Notion */}
-      <ProviderCard
-        title="Notion"
-        description="Sincronización de bases de datos y páginas de espacio de trabajo estructurado."
-        isConnected={!!notion}
-        isProcessing={isProcessing === 'notion'}
-        onConnect={() => connect('notion')}
-        onDisconnect={() => disconnect('notion')}
-        accentColor="zinc"
-      />
-
-      <ProviderCard
-        title="Cloudflare R2"
-        description="Conecta buckets S3/R2 y abre el panel de credenciales directo en el vault unificado."
-        tags={s3Count > 0 ? [`${s3Count} cuenta${s3Count === 1 ? '' : 's'}`] : undefined}
-        isConnected={!!s3}
-        isProcessing={isProcessing === 's3'}
-        onConnect={() => openVault('s3')}
-        onDisconnect={() => disconnect('s3')}
-        accentColor="blue"
-        connectLabel="Abrir vault"
-      />
-
-      <ProviderCard
-        title="Claro Drive"
-        description="Alta de WebDAV con app password y URL del servidor para tu cuenta Claro."
-        tags={claroCount > 0 ? [`${claroCount} cuenta${claroCount === 1 ? '' : 's'}`] : undefined}
-        isConnected={!!claro}
-        isProcessing={isProcessing === 'claro'}
-        onConnect={() => openVault('claro')}
-        onDisconnect={() => disconnect('claro')}
-        accentColor="zinc"
-        connectLabel="Abrir vault"
-      />
-
-      <ProviderCard
-        title="MEGA"
-        description="Bóveda cifrada en el servidor (AES-256-GCM). Añade y unifica múltiples cuentas para crear un gran almacenamiento virtual."
-        tags={megaCount > 0 ? [`${megaCount} cuenta${megaCount === 1 ? '' : 's'} activa${megaCount === 1 ? '' : 's'}`] : undefined}
-        isConnected={megaCount > 0}
-        isProcessing={isProcessing === 'mega'}
-        onConnect={() => openVault('mega')}
-        onDisconnect={() => disconnect('mega')}
-        accentColor="emerald"
-        connectLabel="Abrir vault"
-      />
-
-      <div ref={vaultSectionRef} className="md:col-span-2">
-        {userId && (
-          <CredentialVault
-            userId={userId}
-            onSaved={refresh}
-            defaultTab={vaultTab}
-            open={vaultOpen}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {families.map((family) => (
+          <FamilyCard
+            key={family.key}
+            family={family}
+            accounts={family.accounts}
+            isProcessing={isProcessing === family.key || isProcessing === family.providers[0]}
+            onConnect={() => {
+              if (family.kind === 'oauth') {
+                void connect(family.providers[0]);
+                return;
+              }
+              if (family.vaultTab) {
+                openVault(family.vaultTab);
+              }
+            }}
+            onOpenVault={openVault}
+            onDisconnect={disconnect}
           />
+        ))}
+      </div>
+
+      <div
+        ref={vaultSectionRef}
+        className="rounded-2xl border border-border/40 bg-muted/10 p-4 shadow-sm"
+      >
+        {userId ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-muted-foreground">Vault unificado</p>
+                <p className="text-xs text-muted-foreground">
+                  Este panel sólo guarda credenciales directas. Google, Microsoft y Notion se conectan desde sus tarjetas OAuth.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rounded-lg border border-border/40 bg-background/70 px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-foreground transition-all hover:bg-background"
+                onClick={() => setVaultOpen((current) => !current)}
+              >
+                {vaultOpen ? 'Cerrar vault' : 'Abrir vault'}
+              </button>
+            </div>
+
+            <CredentialVault
+              userId={userId}
+              onSaved={refresh}
+              defaultTab={vaultTab}
+              open={vaultOpen}
+            />
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Inicia sesión para administrar el vault unificado.</p>
         )}
       </div>
 
-      {/* Volúmenes Locales */}
-      <div className="md:col-span-2 p-5 rounded-2xl border border-border/40 bg-muted/10 space-y-4 flex flex-col justify-between">
-        <span className="text-xs font-bold text-foreground uppercase tracking-wider">Volúmenes Locales</span>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="rounded-2xl border border-border/40 bg-muted/10 p-5 space-y-4">
+        <span className="text-xs font-bold uppercase tracking-wider text-foreground">Volúmenes locales</span>
+        <p className="text-[10px] text-muted-foreground">
+          Monta carpetas de la máquina local como silos internos. Cada ruta se valida antes de registrarse.
+        </p>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <LocalVolumeInput
             label="Local Storage"
             placeholder="/mnt/indra/media"
             value={localStoragePath}
             onChange={setLocalStoragePath}
-            onMount={async () => { 
+            onMount={async () => {
               await actions.mountLocalProvider('storage', localStoragePath);
-              await refresh(); 
+              await refresh();
             }}
             isProcessing={isProcessing === 'storage'}
           />
@@ -416,9 +543,9 @@ export function ConnectionsPanel() {
             placeholder="/var/lib/indra/vault"
             value={jsonVaultPath}
             onChange={setJsonVaultPath}
-            onMount={async () => { 
-              await actions.mountLocalProvider('json-file', jsonVaultPath); 
-              await refresh(); 
+            onMount={async () => {
+              await actions.mountLocalProvider('json-file', jsonVaultPath);
+              await refresh();
             }}
             isProcessing={isProcessing === 'json-file'}
           />
@@ -427,3 +554,5 @@ export function ConnectionsPanel() {
     </div>
   );
 }
+
+export default ConnectionsPanel;

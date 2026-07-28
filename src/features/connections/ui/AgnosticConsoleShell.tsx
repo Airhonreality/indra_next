@@ -17,9 +17,9 @@
 
 import { signOut } from 'next-auth/react';
 import {
-  Shield, Loader2, Zap, Layers, Terminal,
+  Shield, Loader2, Zap, Terminal,
   Settings, User, ExternalLink,
-  ChevronRight, ChevronLeft, LogOut, HardDrive, Link2,
+  ChevronRight, ChevronLeft, LogOut, HardDrive, Link2, MonitorSmartphone,
 } from 'lucide-react';
 import { i18n } from '@/lib/i18n';
 import { useIndraStore } from '@/stores/indra-store';
@@ -27,6 +27,7 @@ import { useSessionSync } from '@/hooks/use-session-sync';
 import { ConnectionsPanel } from './ConnectionsPanel';
 import { MetricsPanel } from './MetricsPanel';
 import { IngestionPortList } from './IngestionPortList';
+import { DesktopPanel } from './DesktopPanel';
 import { PortCreator } from '@/components/ports/port-creator';
 import { cn } from '@/lib/utils';
 
@@ -117,6 +118,13 @@ export function AgnosticConsoleShell({ storageSlot }: AgnosticConsoleShellProps)
               isCollapsed={isSidebarCollapsed}
             />
             <SidebarItem
+              active={activeTab === 'desktop'}
+              onClick={() => setActiveTab('desktop')}
+              icon={<MonitorSmartphone className="size-4" />}
+              label="Escritorio"
+              isCollapsed={isSidebarCollapsed}
+            />
+            <SidebarItem
               active={activeTab === 'workflows'}
               onClick={() => setActiveTab('workflows')}
               icon={<Terminal className="size-4" />}
@@ -179,6 +187,7 @@ export function AgnosticConsoleShell({ storageSlot }: AgnosticConsoleShellProps)
               {activeTab === 'nodes' && 'Conexiones / Proveedores de Silos'}
               {activeTab === 'ingestion' && `Operaciones / ${t.portals.title}`}
               {activeTab === 'explorer' && 'Almacenamiento / Silos Soberanos'}
+              {activeTab === 'desktop' && 'Sistema / Escritorio Instalable'}
               {activeTab === 'workflows' && `Operaciones / ${t.workflow.title}`}
               {activeTab === 'settings' && `Sistema / ${t.common.settings}`}
             </h2>
@@ -218,6 +227,19 @@ export function AgnosticConsoleShell({ storageSlot }: AgnosticConsoleShellProps)
                   </p>
                 </div>
                 {storageSlot}
+              </div>
+            )}
+
+            {/* TAB: DESKTOP SHELL */}
+            {activeTab === 'desktop' && (
+              <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-bold tracking-tighter">Escritorio Instalable</h3>
+                  <p className="text-sm text-muted-foreground max-w-xl">
+                    Instala Indra como una app de escritorio ligera para abrirla en ventana propia y acceder más rápido a tu consola.
+                  </p>
+                </div>
+                <DesktopPanel />
               </div>
             )}
 

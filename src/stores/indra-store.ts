@@ -4,7 +4,7 @@ import type { ProviderConfig } from '@/features/connections/integration_types';
 import { computeMetrics, type ConnectionMetrics } from '@/features/connections/integration_types';
 import type { FieldSchema } from '@/core/types/integration';
 
-export type ConsoleTab = 'nodes' | 'ingestion' | 'workflows' | 'settings' | 'explorer';
+export type ConsoleTab = 'nodes' | 'ingestion' | 'workflows' | 'settings' | 'explorer' | 'desktop';
 export type SessionStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
 // ── Typed schema field — extends the core FieldSchema contract; single source of truth

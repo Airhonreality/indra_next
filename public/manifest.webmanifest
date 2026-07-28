@@ -1,0 +1,19 @@
+{
+  "name": "Indra NEXT",
+  "short_name": "Indra",
+  "description": "Consola soberana instalable para storage unificado, conexiones y trabajo local.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "icons": [
+    {
+      "src": "/indra-app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"]
+}

@@ -277,7 +277,14 @@ export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultPr
 
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
-        throw new Error(payload?.error || 'No se pudo iniciar el flujo de Claro Drive');
+        const extra = Array.isArray(payload?.details)
+          ? payload.details.map((item: { url?: string; status?: number; details?: string }) => {
+              return `${item.url ?? 'unknown'} -> ${item.status ?? 'n/a'} ${item.details ? `| ${item.details}` : ''}`;
+            }).join(' ; ')
+          : typeof payload?.details === 'string'
+            ? payload.details
+            : '';
+        throw new Error([payload?.error || 'No se pudo iniciar el flujo de Claro Drive', extra].filter(Boolean).join(' | '));
       }
 
       const payload = await res.json();
@@ -310,7 +317,7 @@ export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultPr
       const message = err instanceof Error ? err.message : 'Error al iniciar el login de Claro';
       console.error('[CredentialVault] Failed to start Claro login flow:', err);
       setClaroFlowError(message);
-      alert('No se pudo iniciar el login de Claro Drive.');
+      alert(`No se pudo iniciar el login de Claro Drive: ${message}`);
     } finally {
       setLoading(false);
     }

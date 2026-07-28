@@ -33,7 +33,6 @@ export async function POST(req: Request) {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json',
-        'OCS-APIREQUEST': 'true',
         'User-Agent': 'Indra Next Claro Login',
       },
       body: new URLSearchParams({ token }).toString(),

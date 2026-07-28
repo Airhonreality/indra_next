@@ -1,11 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, Trash2, Link2 } from 'lucide-react';
 import { useIntegrationState } from '../logic/useIntegrationState';
-import { CredentialVault } from '@/components/storage/CredentialVault';        
+import { CredentialVault, type StorageTab } from '@/components/storage/CredentialVault';
 import { useIndraStore } from '@/stores/indra-store';
 import { cn } from '@/lib/utils';
+
+type IntegrationRow = {
+  id: string;
+  type: string;
+  isActive?: boolean | null;
+  config?: {
+    basePath?: string;
+    email?: string;
+    bucket?: string;
+    baseUrl?: string;
+    username?: string;
+  };
+};
 
 interface ProviderCardProps {
   title: string;
@@ -16,6 +29,8 @@ interface ProviderCardProps {
   onConnect: () => void;
   onDisconnect: () => void;
   accentColor: 'emerald' | 'blue' | 'zinc';
+  connectLabel?: string;
+  disconnectLabel?: string;
 }
 
 function ProviderCard({
@@ -26,7 +41,9 @@ function ProviderCard({
   isProcessing,
   onConnect,
   onDisconnect,
-  accentColor
+  accentColor,
+  connectLabel = 'Conectar',
+  disconnectLabel = 'Desconectar',
 }: ProviderCardProps) {
   const accentStyles = {
     emerald: {
@@ -91,14 +108,14 @@ function ProviderCard({
             className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all"
           >
             {isProcessing ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : (
-              <>
-                <Trash2 className="size-3" />
-                Desconectar
-              </>
-            )}
-          </button>
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <>
+                  <Trash2 className="size-3" />
+                  {disconnectLabel}
+                </>
+              )}
+            </button>
         ) : (
           <button
             type="button"
@@ -114,7 +131,7 @@ function ProviderCard({
             ) : (
               <>
                 <Link2 className="size-3" />
-                Conectar
+                {connectLabel}
               </>
             )}
           </button>
@@ -173,20 +190,23 @@ function LocalVolumeInput({
 
 export function ConnectionsPanel() {
   const userId = useIndraStore((s) => s.userId);
-  const [integrations, setIntegrations] = useState<any[]>([]);
+  const [integrations, setIntegrations] = useState<IntegrationRow[]>([]);
   const [localStoragePath, setLocalStoragePath] = useState('');
   const [jsonVaultPath, setJsonVaultPath] = useState('');
+  const [vaultTab, setVaultTab] = useState<StorageTab>('mega');
+  const [vaultOpen, setVaultOpen] = useState(false);
+  const vaultSectionRef = useRef<HTMLDivElement | null>(null);
   const { actions, isProcessing } = useIntegrationState();
 
-  const fetchIntegrations = async () => {
+  const fetchIntegrations = useCallback(async () => {
     try {
       const res = await fetch('/api/integrations');
       if (res.ok) {
         const data = await res.json();
-        const nextIntegrations = data.integrations || [];
+        const nextIntegrations = (data.integrations || []) as IntegrationRow[];
         setIntegrations(nextIntegrations);
         const localStorage = nextIntegrations.find(
-          (integration: any) => integration.type === 'storage' && integration.isActive
+          (integration) => integration.type === 'storage' && integration.isActive
         );
         if (localStorage?.config?.basePath) {
           setLocalStoragePath(localStorage.config.basePath);
@@ -195,18 +215,36 @@ export function ConnectionsPanel() {
     } catch (err) {
       console.error('[ConnectionsPanel] Failed to fetch integrations:', err);
     }
-  };
+  }, []);
 
-  const refresh = () => fetchIntegrations();       
+  const refresh = useCallback(() => fetchIntegrations(), [fetchIntegrations]);
 
   useEffect(() => { 
-    refresh(); 
-  }, []);
+    const timer = window.setTimeout(() => {
+      void fetchIntegrations();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchIntegrations]);
+
+  useEffect(() => {
+    if (vaultOpen) {
+      vaultSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [vaultOpen]);
 
   const google = integrations.find(i => i.type === 'google-drive' && i.isActive);
   const onedrive = integrations.find(i => i.type === 'onedrive' && i.isActive);
   const notion = integrations.find(i => i.type === 'notion' && i.isActive);    
+  const s3 = integrations.find(i => i.type === 's3' && i.isActive);
+  const claro = integrations.find(i => i.type === 'claro' && i.isActive);
   const megaCount = integrations.filter(i => i.type === 'mega' && i.isActive).length;
+  const s3Count = integrations.filter(i => i.type === 's3' && i.isActive).length;
+  const claroCount = integrations.filter(i => i.type === 'claro' && i.isActive).length;
+
+  const openVault = (tab: StorageTab) => {
+    setVaultTab(tab);
+    setVaultOpen(true);
+  };
 
   const connect = async (provider: string) => {
     try {
@@ -266,26 +304,50 @@ export function ConnectionsPanel() {
         accentColor="zinc"
       />
 
-      {/* MEGA */}
-      <div className="p-5 rounded-2xl border border-border/40 bg-muted/10 flex flex-col justify-between gap-4 overflow-hidden relative hover:scale-[1.01] hover:shadow-lg transition-all duration-300">
-        <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full blur-[60px] pointer-events-none bg-rose-500/5" />
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-foreground uppercase tracking-wider">MEGA</span>  
-            {megaCount > 0 && (
-              <span className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase">
-                {megaCount} {megaCount === 1 ? 'Cuenta Activa' : 'Cuentas Activas'}
-              </span>
-            )}
-          </div>
-          <p className="text-[10px] text-zinc-500 leading-relaxed">
-            Bóveda cifrada en el servidor (AES-256-GCM). Añade y unifica múltiples cuentas para crear un gran almacenamiento virtual.
-          </p>
-        </div>
+      <ProviderCard
+        title="Cloudflare R2"
+        description="Conecta buckets S3/R2 y abre el panel de credenciales directo en el vault unificado."
+        tags={s3Count > 0 ? [`${s3Count} cuenta${s3Count === 1 ? '' : 's'}`] : undefined}
+        isConnected={!!s3}
+        isProcessing={isProcessing === 's3'}
+        onConnect={() => openVault('s3')}
+        onDisconnect={() => disconnect('s3')}
+        accentColor="blue"
+        connectLabel="Abrir vault"
+      />
+
+      <ProviderCard
+        title="Claro Drive"
+        description="Alta de WebDAV con app password y URL del servidor para tu cuenta Claro."
+        tags={claroCount > 0 ? [`${claroCount} cuenta${claroCount === 1 ? '' : 's'}`] : undefined}
+        isConnected={!!claro}
+        isProcessing={isProcessing === 'claro'}
+        onConnect={() => openVault('claro')}
+        onDisconnect={() => disconnect('claro')}
+        accentColor="zinc"
+        connectLabel="Abrir vault"
+      />
+
+      <ProviderCard
+        title="MEGA"
+        description="Bóveda cifrada en el servidor (AES-256-GCM). Añade y unifica múltiples cuentas para crear un gran almacenamiento virtual."
+        tags={megaCount > 0 ? [`${megaCount} cuenta${megaCount === 1 ? '' : 's'} activa${megaCount === 1 ? '' : 's'}`] : undefined}
+        isConnected={megaCount > 0}
+        isProcessing={isProcessing === 'mega'}
+        onConnect={() => openVault('mega')}
+        onDisconnect={() => disconnect('mega')}
+        accentColor="emerald"
+        connectLabel="Abrir vault"
+      />
+
+      <div ref={vaultSectionRef} className="md:col-span-2">
         {userId && (
-          <div className="pt-2 border-t border-border/20 text-left">
-            <CredentialVault userId={userId} onSaved={refresh} />
-          </div>
+          <CredentialVault
+            userId={userId}
+            onSaved={refresh}
+            defaultTab={vaultTab}
+            open={vaultOpen}
+          />
         )}
       </div>
 

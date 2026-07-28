@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Shield, Eye, EyeOff, Check, Loader2, Trash2, Plus, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-type StorageTab = 'mega' | 's3' | 'claro';
+export type StorageTab = 'mega' | 's3' | 'claro';
 
 type StoredConnection = {
   id: string;
@@ -19,10 +19,12 @@ type StoredConnection = {
 interface CredentialVaultProps {
   userId: string;
   onSaved?: () => void;
+  defaultTab?: StorageTab;
+  open?: boolean;
 }
 
-export function CredentialVault({ onSaved }: CredentialVaultProps) {
-  const [activeTab, setActiveTab] = useState<StorageTab>('mega');
+export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultProps) {
+  const [activeTab, setActiveTab] = useState<StorageTab>(defaultTab ?? 'mega');
 
   const [megaEmail, setMegaEmail] = useState('');
   const [megaPassword, setMegaPassword] = useState('');
@@ -63,6 +65,25 @@ export function CredentialVault({ onSaved }: CredentialVaultProps) {
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!defaultTab) return;
+    const timer = window.setTimeout(() => {
+      setActiveTab(defaultTab);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [defaultTab]);
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => {
+      setShowAddForm(true);
+      if (defaultTab) {
+        setActiveTab(defaultTab);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [defaultTab, open]);
 
   const handleSaveMega = async (e: React.FormEvent) => {
     e.preventDefault();

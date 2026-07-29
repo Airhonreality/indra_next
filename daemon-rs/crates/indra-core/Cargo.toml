@@ -1,0 +1,40 @@
+[package]
+name = "indra-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Core abstractions and traits for Indra daemon"
+
+[lib]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+blake3.workspace = true
+rusqlite = { workspace = true, features = ["bundled", "chrono"] }
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+async-trait = "0.1"
+parking_lot = "0.12"
+rayon = "1.7"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+[dev-dependencies]
+tempfile = "3"
+criterion = "0.5"
+
+[[bench]]
+name = "fastcdc_bench"
+harness = false
+
+[[bench]]
+name = "blake3_bench"
+harness = false
+
+[[bench]]
+name = "db_bench"
+harness = false

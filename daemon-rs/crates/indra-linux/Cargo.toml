@@ -1,0 +1,28 @@
+[package]
+name = "indra-linux"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Linux-specific implementations for Indra daemon"
+
+[lib]
+
+[dependencies]
+indra-core = { path = "../indra-core" }
+tokio.workspace = true
+zbus.workspace = true
+fuse3.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+reqwest.workspace = true
+exif.workspace = true
+io-uring.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+dbus.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

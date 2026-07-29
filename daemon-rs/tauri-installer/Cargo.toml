@@ -1,0 +1,38 @@
+[package]
+name = "tauri-installer"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Tauri-based installer for Indra daemon"
+
+[build-dependencies]
+tauri-build = "2.0"
+
+[dependencies]
+indra-core = { path = "../crates/indra-core" }
+tokio = { workspace = true, features = ["full"] }
+anyhow.workspace = true
+tracing.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+tauri = { version = "2.0", features = ["shell-open", "window-all", "dialog-all", "http-all"] }
+tauri-plugin-http = "2.0"
+tauri-plugin-fs = "2.0"
+sha2 = "0.10"
+hex = "0.4"
+dirs = "5.0"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winapi = { version = "0.3", features = ["winbase", "winuser", "winnt"] }
+std::os::windows::ffi = "1.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+nix = { version = "0.27", features = ["process"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+nix = { version = "0.27", features = ["process"] }
+
+[[test]]
+name = "integration_tests"
+path = "tests/integration_tests.rs"

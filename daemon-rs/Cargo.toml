@@ -1,0 +1,51 @@
+[workspace]
+members = [
+    "crates/indra-core",
+    "crates/indra-windows",
+    "crates/indra-linux",
+    "crates/indra-daemon",
+    "crates/indra-tui",
+    "tauri-installer",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Indra Contributors"]
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+tokio = { version = "1.40", features = ["full"] }
+tonic = "0.11"
+tonic-build = "0.11"
+prost = "0.12"
+prost-types = "0.12"
+blake3 = "1.5"
+rusqlite = { version = "0.31", features = ["bundled"] }
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+zbus = "0.60"
+fuse3 = "0.5"
+uuid = { version = "1.10", features = ["v4", "serde"] }
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+rand = "0.8"
+async-trait = "0.1"
+dashmap = "6.0"
+futures = "0.3"
+notify = "6.1"
+mdns-sd = "0.7"
+rustls = "0.23"
+rcgen = "0.12"
+hostname = "0.5"
+reqwest = { version = "0.12", features = ["stream", "http3"] }
+exif = "0.2"
+io-uring = "0.6"
+dbus = "0.9"

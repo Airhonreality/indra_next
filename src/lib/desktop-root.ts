@@ -5,6 +5,7 @@ import path from 'node:path';
 export const DESKTOP_ROOT_DIRNAME = 'Indra Drive';
 export const DESKTOP_ROOT_METADATA_FILE = '.indra-drive.json';
 export const DESKTOP_ROOT_SUBDIRECTORIES = ['incoming', 'cache', 'thumbnails'] as const;
+export const DESKTOP_ROOT_SOURCE_PREFIX = '.sources'; // Hidden folder tracking provider origins
 
 export type DesktopRootMetadata = {
   version: 1;
@@ -12,6 +13,12 @@ export type DesktopRootMetadata = {
   createdAt: string;
   updatedAt: string;
   subdirectories: string[];
+  syncedSources?: Array<{
+    provider: string; // google_drive, r2, mega, etc
+    connection: string; // connection ID
+    label: string; // Google Drive - personal@gmail.com
+    localPath: string; // ~/Indra Drive/Google Drive - personal@gmail.com
+  }>;
 };
 
 export type DesktopRootState = {

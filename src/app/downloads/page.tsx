@@ -120,7 +120,8 @@ export default function DownloadsPage() {
               {/* Download Button */}
               <Button
                 onClick={() => handleDownload(download.file)}
-                className="w-full mb-6 h-11 rounded-xl bg-primary text-primary-foreground font-bold uppercase tracking-widest"
+                disabled={false}
+                className="w-full mb-6 h-11 rounded-xl bg-primary text-primary-foreground font-bold uppercase tracking-widest hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Download className="mr-2 size-4" />
                 Descargar {download.size}
@@ -272,13 +273,25 @@ export default function DownloadsPage() {
             ¿Necesitas ayuda? Revisa la documentación o abre un issue en GitHub.
           </p>
           <div className="flex justify-center gap-4">
-            <Button variant="outline" className="rounded-xl">
+            <Button
+              onClick={() => window.location.href = '/docs'}
+              variant="outline"
+              className="rounded-xl"
+            >
               Documentación
             </Button>
-            <Button variant="outline" className="rounded-xl">
+            <Button
+              onClick={() => window.open('https://github.com/Airhonreality/indra_next', '_blank')}
+              variant="outline"
+              className="rounded-xl"
+            >
               GitHub
             </Button>
-            <Button variant="outline" className="rounded-xl">
+            <Button
+              onClick={() => window.location.href = '/support'}
+              variant="outline"
+              className="rounded-xl"
+            >
               Soporte
             </Button>
           </div>

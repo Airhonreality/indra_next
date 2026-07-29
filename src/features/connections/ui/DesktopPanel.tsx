@@ -27,6 +27,13 @@ type DesktopRootSubdirectory = {
   exists: boolean;
 };
 
+type SyncedSource = {
+  provider: string;
+  connection: string;
+  label: string;
+  localPath: string;
+};
+
 type DesktopRootSummary = {
   path: string;
   exists: boolean;
@@ -35,6 +42,7 @@ type DesktopRootSummary = {
     userId?: string;
     createdAt?: string;
     updatedAt?: string;
+    syncedSources?: SyncedSource[];
   } | null;
   subdirectories?: DesktopRootSubdirectory[];
 };
@@ -55,6 +63,7 @@ type DesktopState = {
   activeCount: number;
   providers: string[];
   nativeBridgeStatus: NativeBridgeStatus | null;
+  syncedSources: SyncedSource[];
 };
 
 const EMPTY_STATE: DesktopState = {
@@ -73,6 +82,7 @@ const EMPTY_STATE: DesktopState = {
   activeCount: 0,
   providers: [],
   nativeBridgeStatus: null,
+  syncedSources: [],
 };
 
 const ROOT_PLACEHOLDERS = ['incoming', 'cache', 'thumbnails'] as const;

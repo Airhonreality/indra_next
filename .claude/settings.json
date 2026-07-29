@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx eslint *)",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\javir\\\\Documents\\\\DEVs\\\\indra-next-sovereign_A\\\\src\\\\app\\\\onboarding\")",
+      "Bash(cat)",
+      "Read(//tmp/**)",
+      "Bash(echo \"Exit code: $?\")"
+    ]
+  }
+}

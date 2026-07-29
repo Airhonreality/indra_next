@@ -251,14 +251,14 @@ export async function POST(req: Request) {
 
     // Si es Cloudflare R2 / S3, procesamos de forma idéntica y segura
     if (type === 's3') {
-      const { bucket, endpoint, accessKeyId, secretAccessKey } = config || {};
-      if (!bucket || !endpoint || !accessKeyId || !secretAccessKey) {
+      const { bucket, email, endpoint, accessKeyId, secretAccessKey } = config || {};
+      if (!bucket || !email || !endpoint || !accessKeyId || !secretAccessKey) {
         return NextResponse.json({ error: 'Todos los campos de S3/Cloudflare R2 son obligatorios.' }, { status: 400 });
       }
 
       // Encriptar credenciales privadas de S3 usando la clave segura del usuario
       const encryptedCredentials = encryptServerPayload(
-        { bucket, endpoint, accessKeyId, secretAccessKey },
+        { bucket, email, endpoint, accessKeyId, secretAccessKey },
         session.user.id
       );
 
@@ -269,7 +269,8 @@ export async function POST(req: Request) {
         isActive: true,
         encryptedCredentials,
         config: {
-          bucket, // Almacenamos únicamente el nombre del bucket de forma pública para la UI
+          bucket,
+          email,
         },
       }).returning();
 
@@ -281,6 +282,7 @@ export async function POST(req: Request) {
         connectionId: 's3-vault',
         config: {
           bucket: result[0].config?.bucket || '',
+          email: result[0].config?.email || '',
           isConnected: true,
         },
         isActive: result[0].isActive,

@@ -28,7 +28,7 @@ export async function POST(
     }
 
     // 2. Execute action based on type
-    let result = { message: `Action ${action} executed successfully.` };
+    const result = { message: `Action ${action} executed successfully.` };
 
     // Simulate different behaviors for the demo/mvp
     switch (action) {

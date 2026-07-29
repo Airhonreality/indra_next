@@ -1,20 +1,19 @@
 'use client';
 
 /**
- * 🔭 ARTEFACTO: ExplorerPanel.tsx
- * ────────────
+ * ARTEFACTO: ExplorerPanel.tsx
  * CAPA: UI / Features (Explorer Tab)
- * VERSIÓN: 1.0.0 — Autonomous Cell
  *
- * 🎯 FUNCTIONAL_SCOPE:
- * - Tab del explorador de silos auto-hidratado vía useConnections().
- * - El Shell no necesita saber nada de conexiones para renderizar este panel.
+ * FUNCTIONAL_SCOPE:
+ * - Tab del explorador de silos auto-hidratado via useConnections().
+ * - El shell no necesita saber nada de conexiones para renderizar este panel.
  */
 
 import { Loader2 } from 'lucide-react';
 import { useConnections } from '@/hooks/use-connections';
 import { useIndraStore } from '@/stores/indra-store';
 import { StorageWidgetClient } from '@/components/storage/StorageWidgetClient';
+import type { StorageConnectionDescriptor } from '@/components/storage/storage-types';
 
 export function ExplorerPanel() {
   const { activeConnections, isLoading } = useConnections();
@@ -28,11 +27,71 @@ export function ExplorerPanel() {
     );
   }
 
-  const connectionIds = Object.fromEntries(activeConnections.map((connection) => [connection.type, connection.id]));
+  const connections = [...activeConnections]
+    .filter((connection) => Boolean(connection.id))
+    .map((connection) => createConnectionDescriptor(connection))
+    .sort(compareConnectionDescriptors);
 
   return (
     <div className="w-full">
-      <StorageWidgetClient userId={userId ?? ''} connectionIds={connectionIds} />
+      <StorageWidgetClient userId={userId ?? ''} connections={connections} />
     </div>
   );
+}
+
+function createConnectionDescriptor(connection: {
+  id: string;
+  type: string;
+  label: string;
+  config?: {
+    email?: string;
+    bucket?: string;
+    username?: string;
+    baseUrl?: string;
+  };
+}): StorageConnectionDescriptor {
+  return {
+    id: connection.id,
+    type: connection.type,
+    label: buildConnectionLabel(connection),
+    connectionId: connection.id,
+    source: 'integration',
+    config: connection.config ?? null,
+  };
+}
+
+function buildConnectionLabel(connection: {
+  type: string;
+  label: string;
+  config?: {
+    email?: string;
+    bucket?: string;
+    username?: string;
+    baseUrl?: string;
+  };
+}) {
+  if (connection.label?.trim()) {
+    return connection.label.trim();
+  }
+
+  if (connection.type === 'mega') {
+    return connection.config?.email ? `MEGA [${connection.config.email}]` : 'MEGA';
+  }
+
+  if (connection.type === 'claro') {
+    const username = connection.config?.username || 'cuenta';
+    const baseUrl = connection.config?.baseUrl || 'https://www.clarodrive.com';
+    return `Claro Drive [${username}] @ ${baseUrl}`;
+  }
+
+  if (connection.type === 's3') {
+    const bucket = connection.config?.bucket || 'bucket';
+    return `Cloudflare R2 [${bucket}]`;
+  }
+
+  return connection.type;
+}
+
+function compareConnectionDescriptors(a: StorageConnectionDescriptor, b: StorageConnectionDescriptor) {
+  return a.type.localeCompare(b.type) || a.label.localeCompare(b.label) || (a.connectionId ?? a.id).localeCompare(b.connectionId ?? b.id);
 }

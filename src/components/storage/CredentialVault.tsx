@@ -30,6 +30,7 @@ export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultPr
   const [megaPassword, setMegaPassword] = useState('');
 
   const [s3Bucket, setS3Bucket] = useState('');
+  const [s3Email, setS3Email] = useState('');
   const [s3Endpoint, setS3Endpoint] = useState('');
   const [s3AccessKeyId, setS3AccessKeyId] = useState('');
   const [s3SecretAccessKey, setS3SecretAccessKey] = useState('');
@@ -125,7 +126,7 @@ export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultPr
 
   const handleSaveS3 = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!s3Bucket || !s3Endpoint || !s3AccessKeyId || !s3SecretAccessKey) return;
+    if (!s3Bucket || !s3Email || !s3Endpoint || !s3AccessKeyId || !s3SecretAccessKey) return;
 
     setLoading(true);
     try {
@@ -137,6 +138,7 @@ export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultPr
           label: `Cloudflare R2 [${s3Bucket}]`,
           config: {
             bucket: s3Bucket,
+            email: s3Email,
             endpoint: s3Endpoint,
             accessKeyId: s3AccessKeyId,
             secretAccessKey: s3SecretAccessKey,
@@ -150,6 +152,7 @@ export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultPr
       }
 
       setS3Bucket('');
+      setS3Email('');
       setS3Endpoint('');
       setS3AccessKeyId('');
       setS3SecretAccessKey('');
@@ -399,14 +402,14 @@ export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultPr
                           ? conn.config?.email
                           : conn.type === 'claro'
                             ? `${conn.config?.username} @ ${conn.config?.baseUrl || 'https://www.clarodrive.com'}`
-                            : conn.config?.bucket
+                            : `bucket: ${conn.config?.bucket || 'sin bucket'} - ${conn.config?.email || 'sin email'}`
                       }
                     >
                       {conn.type === 'mega'
                         ? conn.config?.email
                         : conn.type === 'claro'
                           ? `${conn.config?.username} @ ${conn.config?.baseUrl || 'https://www.clarodrive.com'}`
-                          : `bucket: ${conn.config?.bucket}`}
+                          : `bucket: ${conn.config?.bucket || 'sin bucket'} - ${conn.config?.email || 'sin email'}`}
                     </span>
                   </div>
                 </div>
@@ -540,11 +543,24 @@ export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultPr
           {activeTab === 's3' && (
             <form onSubmit={handleSaveS3} className="space-y-3 animate-in slide-in-from-top-2 duration-300">
               <p className="text-[9px] leading-normal text-zinc-500">
-                Cloudflare R2 uses direct S3 keys. Save the bucket and credentials to enable the storage silo.
+                Cloudflare R2 uses direct S3 keys. Save the account email, bucket and credentials to enable the storage silo.
               </p>
               <div className="space-y-1 rounded-lg border border-amber-500/20 bg-amber-950/15 p-2 text-[9px] leading-normal text-amber-400">
                 <span className="block text-[8px] font-bold uppercase tracking-wider text-amber-500">Zero egress note</span>
                 Storage is encrypted at rest in Postgres and the keys are never shown again in plaintext.
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Account Email</label>
+                <input
+                  type="email"
+                  value={s3Email}
+                  onChange={(e) => setS3Email(e.target.value)}
+                  disabled={loading}
+                  required
+                  placeholder="owner@company.com"
+                  className="w-full rounded-lg border border-border/40 bg-muted/20 px-3 py-2 font-mono text-[11px] placeholder-zinc-600 transition-all focus:border-amber-500/60 focus:outline-none"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -622,7 +638,7 @@ export function CredentialVault({ onSaved, defaultTab, open }: CredentialVaultPr
                 )}
                 <Button
                   type="submit"
-                  disabled={loading || !s3Bucket || !s3Endpoint || !s3AccessKeyId || !s3SecretAccessKey}
+                  disabled={loading || !s3Bucket || !s3Email || !s3Endpoint || !s3AccessKeyId || !s3SecretAccessKey}
                   className="h-9 flex-1 rounded-xl bg-amber-600 font-bold text-[9px] uppercase tracking-wider text-white shadow-lg transition-all hover:bg-amber-500"
                 >
                   {loading ? <Loader2 className="mx-auto size-3.5 animate-spin" /> : 'Connect Cloudflare R2'}

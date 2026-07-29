@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     default: "Indra NEXT",
     template: "%s | Indra NEXT",
   },
-  description: "Consola soberana para storage unificado, conexiones y escritorio instalable.",
+  description: "Consola soberana para storage local, conexiones y sincronizacion de escritorio.",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: "/indra-app-icon.svg",

@@ -15,6 +15,7 @@
 
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { signOut } from 'next-auth/react';
 import {
   Shield, Loader2, Zap, Terminal,
@@ -22,7 +23,7 @@ import {
   ChevronRight, ChevronLeft, LogOut, HardDrive, Link2, MonitorSmartphone,
 } from 'lucide-react';
 import { i18n } from '@/lib/i18n';
-import { useIndraStore } from '@/stores/indra-store';
+import { useIndraStore, type ConsoleTab } from '@/stores/indra-store';
 import { useSessionSync } from '@/hooks/use-session-sync';
 import { ConnectionsPanel } from './ConnectionsPanel';
 import { MetricsPanel } from './MetricsPanel';
@@ -35,9 +36,10 @@ const t = i18n.es;
 
 interface AgnosticConsoleShellProps {
   storageSlot?: React.ReactNode;
+  initialTab?: ConsoleTab;
 }
 
-export function AgnosticConsoleShell({ storageSlot }: AgnosticConsoleShellProps) {
+export function AgnosticConsoleShell({ storageSlot, initialTab }: AgnosticConsoleShellProps) {
   const { session, status } = useSessionSync();
 
   const activeTab = useIndraStore((s) => s.activeTab);
@@ -46,6 +48,18 @@ export function AgnosticConsoleShell({ storageSlot }: AgnosticConsoleShellProps)
   const toggleSidebar = useIndraStore((s) => s.toggleSidebar);
   const isInventoryCollapsed = useIndraStore((s) => s.isInventoryCollapsed);
   const toggleInventory = useIndraStore((s) => s.toggleInventory);
+  const didApplyInitialTab = useRef(false);
+
+  useEffect(() => {
+    if (!initialTab || didApplyInitialTab.current) {
+      return;
+    }
+
+    didApplyInitialTab.current = true;
+    if (activeTab !== initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [activeTab, initialTab, setActiveTab]);
 
   if (status === 'loading') {
     return (

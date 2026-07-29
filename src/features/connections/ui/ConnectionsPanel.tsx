@@ -338,7 +338,9 @@ function connectionDetail(integration: IntegrationRow) {
     return `${username} @ ${baseUrl}`;
   }
   if (integration.type === 's3') {
-    return `bucket: ${integration.config?.bucket || 'sin bucket'}`;
+    const bucket = integration.config?.bucket || 'sin bucket';
+    const email = integration.config?.email || 'sin email';
+    return `bucket: ${bucket} - ${email}`;
   }
   if (integration.type === 'storage') {
     return integration.config?.basePath || 'volumen local';

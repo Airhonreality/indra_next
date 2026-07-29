@@ -1,8 +1,8 @@
 {
   "name": "Indra NEXT",
   "short_name": "Indra",
-  "description": "Consola soberana instalable para storage unificado, conexiones y trabajo local.",
-  "start_url": "/",
+  "description": "Consola soberana para storage local, conexiones y sincronizacion de escritorio.",
+  "start_url": "/desktop",
   "scope": "/",
   "display": "standalone",
   "background_color": "#111111",

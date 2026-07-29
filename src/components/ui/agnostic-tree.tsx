@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { useInventory } from '@/hooks/use-inventory';
 import { Button } from '@/components/ui/button';
 import { ProviderBadge } from '@/components/storage/ProviderBadge';
+import { OriginBadge } from '@/components/storage/OriginBadge';
 
 export interface AgnosticAtom {
   id: string;
@@ -304,7 +305,12 @@ function TreeColumn({
                     <div className="flex items-center gap-1.5 overflow-hidden">
                       <span className="text-xs font-medium truncate leading-tight">{atom.name}</span>
                       {atom.provider && (
-                        <ProviderBadge provider={atom.provider} size="xs" />
+                        <OriginBadge
+                          provider={atom.provider}
+                          connectionLabel={atom.metadata?.connectionLabel as string | undefined}
+                          remotePath={atom.metadata?.remotePath as string | undefined}
+                          size="xs"
+                        />
                       )}
                     </div>
                     {atom.isShared && (

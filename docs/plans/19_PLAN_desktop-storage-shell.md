@@ -5,156 +5,155 @@ ejecutor: codex
 depende_de: [11, 12, 12B, 18]
 ---
 
-# 19 - Desktop instalable para storage soberano
+# 19 - Cliente desktop para storage soberano
 
 ## Contexto
 
-Hoy Indra NEXT ya tiene:
+El repo ya tiene una base funcional de web app y backend:
 
-- un backend y UI web en Next.js;
-- el adaptador `s3` para Cloudflare R2 / S3 bajo el provider id `s3`;
-- el proveedor `claro` para almacenamiento tipo Nextcloud/WebDAV;
-- un explorador de storage que vive en la web;
-- y una base conceptual para carpeta local, trazabilidad de origen y UX de archivos.
+- autenticacion y panel de conexiones;
+- providers `s3` para Cloudflare R2 / S3, `claro` para WebDAV / Claro Drive y otros adaptadores;
+- explorador de storage con trazabilidad por conexion;
+- soporte de carpeta local como origen de trabajo para el provider `storage`.
 
-Lo que **todavia no existe** es la pieza que convierte eso en una app instalable de escritorio
-tipo Google Drive Desktop:
+Lo que **todavia no existe** es el producto correcto para escritorio: un cliente tipo Google Drive Desktop que
+crea y administra una carpeta local en el sistema, mantiene el origen de cada archivo y sincroniza cambios
+sin depender de una interfaz web presentada como objetivo principal.
 
-1. una shell nativa que se instale en Windows y arranque Indra como producto local;
-2. un panel de cuentas para registrar varias identidades de storage sin mezclar origen ni ruta;
-3. un motor local que permita ver el storage como una unidad o carpeta de trabajo, con
-   trazabilidad completa de proveedor, cuenta, conexion y ruta;
-4. una experiencia de exploracion de archivos pensada para escritorio, no solo para web.
+Este plan separa dos planos:
 
-Este plan separa claramente dos cosas:
+- **Control plane**: login, cuentas, administracion y estado operativo.
+- **Data plane**: carpeta local gestionada, sincronizacion nativa y acceso desde el explorador del sistema.
 
-- **Desktop shell**: el contenedor instalable, tray, autostart, ventana principal y actualizaciones.
-- **Local drive bridge**: el puente real con filesystem local / virtual mount para acceder a los archivos.
+La referencia tecnica para el puente local es `docs/research/Local drive integration.md.txt`.
 
-La referencia tecnica para la capa local es `docs/research/Local drive integration.md.txt`.
-La referencia de producto para storage unificado y Claro es `docs/plans/18_PLAN_storage-local-claro-ui.md`.
+## Objetivo real
+
+Construir una experiencia desktop que permita:
+
+1. autenticar cuentas de storage;
+2. crear o validar una raiz local de trabajo por usuario;
+3. navegar archivos con trazabilidad de proveedor, cuenta y ruta;
+4. preparar el camino para integracion nativa de filesystem en Windows y Linux;
+5. mantener el repositorio honesto sobre que esta implementado y que sigue siendo futuro.
+
+## Secuencia del trabajo
+
+La siguiente lane se ordena asi:
+
+1. Dejar una shell minima de administracion y estado.
+2. Crear y exponer una raiz local gestionada por usuario.
+3. Encajar esa raiz con el explorador de storage y la trazabilidad.
+4. Preparar el puente nativo futuro para sincronizacion real con el sistema operativo.
 
 ## Operaciones
 
-### Fase 1 - Shell de escritorio instalable
+### Fase 1 - Contrato local de escritorio
 
-1. Crear una superficie desktop que reuse la UI existente de Indra sin duplicar negocio.
-   - Definir un subproyecto desktop en el repo para empaquetado instalable.
-   - Reusar la UI actual como contenido principal de la ventana.
-   - Mantener el shell separado del core de storage para no mezclar presentacion con dominio.
+1. Definir la raiz local gestionada.
+   - Una carpeta por usuario o perfil.
+   - Metadata local para registrar el origen y el estado.
+   - Subcarpetas de soporte para entrada, cache y miniaturas.
 
-2. Añadir ciclo de vida de escritorio.
-   - Ventana principal.
-   - Icono de bandeja / tray.
-   - Arranque con el sistema.
-   - Persistencia de preferencias locales.
-   - Cierre seguro sin perder estado de sincronizacion.
+2. Exponer esa raiz al shell.
+   - Consultar estado.
+   - Crear la raiz si no existe.
+   - Mostrar ruta y readiness.
 
-3. Mantener la instalacion centrada en Windows primero.
-   - Windows es la prioridad para una experiencia tipo Google Drive Desktop.
-   - Linux queda como segunda fase de paridad para el bridge local.
+3. Mantener la administracion separada del data plane.
+   - Login y cuentas viven en la shell.
+   - El filesystem local vive en el contrato de storage.
 
-### Fase 2 - Panel de cuentas multi-storage
+### Fase 2 - Shell desktop minimo
 
-1. Crear un panel de cuentas que soporte multiples conexiones por proveedor.
-   - Cloudflare / R2: hasta 10 cuentas visibles y trazables.
-   - Claro Drive: una o mas cuentas segun lo que soporte la verificacion real.
-   - Cada cuenta debe guardar provider, nombre visible, estado y ruta/identificador.
+1. Convertir la vista desktop en un panel de estado real.
+   - Raiz local.
+   - Cuentas activas.
+   - Proveedor activo.
+   - Estado de sincronizacion.
 
-2. Separar autenticacion de almacenamiento y no mezclar credenciales entre cuentas.
-   - Credenciales cifradas localmente.
-   - Estado de login por cuenta.
-   - Boton de reautenticacion / desconexion por identidad.
-   - Prueba de conexion antes de darla por activa.
+2. Evitar el lenguaje de PWA como objetivo principal.
+   - No vender el producto como una simple app instalable web.
+   - La meta es una experiencia de storage de escritorio.
 
-3. Reusar los providers existentes en vez de crear nuevas variantes conceptuales.
-   - `s3` sigue siendo el provider id para Cloudflare R2 / S3.
-   - `claro` sigue siendo el provider para Claro Drive.
-   - No introducir un nuevo nombre de proveedor que rompa el contrato actual.
+3. Reusar la UI actual solo como superficie de control.
+   - Login.
+   - Administracion basica.
+   - Acciones de mantenimiento.
 
-### Fase 3 - Bridge local de archivos
+### Fase 3 - Explorador con trazabilidad
 
-1. Convertir la carpeta local en un origen de trabajo visible y trazable.
-   - Un root local de trabajo por usuario o perfil.
-   - Metadata que preserve origen: provider, conexion, cuenta y ruta remota.
-   - El panel debe poder mostrar si un archivo vive en local, en cloud o en ambos.
-
-2. Diseñar el bridge con dos niveles.
-   - Nivel de trabajo local: carpeta sincronizada y gestionada por Indra.
-   - Nivel de integracion nativa: mount virtual / sync root para Windows y FUSE para Linux.
-
-3. Ajustar la experiencia para operaciones frecuentes de escritorio.
-   - abrir archivo;
-   - copiar / mover entre cuentas;
-   - renombrar;
-   - arrastrar y soltar entre storages;
-   - ver progreso y errores por cuenta;
-   - conservar procedencia despues de cada operacion.
-
-### Fase 4 - UX del explorador de escritorio
-
-1. Rehacer la navegacion para densidad de trabajo real.
-   - Breadcrumbs.
-   - Buscador.
-   - Filtros por proveedor, cuenta, tipo y estado.
-   - Seleccion multiple.
-   - Barra de acciones persistente.
-
-2. Hacer visible la trazabilidad todo el tiempo.
+1. Hacer visible el origen en cada elemento.
    - Proveedor.
    - Cuenta.
    - Conexion.
-   - Ruta original.
-   - Estado de sincronizacion.
+   - Ruta remota o local.
 
-3. Mejorar jerarquia visual para pantalla grande.
-   - Panel lateral util.
-   - Lista / grid con mas ancho efectivo.
-   - Vista de detalle y preview sin esconder contexto.
-   - Estados vacios y de carga que expliquen que esta pasando.
+2. Mantener densidad de trabajo real.
+   - Breadcrumbs.
+   - Busqueda.
+   - Filtros.
+   - Seleccion multiple.
+
+3. Preparar thumbnails y preview sin hidratar de mas.
+   - Cache local.
+   - Rango de bytes para metadatos.
+   - Evitar bloqueos del explorador.
+
+### Fase 4 - Bridge nativo futuro
+
+1. Windows primero.
+   - CFAPI / sync root como camino nativo.
+   - Integracion con File Explorer.
+   - Registro del proveedor de storage cuando exista el binario nativo.
+
+2. Linux como segunda fase.
+   - FUSE / FUSE3.
+   - Mount local y lectura diferida.
+
+3. No prometer el bridge nativo antes de tenerlo.
+   - El repo puede dejar contratos, helpers y UI.
+   - El binario y la extension nativa siguen siendo trabajo futuro.
 
 ### Fase 5 - Instalacion y distribucion
 
-1. Definir artefactos instalables.
-   - Instalador para Windows.
-   - Auto-update.
-   - Arranque al iniciar sesion del usuario.
-   - Acceso rapido desde bandeja.
+1. Definir artefactos reales.
+   - Shell desktop empaquetado.
+   - Servicio local de sincronizacion.
+   - Actualizacion y arranque automatico cuando exista el binario nativo.
 
-2. Mantener la distribucion coherente con el repo actual.
-   - No duplicar providers.
-   - No romper la app web.
-   - No exigir al usuario una migracion manual rara entre web y desktop.
+2. No duplicar negocio.
+   - No crear providers nuevos si ya existe `s3`.
+   - No mezclar web admin con motor de filesystem.
 
-3. Dejar listo el camino para paridad futura.
-   - Linux desktop.
-   - Mejoras de shell integration.
-   - Refuerzo de thumbnails / preview nativo cuando aplique.
+3. Cerrar el plan solo cuando la experiencia sea util de extremo a extremo.
+   - Login funcional.
+   - Raiz local gestionada.
+   - Exploracion trazable.
+   - Camino nativo preparado.
 
-### Fase 6 - Honestidad tecnica y verificaciones
+### Fase 6 - Honestidad tecnica y verificacion
 
-1. Claro Drive solo entra como compatibilidad real si la evidencia lo sostiene.
-   - Si la via real de login/listado no se puede verificar, el plan debe detenerse y reportarlo.
-   - No inventar soporte por deseo de producto.
+1. Si el bridge nativo no esta implementado, decirlo de forma directa.
+   - No inventar CFAPI ni FUSE.
+   - No declarar sincronizacion de sistema operativo sin binario real.
 
-2. No tocar otros adaptadores fuera de lo imprescindible para el desktop shell.
-   - El foco es el contenedor instalable, el bridge local y la UX.
-   - No abrir frentes nuevos de storage salvo wiring minimo necesario.
+2. Limitar el radio de cambio.
+   - No tocar adaptadores ajenos salvo el wiring minimo necesario.
+   - Mantener el foco en la experiencia desktop de storage.
 
-3. Cerrar el plan solo cuando la experiencia sea usable de extremo a extremo.
-   - Instalable.
-   - Login multi-cuenta.
-   - Vista unificada de archivos.
-   - Trazabilidad completa.
-   - Operaciones basicas de gestion de archivos.
+3. Verificar la base de trabajo.
+   - Typecheck.
+   - Lint.
+   - Build.
+   - Contratos de integraciones.
 
 ## Prohibiciones
 
-- No inventar una app desktop sin shell instalable real.
-- No mezclar la UI web con el bridge local como si fueran lo mismo.
-- No declarar soporte de Claro Drive sin verificacion real del flujo de acceso.
-- No crear nombres de proveedor nuevos si ya existe `s3` para Cloudflare / R2.
-- No tocar rutas API ni adaptadores ajenos salvo el wiring minimo estrictamente necesario.
+- No presentar la app web como si fuera el cliente desktop final.
+- No prometer una extension nativa que no exista.
+- No crear nombres nuevos de proveedor si ya existe `s3` para Cloudflare / R2.
+- No tocar otros adaptadores fuera de lo imprescindible.
 - No stagear `.claude/settings.local.json`.
 - No usar `git add -A` ni `git add .`.
 
@@ -165,7 +164,6 @@ npx tsc --noEmit
 npm run lint
 npm run test:contract
 npm run build
-git diff --cached --stat
 ```
 
 ## Commit
@@ -175,5 +173,5 @@ Archivos exactos del commit:
 - `docs/plans/19_PLAN_desktop-storage-shell.md`
 
 ```text
-docs(plan): desktop installable shell for unified storage management (Plan 19)
+docs(plan): align desktop plan with managed local drive client
 ```

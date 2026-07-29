@@ -683,7 +683,7 @@ export function IngestionClient({ slug, portLabel, schema, config }: IngestionCl
     }
 
     const adapter = makePortAdapter(slug, currentFormValues, resumableUri);
-    let pipelineInstance = pipeline.current;
+    const pipelineInstance = pipeline.current;
 
     if (stored?.uploadedChunks.length) {
       const resumedSession = pipelineInstance.getOrCreateSession(manifest);

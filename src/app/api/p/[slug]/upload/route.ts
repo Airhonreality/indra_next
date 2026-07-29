@@ -46,7 +46,7 @@ export async function POST(
     // Placeholders like {year}, {month}, {day} are system-provided.
     // Custom placeholders are resolved from the 'variables' object (form data).
     
-    let baseDirectory = port.port.targetPath; // Root directory defined at port level
+    const baseDirectory = port.port.targetPath; // Root directory defined at port level
     const routingPattern = (port.port.config as any)?.pattern || '/{year}/{month}';
     
     const timestamp = new Date();

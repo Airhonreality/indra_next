@@ -1,15 +1,41 @@
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
-import { integrations } from '@/core/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
+import { integrations, storageConnections } from '@/core/db/schema';
 import { StorageWidgetClient } from './StorageWidgetClient';
+import type { StorageConnectionDescriptor } from './storage-types';
+
+type IntegrationRow = typeof integrations.$inferSelect;
+type StorageRow = typeof storageConnections.$inferSelect;
+
+function toIntegrationConnection(row: IntegrationRow): StorageConnectionDescriptor {
+  return {
+    id: row.id,
+    type: row.type,
+    label: row.label || row.type,
+    connectionId: row.connectionId || row.id,
+    isActive: row.isActive,
+    source: 'integration',
+    config: row.config ?? null,
+  };
+}
+
+function toStorageConnection(row: StorageRow): StorageConnectionDescriptor {
+  return {
+    id: row.id,
+    type: row.provider,
+    label: row.label,
+    connectionId: row.id,
+    isActive: row.isActive,
+    source: 'storage',
+    config: row.config ?? null,
+  };
+}
 
 /**
- * 🏛️ STORAGE WIDGET (Server Component)
- * ──────────────────────────────────
- * Root component for the unified storage explorer dashboard.
- * Performs secure authentication check at the edge, queries the Drizzle ORM database
- * to fetch connection IDs securely, and passes client parameters safely down.
+ * Storage widget server component.
+ * Resolves all active connections, including dedicated storage accounts, and
+ * forwards a traceable list to the client shell.
  */
 export async function StorageWidget() {
   const session = await auth();
@@ -20,37 +46,48 @@ export async function StorageWidget() {
           Acceso Restringido
         </p>
         <p className="text-xs text-zinc-500">
-          Inicia sesión con tu cuenta de colectivo para acceder al almacenamiento virtual soberano.
+          Inicia sesion con tu cuenta para acceder al almacenamiento virtual.
         </p>
       </div>
     );
   }
 
-  // Fetch active integrations for the authenticated user from the database
-  const activeIntegrations = await db
-    .select()
-    .from(integrations)
-    .where(
-      and(
-        eq(integrations.userId, session.user.id),
-        eq(integrations.isActive, true)
-      )
-    );
+  const [activeIntegrations, activeStorageConnections] = await Promise.all([
+    db
+      .select()
+      .from(integrations)
+      .where(
+        and(
+          eq(integrations.userId, session.user.id),
+          eq(integrations.isActive, true)
+        )
+      ),
+    db
+      .select()
+      .from(storageConnections)
+      .where(
+        and(
+          eq(storageConnections.userId, session.user.id),
+          eq(storageConnections.isActive, true)
+        )
+      ),
+  ]);
 
-  // Map to connectionIds: Record<string, string>
-  const connectionIds: Record<string, string> = {};
-  for (const integration of activeIntegrations) {
-    if (integration.connectionId) {
-      connectionIds[integration.type] = integration.connectionId;
-    }
-  }
+  const connections: StorageConnectionDescriptor[] = [
+    ...activeIntegrations.map(toIntegrationConnection),
+    ...activeStorageConnections.map(toStorageConnection),
+  ].sort(compareConnections);
 
   return (
-    <StorageWidgetClient 
+    <StorageWidgetClient
       userId={session.user.id}
-      connectionIds={connectionIds} 
+      connections={connections}
     />
   );
 }
 
 export default StorageWidget;
+
+function compareConnections(a: StorageConnectionDescriptor, b: StorageConnectionDescriptor) {
+  return a.type.localeCompare(b.type) || a.label.localeCompare(b.label) || a.id.localeCompare(b.id);
+}

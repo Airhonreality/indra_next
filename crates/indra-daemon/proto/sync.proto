@@ -1,0 +1,114 @@
+syntax = "proto3";
+
+package indra.sync;
+
+option go_package = "github.com/indracloud/indra/pkg/sync";
+option java_package = "com.indracloud.sync";
+
+// Event types for file changes
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  FILE_CREATED = 1;
+  FILE_UPDATED = 2;
+  FILE_DELETED = 3;
+  FILE_RENAMED = 4;
+  FOLDER_CREATED = 5;
+  FOLDER_DELETED = 6;
+  SYNC_COMPLETE = 7;
+}
+
+// Chunk hash (BLAKE3)
+message ChunkHash {
+  string algorithm = 1;  // "BLAKE3"
+  bytes digest = 2;      // 32 bytes
+}
+
+// File metadata
+message FileMetadata {
+  string path = 1;
+  int64 size = 2;
+  int64 modified_time_ms = 3;
+  string mode = 4;  // "0644"
+  repeated ChunkHash chunks = 5;
+}
+
+// Sync event (file-level)
+message SyncEvent {
+  string event_id = 1;  // UUID
+  EventType type = 2;
+  FileMetadata file = 3;
+  int64 timestamp_ms = 4;
+  string device_id = 5;  // Who triggered this
+  int32 version_vector = 6;  // For conflict resolution
+}
+
+// Device metadata
+message Device {
+  string device_id = 1;
+  string device_name = 2;
+  string platform = 3;  // "windows", "linux", "macos"
+  int64 last_seen_ms = 4;
+  string ip_address = 5;
+  int32 port = 6;
+  bool trusted = 7;
+  bytes public_key_hmac = 8;  // HMAC-SHA256 key for trust
+}
+
+// Request: Get events since version
+message PullRequest {
+  string device_id = 1;
+  int32 since_version = 2;
+  string sync_root = 3;
+}
+
+// Response: Batch of events
+message PullResponse {
+  repeated SyncEvent events = 1;
+  int32 current_version = 2;
+  bool has_more = 3;
+}
+
+// Request: Push new events
+message PushRequest {
+  repeated SyncEvent events = 1;
+  string device_id = 2;
+}
+
+// Response: Ack + conflict list
+message PushResponse {
+  repeated string conflict_event_ids = 1;  // Events that conflicted
+  int32 new_version = 2;
+}
+
+// EventStream: Server pushes changes in real-time
+message StreamEvent {
+  SyncEvent event = 1;
+  Device source_device = 2;
+}
+
+// Device heartbeat
+message HeartbeatRequest {
+  string device_id = 1;
+  string device_name = 2;
+  string ip_address = 3;
+  int32 port = 4;
+}
+
+message HeartbeatResponse {
+  bool acknowledged = 1;
+  repeated Device known_devices = 2;
+}
+
+service SyncService {
+  // Pull events from peer
+  rpc Pull(PullRequest) returns (PullResponse);
+
+  // Push events to peer
+  rpc Push(PushRequest) returns (PushResponse);
+
+  // Stream events in real-time (server push)
+  rpc Subscribe(PullRequest) returns (stream StreamEvent);
+
+  // Heartbeat for discovery
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+}

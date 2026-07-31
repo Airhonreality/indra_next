@@ -30,7 +30,7 @@ anyhow = "1.0"
 thiserror = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-zbus = "0.60"
+zbus = "5.0"
 fuse3 = "0.5"
 uuid = { version = "1.10", features = ["v4", "serde"] }
 hmac = "0.12"
@@ -44,8 +44,7 @@ notify = "6.1"
 mdns-sd = "0.7"
 rustls = "0.23"
 rcgen = "0.12"
-hostname = "0.5"
-reqwest = { version = "0.12", features = ["stream", "http3"] }
-exif = "0.2"
+hostname = "0.4"
+reqwest = { version = "0.11", features = ["stream"] }
 io-uring = "0.6"
 dbus = "0.9"

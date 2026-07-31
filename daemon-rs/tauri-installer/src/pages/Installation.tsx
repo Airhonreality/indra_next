@@ -9,13 +9,6 @@ interface InstallationProps {
   onError: (error: string) => void;
 }
 
-interface ProgressUpdate {
-  step: string;
-  progress: number;
-  message: string;
-  error?: string;
-}
-
 export default function Installation({
   config,
   onComplete,

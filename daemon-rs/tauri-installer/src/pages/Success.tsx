@@ -1,12 +1,8 @@
-import { useState } from "react";
-
 interface SuccessProps {
   onClose: () => void;
 }
 
 export default function Success({ onClose }: SuccessProps) {
-  const [launchUI] = useState(false);
-
   const handleLaunchUI = () => {
     // Launch the Indra UI application
     // This would call a Tauri command to open the UI

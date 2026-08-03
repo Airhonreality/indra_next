@@ -11,7 +11,14 @@
       "PowerShell(if \\(Test-Path \"$env:USERPROFILE\\\\.cargo\\\\bin\\\\cargo.exe\"\\) { Write-Host \"Cargo found\"; & \"$env:USERPROFILE\\\\.cargo\\\\bin\\\\cargo.exe\" --version } else { Write-Host \"Cargo not found in .cargo directory\" })",
       "Bash(mkdir -p \"c:/Users/javir/Documents/DEVs/indra-daemon-rs/crates/indra-windows/src/cfapi\" \"c:/Users/javir/Documents/DEVs/indra-daemon-rs/crates/indra-windows/src/com\")",
       "Bash(mkdir -p \"c:/Users/javir/Documents/DEVs/indra-daemon-rs/crates/indra-linux/src/fuse\" \"c:/Users/javir/Documents/DEVs/indra-daemon-rs/crates/indra-linux/src/async_io\")",
-      "Bash(rm \"c:/Users/javir/Documents/DEVs/indra-daemon-rs/crates/indra-linux/src/fuse.rs\" 2>&1 || echo \"File doesn't exist or already removed\")"
+      "Bash(rm \"c:/Users/javir/Documents/DEVs/indra-daemon-rs/crates/indra-linux/src/fuse.rs\" 2>&1 || echo \"File doesn't exist or already removed\")",
+      "Bash(tee /tmp/build.log)",
+      "Bash(rm -rf \"src/app/api/daemon/update\")",
+      "Bash(mkdir -p \"src/app/api/daemon/update/\\\\[target\\\\]/\\\\[arch\\\\]\")",
+      "Bash(rm -rf \"src/app/api/downloads\")",
+      "Bash(rm -rf \"src/app/api/daemon\")",
+      "Bash(mkdir -p \"src/app/api/downloads/[filename]\")",
+      "Bash(mkdir -p \"src/app/api/daemon/update/[target]/[arch]\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\javir\\Documents\\DEVs\\indra-daemon-rs\\crates\\indra-core",

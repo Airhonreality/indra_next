@@ -1,6 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 
-// Redireccionar descargas a GitHub Releases
 const GITHUB_RELEASES_URL = 'https://github.com/Airhonreality/indra_next/releases/download/v0.1.0';
 
 const DOWNLOADS: Record<string, string> = {
@@ -10,12 +9,11 @@ const DOWNLOADS: Record<string, string> = {
 };
 
 export async function GET(
-  _request: Request,
-  { params }: { params: { filename: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ filename: string }> }
 ) {
-  const { filename } = params;
+  const { filename } = await params;
 
-  // Encontrar el archivo en GitHub Releases
   const githubFilename = DOWNLOADS[filename];
 
   if (!githubFilename) {
@@ -25,8 +23,6 @@ export async function GET(
     );
   }
 
-  // Redireccionar a GitHub Releases
   const downloadUrl = `${GITHUB_RELEASES_URL}/${githubFilename}`;
-
   return NextResponse.redirect(downloadUrl, 302);
 }

@@ -91,7 +91,7 @@ export class StorageAdapter extends BaseAdapter {
   }): Promise<OperationResult<IndraRecord[]>> {
     try {
       const data = await this.readFile(sourceId);
-      let rows = this.normalizeToArray(data);
+      const rows = this.normalizeToArray(data);
 
       let records: IndraRecord[] = rows.map((row: any, i) => ({
         id: String(row.id ?? row.gid ?? `row_${i}`),

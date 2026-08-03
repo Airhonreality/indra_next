@@ -24,5 +24,9 @@ export async function GET(
   }
 
   const downloadUrl = `${GITHUB_RELEASES_URL}/${githubFilename}`;
-  return NextResponse.redirect(downloadUrl, 302);
+
+  return NextResponse.json({
+    url: downloadUrl,
+    filename: githubFilename
+  });
 }

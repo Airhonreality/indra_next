@@ -52,17 +52,18 @@ export default function DownloadsPage() {
   ];
 
   const handleDownload = async (filename: string) => {
-    const response = await fetch(`/api/downloads/${filename}`);
-    if (response.ok) {
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+    try {
+      const response = await fetch(`/api/downloads/${filename}`);
+      if (response.ok) {
+        const data = await response.json();
+        // Abrir en nueva pestaña directamente desde GitHub
+        window.open(data.url, '_blank');
+      } else {
+        alert('Error al descargar. Intenta de nuevo.');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Error de conexión. Intenta de nuevo.');
     }
   };
 

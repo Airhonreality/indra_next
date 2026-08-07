@@ -208,16 +208,106 @@ se clonó localmente" es verificable por fuera del propio daemon.
 - **`CfRegisterSyncRoot` sigue sin invocarse** (root.rs) — el archivo de prueba llegó por
   detección de `notify`, no por el mecanismo real de Cloud Filters API.
 
-## Fase 2 — Camino de subida real hacia un backend remoto real (push funcional)
-## Fase 3 — Sesión real (Javier logueado) ejecutando el round-trip HTTP completo
-## Fase 4 — Camino inverso: nube → local (requiere Fase 2)
-## Fase 5 — Test E2E completo y bidireccional, automatizado y repetible
+## Decisión de arquitectura (2026-08-07): sin bucket propio de Indra
 
-Las Fases 2-5 se detallan (Operaciones + Verificación mecánica concretas) una vez que Javier
-decida el backend real de "push" (¿SQLite del propio daemon vía un segundo dispositivo LAN, tal
-como diseñó originalmente el plan 23? ¿o el adaptador S3/R2 ya auditado, más simple pero un
-cambio de arquitectura respecto a lo elegido en esta fase?) — especificarlas antes sería
-documentar código que todavía puede cambiar de forma.
+Javier corrigió el rumbo antes de que se escribiera código de Fase 2: el destino de los bytes
+**no puede ser un storage operado por Indra**. Viola la Ley 3 del North Star (`00_NORTH_STAR.md`
+§1): *"Indra se mantiene gratuito y open source porque no aloja datos de nadie."* El daemon local
+tampoco debe tener nunca credenciales de storage en texto plano (riesgo de seguridad nuevo e
+innecesario).
+
+**Diseño correcto** (confirmado leyendo el contrato real, no supuesto):
+
+- El destino de "sync local" es **la integración que el propio usuario ya conectó** (su Drive, su
+  R2, su OneDrive — con sus propias credenciales), reusando el contrato `IntegrationAdapter` de
+  `src/core/types/integration.ts` (plan 11, `AUDITADO`) tal cual está.
+- La subida real ya existe como patrón: `createResumableSession(targetId, fileName, mimeType,
+  totalSize)` (confirmado en `src/integrations/s3/adapter.ts:218-243`) devuelve una URL
+  pre-firmada; el llamador hace `PUT` directo de los bytes a esa URL. Es el mismo mecanismo que ya
+  usa el portal de subida (`src/app/api/p/[slug]/upload/route.ts`) — no hay que inventar nada.
+- `createResumableSession` es **opcional** en el contrato (`?` en la interfaz) — no todos los
+  adapters lo implementan. Solo los que sí pueden ofrecerse como "drive de sync local".
+- El daemon (Rust) queda ciego a credenciales: solo reporta vía gRPC `Pull()` qué archivos tiene y
+  su hash (ya construido, Fase 1). Next.js es quien lee los bytes del disco local (mismo equipo,
+  path que ya devuelve `Pull()`) y los sube a través del adapter elegido.
+- El diseño original del plan 23 (`23_PLAN_multi-device-sync.md`: mDNS + pairing HMAC + *"sin
+  depender de un servidor central externo"*) queda **superado, no vigente**: contradice
+  directamente el goal declarado ("replicar Google Drive Desktop" = modelo hub-and-spoke contra
+  un backend central, no P2P en LAN). El "hub" en este diseño es la integración soberana del
+  usuario, no un servidor de Indra ni pairing entre dispositivos.
+
+## Fase 2 — Camino de subida real (local → integración elegida por el usuario)
+
+### Operaciones
+
+1. **Confirmar qué adapters ya implementan `createResumableSession`** antes de ofrecerlos como
+   opción de "drive de sync local" en la UI (`grep -rn "createResumableSession" src/integrations`
+   — hoy confirmado solo en `s3/adapter.ts`; verificar Drive/OneDrive/Mega antes de habilitarlos).
+2. **Agregar tabla `local_sync_state`** a `src/core/db/schema.ts` (junto a `integrations`/
+   `records`, línea ~30) + migración Drizzle:
+   ```ts
+   export const localSyncState = pgTable("local_sync_state", {
+     id: uuid("id").primaryKey().defaultRandom(),
+     userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+     integrationId: uuid("integration_id").notNull().references(() => integrations.id, { onDelete: "cascade" }),
+     localPath: text("local_path").notNull(),
+     blake3Hash: text("blake3_hash").notNull(),
+     remoteObjectId: text("remote_object_id"),
+     syncedAt: timestamp("synced_at").defaultNow().notNull(),
+   });
+   ```
+   Único por `(userId, localPath)`. Este es el registro de "qué ya subí", para no re-subir en
+   cada `Pull()`.
+3. **Marcar una integración como target**: reusar el campo libre `integrations.config` (jsonb,
+   `src/core/db/schema.ts:36`) con `config.isLocalSyncTarget = true`. Sin migración nueva — ya es
+   schemaless. Regla MVP: como mucho una integración activa como target por usuario.
+4. **Extender `src/app/api/desktop/files/route.ts` (o endpoint nuevo `desktop/sync/route.ts`)**:
+   tras `daemonPullFiles()`, diffear por `blake3Hash` contra `local_sync_state`. Para cada archivo
+   nuevo/cambiado: leer bytes locales (`fs.readFile` sobre el `path` que ya devuelve `Pull()` —
+   mismo equipo, ver limitación de alcance más abajo), pedir `createResumableSession` al adapter
+   marcado como target, `PUT` de los bytes al `resumableUri`, upsert en `local_sync_state`.
+
+### Verificación
+
+```
+1. Subir un archivo real vía el flujo de arriba.
+2. GET /api/storage/union?provider=<target> (la nube REAL, ya auditada) debe listar
+   ese archivo — mismo nombre, mismo tamaño.
+3. Descargar el objeto subido y comparar su BLAKE3 contra local_sync_state.blake3Hash
+   → deben coincidir exacto (mismo criterio de integridad usado en Fase 1).
+```
+
+## Fase 3 — Sesión real ejecutando el round-trip HTTP completo
+
+No es una fase de código — es la verificación que Fase 1 dejó pendiente por diseño (no se debía
+simular login). Cuando Javier esté disponible:
+
+1. Javier inicia sesión real (Google OAuth) en `http://localhost:3000`.
+2. Con esa sesión de navegador, `GET /api/desktop/bridge` y `GET /api/desktop/files` deben
+   responder 200 (no 401) y devolver datos reales del daemon.
+3. Yo (Orquestador) reviso la respuesta contra lo ya verificado por gRPC directo en Fase 1 —
+   deben coincidir.
+
+## Fase 4 — Camino inverso: integración → local
+
+Con `local_sync_state` de Fase 2 ya existente, la ruta más simple **dentro del alcance actual de
+una sola máquina** no requiere terminar `push()`/`subscribe()` en el daemon (evita reinventar
+transporte de bytes por gRPC): Next.js compara el listado del adapter target
+(`/api/storage/union`) contra `local_sync_state`; para objetos remotos ausentes localmente, baja
+los bytes con `adapter.downloadBlob()` y los escribe directo en la carpeta "Indra Drive" (mismo
+equipo). El file watcher del daemon — ya construido y verificado en Fase 0/1 — los detecta,
+hashea y persiste solo, sin código nuevo de ese lado.
+
+**Nota de alcance**: esto solo funciona porque Next.js y el daemon corren en el mismo equipo hoy.
+El caso real multi-dispositivo (dos máquinas físicas distintas) sigue bloqueado por el problema de
+NAT/relay ya señalado en Fase 1 — no se resuelve en esta fase.
+
+## Fase 5 — Test E2E completo, bidireccional, automatizado
+
+Script repetible (no verificación manual ad hoc como en Fase 1) que encadena Fases 2-4 y mide,
+por corrida: tiempo local→nube, tiempo nube→local, resultado de comparación BLAKE3 en ambos
+sentidos. Ejecutar n≥10 veces antes de reportar cualquier percentil de tiempo (doctrina de este
+plan, punto 7). Vive en `scripts/` (ruta exacta a definir cuando se escriba, no antes).
 
 ---
 

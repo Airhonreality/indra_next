@@ -82,9 +82,15 @@ depende_de: [NN, NN]
 | 15 | Colecciones inter-storage (metadata-only) | codex sobre spec del orquestador | CRUD de colecciones sin escrituras en storages | PENDIENTE |
 | 16 | Usabilidad: previews ligeras, renombrado en bloque, panel unificado | codex | checklist visual + /verify | PENDIENTE |
 | 17 | Amplitud: nuevos proveedores (YouTube como publish-target con capacidades reducidas) | codex (uno por proveedor) | suite de contrato | PENDIENTE |
+| 23 | Sync multi-dispositivo vía mDNS/pairing LAN, sin servidor central | codex | n/a | **SUPERADO** — contradice el goal "replicar Google Drive Desktop" (hub central, no P2P); ver decisión de arquitectura en 24 |
+| 24 | Instalador + daemon local real, puente gRPC daemon↔Next.js, verificación E2E de storage | orquestador diseña/verifica → codex/haiku ejecutan fases | ver `## Verificación` por fase en el plan | EN_EJECUCION (Fase 0 y 1 EJECUTADAS Y VERIFICADAS; 2-5 pendientes) |
+| 25 | Capa 2 (esquematización): diseño UX de tags/contextos personalizados | orquestador (diseño no delegable) | n/a (BORRADOR, sin Operaciones aún) | BORRADOR |
 
 **Regla de dependencia**: 11 abarata todo lo posterior; 15 solo tiene sentido con 12 y 14
-auditados. 13 bloquea cualquier trabajo nuevo sobre portales de subida.
+auditados. 13 bloquea cualquier trabajo nuevo sobre portales de subida. 24 depende de 11/12/12B
+para su Fase 2 (sube a través del `StorageAdapter` que el usuario ya conectó, nunca a un storage
+propio de Indra). 25 depende de 24 (comparte la noción de "qué vive dónde") y de 11 (el contrato
+de adapters que la Capa 2 debe respetar sin reescribir).
 
 ## 4. Roles
 

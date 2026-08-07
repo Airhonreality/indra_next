@@ -1,7 +1,6 @@
 //! Cloud Filter API - Callback Handlers
 
 use anyhow::Result;
-use std::sync::Arc;
 use tokio::sync::mpsc;
 use windows::Win32::Foundation::*;
 use windows::Win32::Storage::CloudFilters::*;
@@ -132,75 +131,21 @@ impl SyncEngineCallbacks {
     }
 }
 
-/// Callback handler for CF_CALLBACK_TYPE_FETCH_DATA
-///
-/// Invoked when the system needs to fetch data for a placeholder file
-pub unsafe extern "system" fn on_fetch_data(
-    _callback_info: *const CF_CALLBACK_INFO,
-    _param: *const CF_CALLBACK_PARAMETERS,
-) -> HRESULT {
-    tracing::debug!("CFAPI callback: FetchData");
+// Note: These callback functions are defined but not currently used.
+// They are placeholders for future Cloud Filter API integration.
+// The callback prototypes will be properly implemented when CloudFilter
+// integration is needed. For now, file watching is handled via notify crate.
 
-    // In a real implementation:
-    // let info = &*callback_info;
-    // let fetch_param = &(*param).FetchData;
-    //
-    // let event = SyncEvent::FetchData {
-    //     file_id: format!("{:?}", info.FileId),
-    //     offset: fetch_param.RequiredFileRange.StartingOffset.QuadPart as u64,
-    //     length: fetch_param.RequiredFileRange.Length.QuadPart as u64,
-    // };
-    //
-    // // Enqueue for async processing
-    // GLOBAL_CALLBACK_HANDLER.emit(event)?;
-
-    S_OK
-}
-
-/// Callback handler for CF_CALLBACK_TYPE_CANCEL_FETCH_DATA
-///
-/// Invoked when the system cancels an in-flight fetch operation
-pub unsafe extern "system" fn on_cancel_fetch(
-    _callback_info: *const CF_CALLBACK_INFO,
-    _param: *const CF_CALLBACK_PARAMETERS,
-) -> HRESULT {
-    tracing::debug!("CFAPI callback: CancelFetch");
-
-    // Prioritize cancellation in download queue
-    // Does not affect critical fetches in execution
-
-    S_OK
-}
-
-/// Callback handler for CF_CALLBACK_TYPE_DELETE
-///
-/// Invoked when a placeholder is deleted
-pub unsafe extern "system" fn on_delete_placeholder(
-    _callback_info: *const CF_CALLBACK_INFO,
-    _param: *const CF_CALLBACK_PARAMETERS,
-) -> HRESULT {
-    tracing::debug!("CFAPI callback: DeletePlaceholder");
-
-    // Clean up metadata for deleted file
-    // Remove from local cache DB
-
-    S_OK
-}
-
-/// Callback handler for CF_CALLBACK_TYPE_RENAME
-///
-/// Invoked when a placeholder is renamed locally
-pub unsafe extern "system" fn on_rename_local(
-    _callback_info: *const CF_CALLBACK_INFO,
-    _param: *const CF_CALLBACK_PARAMETERS,
-) -> HRESULT {
-    tracing::debug!("CFAPI callback: RenameLocal");
-
-    // Sync rename to cloud provider
-    // Update metadata DB with new path
-
-    S_OK
-}
+// /// Callback handler for CF_CALLBACK_TYPE_FETCH_DATA
+// ///
+// /// Invoked when the system needs to fetch data for a placeholder file
+// pub unsafe extern "system" fn on_fetch_data(
+//     _callback_info: *const CF_CALLBACK_INFO,
+//     _param: *const CF_CALLBACK_PARAMETERS,
+// ) -> windows::Win32::Foundation::HRESULT {
+//     tracing::debug!("CFAPI callback: FetchData");
+//     windows::Win32::Foundation::S_OK
+// }
 
 #[cfg(test)]
 mod tests {

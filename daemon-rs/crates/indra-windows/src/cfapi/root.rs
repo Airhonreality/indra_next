@@ -107,16 +107,19 @@ pub fn check_cfapi_available() -> Result<()> {
 
     unsafe {
         let mut version_info = std::mem::zeroed();
-        if !GetVersionExW(&mut version_info).as_bool() {
-            return Err(anyhow!("Failed to get Windows version"));
+        match GetVersionExW(&mut version_info) {
+            Ok(_) => {
+                tracing::info!(
+                    major = version_info.dwMajorVersion,
+                    minor = version_info.dwMinorVersion,
+                    build = version_info.dwBuildNumber,
+                    "Windows version detected"
+                );
+            }
+            Err(e) => {
+                return Err(anyhow!("Failed to get Windows version: {:?}", e));
+            }
         }
-
-        tracing::info!(
-            major = version_info.dwMajorVersion,
-            minor = version_info.dwMinorVersion,
-            build = version_info.dwBuildNumber,
-            "Windows version detected"
-        );
 
         // Cloud Files API available on Windows 10.1809+
         if version_info.dwMajorVersion < 10 {

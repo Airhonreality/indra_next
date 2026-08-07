@@ -7,7 +7,7 @@ use crate::fastcdc::FastCdcChunker;
 use crate::state_machine::StateMachine;
 use crate::storage::StorageProvider;
 use crate::types::{Blake3Hash, SyncEntry, SyncState, SyncTask};
-use crate::{blake3_hasher::Blake3Hasher, Result};
+use crate::{blake3_hasher::Blake3Hasher, Error, Result};
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -29,7 +29,7 @@ pub struct SyncEngine<P: StorageProvider> {
     _task_handle: tokio::task::JoinHandle<()>,
 }
 
-impl<P: StorageProvider> SyncEngine<P> {
+impl<P: StorageProvider + 'static> SyncEngine<P> {
     /// Create new SyncEngine instance
     pub async fn new(provider: P, db_path: &Path) -> Result<Self> {
         let db = Arc::new(SyncDb::init(db_path).await?);
@@ -104,10 +104,12 @@ impl<P: StorageProvider> SyncEngine<P> {
         entry.state = StateMachine::start_sync(entry.state)?;
         self.db.upsert_file(&entry).await?;
 
-        self.critical_queue.send(SyncTask::FetchData {
-            path: path.to_path_buf(),
-            range: (0, entry.local_metadata.size),
-        })?;
+        self.critical_queue
+            .send(SyncTask::FetchData {
+                path: path.to_path_buf(),
+                range: (0, entry.local_metadata.size),
+            })
+            .map_err(|e| Error::Other(e.to_string()))?;
 
         Ok(())
     }
@@ -151,8 +153,8 @@ impl<P: StorageProvider> SyncEngine<P> {
                 state: SyncState::Pending,
                 local_metadata: self.provider.get_metadata(path).await?,
                 remote_metadata: None,
-                chunks: Some(chunks),
-                chunk_hashes: Some(chunk_hashes),
+                chunks: None,
+                chunk_hashes: None,
             },
         };
 
@@ -175,9 +177,11 @@ impl<P: StorageProvider> SyncEngine<P> {
 
         // Enqueue for processing
         for entry in pending {
-            self.medium_queue.send(SyncTask::ProcessMetadata {
-                path: entry.path,
-            })?;
+            self.medium_queue
+                .send(SyncTask::ProcessMetadata {
+                    path: entry.path,
+                })
+                .map_err(|e| Error::Other(e.to_string()))?;
         }
 
         Ok(())

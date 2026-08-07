@@ -46,3 +46,10 @@ next-env.d.ts
 # scratch local
 /scratch/
 scratch_diagnose.js
+
+# daemon-rs (Rust workspace) — never commit compiled binaries/build cache
+daemon-rs/target/
+daemon-rs/data/
+daemon-rs/*.log
+daemon-rs/daemon_output.txt
+daemon-rs/*.exe

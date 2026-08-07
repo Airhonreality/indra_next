@@ -135,7 +135,7 @@ pub struct FileHandle {
 }
 
 /// Sync state of a file
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SyncState {
     /// Local changes pending
     Pending,

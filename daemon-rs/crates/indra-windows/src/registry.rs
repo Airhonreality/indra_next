@@ -1,7 +1,13 @@
 //! Windows Registry Configuration for Indra Sync Provider
 
 use anyhow::{anyhow, Result};
+use std::ffi::OsStr;
+use std::os::windows::ffi::OsStrExt;
 use uuid::Uuid;
+use windows::Win32::System::Registry::*;
+use windows::Win32::Foundation::ERROR_SUCCESS;
+use windows::core::PCWSTR;
+use tracing::debug;
 
 /// Configuration for the Indra storage provider in Windows Registry
 #[derive(Debug, Clone)]
@@ -33,6 +39,50 @@ impl Default for ProviderConfig {
     }
 }
 
+/// Helper: Convert &str to wide null-terminated string for Windows API
+fn str_to_wide(s: &str) -> Vec<u16> {
+    let os_str: &OsStr = s.as_ref();
+    os_str
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect()
+}
+
+/// Helper: Set a registry value (REG_SZ)
+unsafe fn set_registry_string(
+    hkey: HKEY,
+    value_name: &str,
+    value: &str,
+) -> Result<()> {
+    let mut value_name_wide = str_to_wide(value_name);
+    let mut value_wide = str_to_wide(value);
+
+    // Convert the wide string to bytes (excluding null terminator for the data)
+    let value_bytes = std::slice::from_raw_parts(
+        value_wide.as_ptr() as *const u8,
+        (value_wide.len() - 1) * 2,
+    );
+
+    let result = RegSetValueExW(
+        hkey,
+        PCWSTR(value_name_wide.as_mut_ptr()),
+        0,
+        REG_SZ,
+        Some(value_bytes),
+    );
+
+    if result == ERROR_SUCCESS {
+        debug!("Registry value set: {}", value_name);
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "Failed to set registry value {}: error {:#x}",
+            value_name,
+            result.0
+        ))
+    }
+}
+
 /// Register the Indra provider in Windows Registry
 ///
 /// Creates/updates the registry key:
@@ -51,16 +101,6 @@ pub fn register_provider(config: &ProviderConfig) -> Result<()> {
         "Registering Indra provider in Windows Registry"
     );
 
-    // In a real implementation, this would use winreg or similar to write to:
-    // HKCU\SOFTWARE\SyncEngines\Providers\Indra
-    //
-    // Registry entries:
-    // - MountPoint: REG_SZ = config.mount_point
-    // - DisplayName: REG_SZ = config.display_name
-    // - Handler: REG_SZ = config.handler_clsid
-    // - HashAlgorithm: REG_SZ = config.hash_algorithm
-    // - WOPIServiceId: REG_SZ = config.wopi_service_id
-
     if config.mount_point.is_empty() {
         return Err(anyhow!("Mount point cannot be empty"));
     }
@@ -69,50 +109,192 @@ pub fn register_provider(config: &ProviderConfig) -> Result<()> {
         return Err(anyhow!("Display name cannot be empty"));
     }
 
-    tracing::debug!(
-        handler_clsid = %config.handler_clsid,
-        hash_algorithm = %config.hash_algorithm,
-        "Registry entries to be created"
-    );
+    unsafe {
+        // Open or create the registry key
+        let reg_path = r#"SOFTWARE\SyncEngines\Providers\Indra"#;
+        let mut reg_path_wide = str_to_wide(reg_path);
 
-    tracing::info!(
-        "Indra provider registered in Windows Registry"
-    );
+        let mut hkey: HKEY = Default::default();
+        let result = RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            PCWSTR(reg_path_wide.as_mut_ptr()),
+            0,
+            None,
+            REG_OPTION_NON_VOLATILE,
+            KEY_WRITE,
+            None,
+            &mut hkey,
+            None,
+        );
 
-    Ok(())
+        if result != ERROR_SUCCESS {
+            return Err(anyhow!(
+                "Failed to create registry key: error {:#x}",
+                result.0
+            ));
+        }
+
+        // Set registry values
+        set_registry_string(hkey, "MountPoint", &config.mount_point)?;
+        set_registry_string(hkey, "DisplayName", &config.display_name)?;
+        set_registry_string(hkey, "Handler", &config.handler_clsid)?;
+        set_registry_string(hkey, "HashAlgorithm", &config.hash_algorithm)?;
+
+        if let Some(ref wopi_service_id) = config.wopi_service_id {
+            set_registry_string(hkey, "WOPIServiceId", wopi_service_id)?;
+        }
+
+        // Close the registry key
+        let _ = RegCloseKey(hkey);
+
+        tracing::info!(
+            "Indra provider registered in Windows Registry"
+        );
+
+        Ok(())
+    }
 }
 
 /// Unregister the Indra provider from Windows Registry
 pub fn unregister_provider() -> Result<()> {
     tracing::info!("Unregistering Indra provider from Windows Registry");
 
-    // In a real implementation:
-    // Remove HKCU\SOFTWARE\SyncEngines\Providers\Indra key
+    unsafe {
+        let reg_path = r#"SOFTWARE\SyncEngines\Providers"#;
+        let mut reg_path_wide = str_to_wide(reg_path);
 
-    tracing::info!("Indra provider unregistered from Windows Registry");
-    Ok(())
+        let result = RegDeleteTreeW(HKEY_CURRENT_USER, PCWSTR(reg_path_wide.as_mut_ptr()));
+
+        if result == ERROR_SUCCESS {
+            tracing::info!("Indra provider unregistered from Windows Registry");
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "Failed to unregister provider: error {:#x}",
+                result.0
+            ))
+        }
+    }
+}
+
+/// Helper: Read a registry string value
+unsafe fn get_registry_string(hkey: HKEY, value_name: &str) -> Result<String> {
+    let mut value_name_wide = str_to_wide(value_name);
+    let mut buffer: [u8; 512] = [0; 512];
+    let mut size: u32 = buffer.len() as u32;
+
+    let result = RegQueryValueExW(
+        hkey,
+        PCWSTR(value_name_wide.as_mut_ptr()),
+        None,
+        None,
+        Some(buffer.as_mut_ptr()),
+        Some(&mut size),
+    );
+
+    if result == ERROR_SUCCESS {
+        // Convert from UTF-16
+        let wide_str = std::slice::from_raw_parts(
+            buffer.as_ptr() as *const u16,
+            (size as usize) / 2,
+        );
+        let s = String::from_utf16_lossy(wide_str).to_string();
+        // Remove null terminator if present
+        Ok(s.trim_end_matches('\0').to_string())
+    } else {
+        Err(anyhow!(
+            "Failed to read registry value {}: error {:#x}",
+            value_name,
+            result.0
+        ))
+    }
 }
 
 /// Verify that the provider is registered
 pub fn verify_provider_registration() -> Result<()> {
     tracing::info!("Verifying Indra provider registration");
 
-    // In a real implementation:
-    // Read HKCU\SOFTWARE\SyncEngines\Providers\Indra
-    // Check required keys exist and are valid
+    unsafe {
+        let reg_path = r#"SOFTWARE\SyncEngines\Providers\Indra"#;
+        let mut reg_path_wide = str_to_wide(reg_path);
 
-    tracing::info!("Indra provider registration verified");
-    Ok(())
+        let mut hkey: HKEY = Default::default();
+        let result = RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            PCWSTR(reg_path_wide.as_mut_ptr()),
+            0,
+            KEY_READ,
+            &mut hkey,
+        );
+
+        if result != ERROR_SUCCESS {
+            return Err(anyhow!(
+                "Indra provider not registered: error {:#x}",
+                result.0
+            ));
+        }
+
+        // Check required values exist
+        let required_values = ["MountPoint", "DisplayName", "Handler", "HashAlgorithm"];
+        for value_name in &required_values {
+            if let Err(e) = get_registry_string(hkey, value_name) {
+                let _ = RegCloseKey(hkey);
+                return Err(anyhow!(
+                    "Missing required registry value '{}': {}",
+                    value_name,
+                    e
+                ));
+            }
+        }
+
+        let _ = RegCloseKey(hkey);
+        tracing::info!("Indra provider registration verified");
+        Ok(())
+    }
 }
 
 /// Get current provider configuration from Registry
 pub fn get_provider_config() -> Result<ProviderConfig> {
     tracing::info!("Reading Indra provider configuration from Registry");
 
-    // In a real implementation:
-    // Read from HKCU\SOFTWARE\SyncEngines\Providers\Indra
+    unsafe {
+        let reg_path = r#"SOFTWARE\SyncEngines\Providers\Indra"#;
+        let mut reg_path_wide = str_to_wide(reg_path);
 
-    Ok(ProviderConfig::default())
+        let mut hkey: HKEY = Default::default();
+        let result = RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            PCWSTR(reg_path_wide.as_mut_ptr()),
+            0,
+            KEY_READ,
+            &mut hkey,
+        );
+
+        if result != ERROR_SUCCESS {
+            debug!("Registry key not found, returning default config");
+            return Ok(ProviderConfig::default());
+        }
+
+        let mount_point = get_registry_string(hkey, "MountPoint")
+            .unwrap_or_else(|_| ProviderConfig::default().mount_point);
+        let display_name = get_registry_string(hkey, "DisplayName")
+            .unwrap_or_else(|_| ProviderConfig::default().display_name);
+        let handler_clsid = get_registry_string(hkey, "Handler")
+            .unwrap_or_else(|_| Uuid::new_v4().to_string());
+        let hash_algorithm = get_registry_string(hkey, "HashAlgorithm")
+            .unwrap_or_else(|_| "BLAKE3".to_string());
+        let wopi_service_id = get_registry_string(hkey, "WOPIServiceId").ok();
+
+        let _ = RegCloseKey(hkey);
+
+        Ok(ProviderConfig {
+            mount_point,
+            display_name,
+            handler_clsid,
+            hash_algorithm,
+            wopi_service_id,
+        })
+    }
 }
 
 #[cfg(test)]

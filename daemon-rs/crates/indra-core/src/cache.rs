@@ -27,11 +27,11 @@ impl SyncDb {
             .map_err(|e| Error::Database(format!("Failed to open database: {}", e)))?;
 
         // Enable WAL mode for concurrent access
-        conn.execute("PRAGMA journal_mode = WAL", [])
+        conn.execute_batch("PRAGMA journal_mode = WAL;")
             .map_err(|e| Error::Database(format!("Failed to enable WAL: {}", e)))?;
 
         // Enable foreign keys
-        conn.execute("PRAGMA foreign_keys = ON", [])
+        conn.execute_batch("PRAGMA foreign_keys = ON;")
             .map_err(|e| Error::Database(format!("Failed to enable foreign keys: {}", e)))?;
 
         // Create tables

@@ -12,8 +12,6 @@ path = "src/main.rs"
 
 [dependencies]
 indra-core = { path = "../indra-core" }
-indra-windows = { path = "../indra-windows" }
-indra-linux = { path = "../indra-linux" }
 tokio.workspace = true
 tonic.workspace = true
 prost.workspace = true
@@ -39,6 +37,10 @@ mdns-sd.workspace = true
 rustls.workspace = true
 rcgen.workspace = true
 hostname.workspace = true
+tokio-stream.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+indra-windows = { path = "../indra-windows" }
 
 [build-dependencies]
 tonic-build.workspace = true

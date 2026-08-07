@@ -256,10 +256,21 @@ El resto del código (las dos rutas, el manejo de tipos, el patrón de auth, el 
 por archivo sin abortar el batch completo) pasó la auditoría sin cambios — calidad sólida para
 una ejecución delegada.
 
-**Pendiente, explícito**: la migración generada (`drizzle/0001_clear_elektra.sql`) todavía NO se
-aplicó contra ninguna base de datos — ni de prueba ni real. Aplicarla y probar una subida real
-contra un provider conectado de verdad es la sección `### Verificación` de esta fase, todavía sin
-ejecutar.
+**Migración aplicada** (2026-08-07, autorizado por Javier): `npx drizzle-kit migrate` salió con
+exit 0 pero **no aplicó nada realmente** — `drizzle.__drizzle_migrations` quedó vacío y las tablas
+no existían (verificado con una query directa antes de confiar en el exit code de la CLI). Causa
+probable: esta base ya tenía su schema original creado por `drizzle-kit push` en algún momento, no
+por `migrate`, así que no había journal previo con el que reconciliarse — pendiente de investigar
+si hace falta, no bloqueante ahora. Se aplicó el SQL de `drizzle/0001_clear_elektra.sql`
+directamente (mismo contenido, ejecutado statement por statement) y se verificó independientemente
+contra la base real: `local_sync_settings` y `local_sync_state` existen, y `local_sync_state`
+tiene exactamente una PK, un FK y el `UNIQUE(user_id, local_path)` — sin duplicados ni conflictos.
+`GET`/`PATCH`/`POST` en las rutas nuevas responden 401 sin sesión (routing confirmado, mismo
+patrón que Fase 1).
+
+**Pendiente, explícito**: subir un archivo real contra un provider conectado de verdad, con sesión
+real de Javier — la sección `### Verificación` de esta fase todavía no se ejecutó de punta a
+punta. Eso converge con la Fase 3.
 
 ### Corrección de esquema (verificado leyendo el código, no supuesto)
 

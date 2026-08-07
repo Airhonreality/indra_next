@@ -24,7 +24,7 @@
  * 🔗 RELATIONSHIPS: [IntegrationAdapter, InngestJobs, PortDesigner]
  */
 
-import { pgTable, text, timestamp, jsonb, uuid, boolean, primaryKey, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, jsonb, uuid, boolean, primaryKey, integer, unique } from "drizzle-orm/pg-core";
 import { FieldSchema } from "@/core/types/integration";
 import type { AdapterAccount } from "@auth/core/adapters";
 export const integrations = pgTable("integrations", {
@@ -205,4 +205,39 @@ export const userFiles = pgTable("user_files", {
   }>(),
   syncedAt: timestamp("synced_at").defaultNow().notNull(),
 });
+
+/**
+ * LOCAL SYNC SETTINGS
+ * Stores the user's chosen target for local file sync (which storage provider to push to).
+ * One row per user — tracks the provider chosen as destination for "sync local → cloud".
+ */
+export const localSyncSettings = pgTable("local_sync_settings", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider"), // 'id' of the adapter chosen as target (e.g., 's3', 'mega', 'google-drive'), or null to disable
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
+ * LOCAL SYNC STATE
+ * Stores the record of which files have already been synced to the target provider.
+ * Used to avoid re-uploading the same file on every Pull() — check by blake3Hash.
+ * Unique by (userId, localPath) to prevent duplicate entries for the same file.
+ */
+export const localSyncState = pgTable(
+  "local_sync_state",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(), // Same 'id' as in localSyncSettings.provider
+    localPath: text("local_path").notNull(), // Full path of the file on the local machine
+    blake3Hash: text("blake3_hash").notNull(), // BLAKE3 digest of the file (hex-encoded)
+    remoteObjectId: text("remote_object_id"), // Optional: ID/path of the uploaded object in the target provider
+    syncedAt: timestamp("synced_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    // Enforced at the DB level (not just app-code check-then-insert) so concurrent
+    // sync requests for the same file can't create duplicate rows.
+    userPathUnique: unique("local_sync_state_user_path_unique").on(table.userId, table.localPath),
+  })
+);
 

@@ -118,9 +118,10 @@ async fn main() -> Result<()> {
                         }
                     };
 
-                    // Register the file for sync
-                    if let Err(e) = engine_clone.sync_file(&path).await {
-                        tracing::warn!("Failed to sync file {:?}: {}", path, e);
+                    // Chunk, BLAKE3-hash, and persist the file's sync metadata locally.
+                    // (No remote push yet — see docs/plans/24_PLAN_verificacion-e2e-storage.md.)
+                    if let Err(e) = engine_clone.process_file(&path).await {
+                        tracing::warn!("Failed to process file {:?}: {}", path, e);
                     }
                 }
             }
@@ -134,8 +135,9 @@ async fn main() -> Result<()> {
     let listen_addr: SocketAddr = format!("{}:{}", config.listen_addr, config.listen_port)
         .parse()?;
 
+    let grpc_engine = engine.clone();
     tokio::spawn(async move {
-        if let Err(e) = grpc::start_grpc_server(listen_addr).await {
+        if let Err(e) = grpc::start_grpc_server(listen_addr, grpc_engine).await {
             tracing::error!("gRPC server error: {}", e);
         }
     });

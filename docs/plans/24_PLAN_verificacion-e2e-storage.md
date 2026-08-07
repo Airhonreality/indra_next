@@ -104,31 +104,120 @@ respondido todavía — se traslada a Javier en este turno, no se decide unilate
 
 ---
 
-## Fase 1 — Cerrar el mismatch de puerto y decidir la arquitectura del puente (BORRADOR — bloqueada por decisión de producto)
+## Fase 1 — Cliente gRPC real en Next.js + Pull() real en el daemon (**EJECUTADO Y VERIFICADO** — 2026-08-07)
 
-**Decisión requerida antes de escribir código** (afecta el resto de las fases): cómo habla la
-app Next.js con el daemon, y qué cuenta como "storage" para el test.
+Javier eligió la opción **(B)**: cliente gRPC real en Next.js (`@grpc/grpc-js` +
+`@grpc/proto-loader` contra `sync.proto`), fiel al diseño original de
+`23_PLAN_multi-device-sync.md`, en vez del endpoint HTTP ligero o de reusar el adaptador S3/R2.
 
-Opciones evaluadas (sin ejecutar aún, ver pregunta a Javier en la conversación):
+### Trabajo realizado
 
-- **(A) Endpoint HTTP ligero en el daemon** (ej. `axum`/`warp` sirviendo `/health`, `/files` en
-  el mismo proceso). Next.js hace `fetch('http://127.0.0.1:50051/...')` directo desde el route
-  handler. Menor superficie nueva, reutiliza el servidor que ya corre.
-- **(B) Cliente gRPC real en Next.js** tal como lo esbozó `23_PLAN_multi-device-sync.md`
-  (`@grpc/grpc-js` + `sync.proto`). Más fiel al diseño original multi-dispositivo, más trabajo.
-- **(C) El daemon empuja los archivos al adaptador S3/R2 ya auditado** (plan 12/12B,
-  `EJECUTADO`/`AUDITADO`) en vez de inventar un backend nube nuevo; `/api/storage/union` ya sabe
-  listarlos. El daemon deja de ser la fuente de verdad del listado — solo hidrata/escribe local.
+- **`daemon-rs/crates/indra-core/src/cache.rs`**: `sync_entries` ahora persiste `content_hash`
+  (BLAKE3, 32 bytes) y guarda `modified_at` en **milisegundos** (no segundos) — con segundos,
+  dos archivos creados en la misma ventana de 1s eran indistinguibles para "más reciente", el
+  problema exacto que la auditoría original marcó como debilidad de diseño. Se agregó
+  `list_recent(limit)`.
+- **`daemon-rs/crates/indra-core/src/engine.rs`**: `process_file` ahora persiste la entrada en
+  `sync_entries` **antes** de escribir `chunks`/`hash_references` (ver bug de FK abajo), y marca
+  el archivo `Synced` al terminar — antes de este cambio ningún archivo salía nunca de
+  `Pending`/`Syncing` porque `ProcessMetadata` nunca se encolaba automáticamente. Se agregó
+  `list_recent()` como delegado público.
+- **`daemon-rs/crates/indra-daemon/src/grpc.rs`**: `pull()` dejó de ser un stub. Ahora lee
+  `SyncEngine::list_recent()` y devuelve `SyncEvent` reales con `FileMetadata.chunks[0]` portando
+  el hash BLAKE3 de archivo completo. `push()`/`subscribe()` **siguen siendo stubs** — ver
+  "Lo que NO quedó cerrado" abajo.
+- **`daemon-rs/crates/indra-daemon/src/main.rs`**: el watcher de archivos ahora llama
+  `process_file` (hashea y persiste de verdad) en vez de `sync_file` (que solo encolaba sin
+  procesar nunca). El servidor gRPC recibe el `Arc<SyncEngine<..>>` real.
+- **`src/lib/daemon-client.ts`** (nuevo): cliente gRPC en Node/Next.js contra
+  `127.0.0.1:50051`, con `isDaemonReachable()`, `daemonHeartbeat()`, `daemonPullFiles()`.
+- **`src/app/api/desktop/bridge/route.ts`**: ya no devuelve `capability:'none'` fijo — hace un
+  heartbeat gRPC real contra el daemon. Puerto corregido a 50051 (antes documentaba 9876, que
+  nunca coincidió con el daemon real).
+- **`src/app/api/desktop/files/route.ts`** (nuevo): el endpoint REST que pide el test original —
+  pulls del daemon y devuelve los archivos ordenados por `modifiedAtMs` descendente, con
+  `blake3Hex` por archivo.
+- `@grpc/grpc-js` y `@grpc/proto-loader` añadidos como dependencias directas de `package.json`
+  (estaban resueltas de forma transitiva por otro paquete, sin declarar — frágil).
 
-## Fase 2 — Camino de subida real: local → storage
-## Fase 3 — Listado en API REST con marcador único de test + orden verificable por fecha
-## Fase 4 — Camino inverso: nube → local
-## Fase 5 — Test E2E real de uso (el pedido original), automatizado y repetible
+### Bugs reales encontrados por el test de uso real (no por lectura de código)
 
-Las Fases 2-5 se detallan (Operaciones + Verificación mecánica concretas) una vez cerrada la
-decisión de arquitectura de la Fase 1 — especificarlas antes sería documentar código que
-todavía puede cambiar de forma, violando la doctrina de este mismo plan (criterio de éxito
-explícito, no aspiracional).
+Correr el test contra un archivo real de 89 bytes hizo panic al daemon en el primer intento.
+Seguir la doctrina de este mismo plan (correr `cargo test`, no solo `cargo build`) destapó tres
+más. Los cuatro eran reales, no hipotéticos:
+
+1. **`fastcdc.rs`**: `while chunk_start < data.len()` no protegía el índice real leído
+   (`data[chunk_start + chunk_len]`). Cualquier archivo más chico que `min_chunk_size` (16KB —
+   es decir, la mayoría de archivos de texto/config reales) hacía panic por index-out-of-bounds.
+   Corregido a `while chunk_start + chunk_len < data.len()`.
+2. **`engine.rs::process_file`**: escribía en `chunks`/`hash_references` (FK sobre
+   `sync_entries.path`) antes de insertar la fila padre en `sync_entries` — fallaba con
+   `FOREIGN KEY constraint failed` en cualquier archivo nuevo. Reordenado: `upsert_file` primero.
+3. **`engine.rs` test `test_sync_file`**: comparaba `SyncState` contra un `SystemTime` esperado
+   (error de tipos, no compilaba). Corregido a `matches!`.
+4. **`engine.rs` test `test_sync_engine_creation`**: usaba `mem::discriminant` sobre un
+   `Arc<SyncDb>` (no es un enum, lint `deny`-by-default). Reemplazado por una aserción real
+   (`list_pending()` vacío en un engine recién creado).
+
+Los 4 tests de `cache.rs` que dependían de la fila padre (`test_chunk_storage`,
+`test_dedup_lookup`, `test_version_vector`) fallaban por el mismo problema de FK que #2 — se les
+agregó un `upsert_file` previo. **`cargo test -p indra-core --release`: 33/33 en verde.**
+
+### Verificación real ejecutada (no simulada)
+
+```
+1. cargo build -p indra-daemon --release         → indra-daemon.exe reconstruido
+2. Se detiene el daemon anterior, se limpia daemon-rs/data (esquema cambió)
+3. Se arranca el daemon nuevo → gRPC LISTENING en 127.0.0.1:50051 (confirmado por netstat)
+4. Se escribe un archivo de prueba único en "C:\Users\javir\Indra Drive"
+   (marcador con timestamp+PID en el nombre, 89 bytes)
+5. Hash BLAKE3 de referencia calculado de forma INDEPENDIENTE (herramienta descartable
+   fuera del pipeline del daemon, leyendo el archivo directo del disco)
+   → df8392980a12654e510d6d3e40def5706a4cfb5f1e46deed9cf85c483e1b8b69
+6. npm run dev (Next.js) arranca limpio; GET /api/desktop/bridge y /api/desktop/files
+   sin sesión → 401 Unauthorized (confirma que las rutas están cableadas y el guard de auth
+   dispara correctamente — mismo patrón que /api/storage/union)
+7. Cliente gRPC (mismo código que src/lib/daemon-client.ts) llama Pull() directo contra
+   el daemon real → 1 evento, blake3Hex = df8392980a12654e510d6d3e40def5706a4cfb5f1e46deed9cf85c483e1b8b69
+   → COINCIDE EXACTO con el hash independiente del paso 5. Sin corrupción.
+8. Latencia de Pull() (6 corridas, n insuficiente para percentiles serios):
+   35, 32, 31, 35, 38, 32 ms — orden de magnitud razonable para localhost, no una medición
+   estadística formal (ver doctrina de este plan, punto 7 — pendiente para cuando haya un
+   harness de benchmark dedicado).
+```
+
+**Esto prueba, con evidencia y no por inspección de código**: local (file watcher) → hash
+BLAKE3 real → SQLite → gRPC Pull real → cliente Node real, sin corrupción, en el mismo camino
+de código que usará la ruta REST. Es el primer punto de esta iniciativa donde "el archivo que
+se clonó localmente" es verificable por fuera del propio daemon.
+
+### Lo que NO quedó cerrado (para no reportar más de lo verificado)
+
+- **El round-trip HTTP+sesión real no se ejecutó.** `/api/desktop/files` exige sesión de
+  NextAuth (Google OAuth contra Postgres real). No se simuló ni se hizo bypass de login —
+  hacerlo habría requerido una cuenta de Google real o falsificar una cookie de sesión, ninguna
+  de las dos aceptable para una verificación automatizada. Lo verificado es: (a) la ruta
+  responde 401 correctamente sin sesión, y (b) el mismo cliente gRPC que usa la ruta funciona
+  contra el daemon real. Falta cerrar el tramo con una sesión real de Javier.
+- **`push()` y `subscribe()` siguen siendo stubs.** El sentido inverso del test pedido
+  ("empezar en la nube, verificar que llega a local") sigue sin camino de código. No hay a dónde
+  "empujar" un evento que el daemon vaya a materializar como archivo local.
+- **Sigue siendo de una sola máquina.** `127.0.0.1:50051` solo funciona si Next.js y el daemon
+  corren en el mismo equipo — el problema de NAT/relay para nube hospedada de verdad sigue sin
+  tocarse (ver Fase 1 original de este documento).
+- **`CfRegisterSyncRoot` sigue sin invocarse** (root.rs) — el archivo de prueba llegó por
+  detección de `notify`, no por el mecanismo real de Cloud Filters API.
+
+## Fase 2 — Camino de subida real hacia un backend remoto real (push funcional)
+## Fase 3 — Sesión real (Javier logueado) ejecutando el round-trip HTTP completo
+## Fase 4 — Camino inverso: nube → local (requiere Fase 2)
+## Fase 5 — Test E2E completo y bidireccional, automatizado y repetible
+
+Las Fases 2-5 se detallan (Operaciones + Verificación mecánica concretas) una vez que Javier
+decida el backend real de "push" (¿SQLite del propio daemon vía un segundo dispositivo LAN, tal
+como diseñó originalmente el plan 23? ¿o el adaptador S3/R2 ya auditado, más simple pero un
+cambio de arquitectura respecto a lo elegido en esta fase?) — especificarlas antes sería
+documentar código que todavía puede cambiar de forma.
 
 ---
 

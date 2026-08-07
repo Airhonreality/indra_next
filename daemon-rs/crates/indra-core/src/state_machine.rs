@@ -205,7 +205,7 @@ mod tests {
         };
 
         // Cannot go back to syncing
-        assert!(StateMachine::start_sync(state).is_err());
+        assert!(StateMachine::start_sync(state.clone()).is_err());
 
         // Cannot complete (already synced)
         assert!(StateMachine::complete_sync(state).is_err());

@@ -128,11 +128,26 @@ impl<P: StorageProvider + 'static> SyncEngine<P> {
         // Extract hashes
         let chunk_hashes: Vec<Blake3Hash> = chunks.iter().map(|c| c.hash).collect();
 
-        // Store chunks
-        self.db.store_chunks(path, &chunks).await?;
-
         // Compute content hash
         let content_hash = Blake3Hasher::hash(&content);
+
+        // Get or create entry, and persist it FIRST: chunks/hash_references carry a foreign
+        // key on sync_entries.path, so the parent row must exist before those inserts.
+        let mut entry = match self.db.get_file(path).await? {
+            Some(e) => e,
+            None => SyncEntry {
+                path: path.to_path_buf(),
+                state: SyncState::Pending,
+                local_metadata: self.provider.get_metadata(path).await?,
+                remote_metadata: None,
+                chunks: None,
+                chunk_hashes: None,
+            },
+        };
+        self.db.upsert_file(&entry).await?;
+
+        // Store chunks
+        self.db.store_chunks(path, &chunks).await?;
 
         // Check for duplicates
         let duplicates = self.db.find_duplicates(content_hash).await?;
@@ -145,26 +160,23 @@ impl<P: StorageProvider + 'static> SyncEngine<P> {
             .store_hash_reference(content_hash, path)
             .await?;
 
-        // Get or create entry
-        let mut entry = match self.db.get_file(path).await? {
-            Some(e) => e,
-            None => SyncEntry {
-                path: path.to_path_buf(),
-                state: SyncState::Pending,
-                local_metadata: self.provider.get_metadata(path).await?,
-                remote_metadata: None,
-                chunks: None,
-                chunk_hashes: None,
-            },
-        };
-
         entry.chunks = Some(chunks);
         entry.chunk_hashes = Some(chunk_hashes);
         entry.local_metadata.content_hash = Some(content_hash);
+        // Single-device MVP: there is no remote counterpart to confirm against yet, so
+        // "hashed and persisted locally" is the strongest sync guarantee we can make today.
+        entry.state = SyncState::Synced {
+            synced_at: std::time::SystemTime::now(),
+        };
 
         self.db.upsert_file(&entry).await?;
 
         Ok(entry)
+    }
+
+    /// List files across all states, most recently modified first (used by the gRPC Pull RPC)
+    pub async fn list_recent(&self, limit: i64) -> Result<Vec<SyncEntry>> {
+        self.db.list_recent(limit).await
     }
 
     /// Start full sync cycle
@@ -344,7 +356,10 @@ mod tests {
         };
 
         let engine = SyncEngine::new(provider, &db_path).await.unwrap();
-        assert_ne!(std::mem::discriminant(&engine.db), std::mem::discriminant(&engine.db));
+        assert!(
+            engine.list_pending().await.unwrap().is_empty(),
+            "freshly created engine should have no pending files"
+        );
     }
 
     #[tokio::test]
@@ -385,6 +400,10 @@ mod tests {
         engine.sync_file(path).await.unwrap();
         let status = engine.get_sync_status(path).await.unwrap();
 
-        assert_eq!(status, SyncState::Syncing { progress: 0.0, started_at: engine.db.get_file(path).await.unwrap().unwrap().state.clone() });
+        assert!(
+            matches!(status, SyncState::Syncing { .. }),
+            "expected Syncing state, got {:?}",
+            status
+        );
     }
 }

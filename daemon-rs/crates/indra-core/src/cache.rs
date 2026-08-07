@@ -52,7 +52,8 @@ impl SyncDb {
                 local_size INTEGER NOT NULL,
                 modified_at INTEGER NOT NULL,
                 synced_at INTEGER,
-                error_reason TEXT
+                error_reason TEXT,
+                content_hash BLOB
             );
 
             CREATE TABLE IF NOT EXISTS chunks (
@@ -106,18 +107,25 @@ impl SyncDb {
             _ => None,
         };
 
+        // Stored with millisecond precision: multiple files created/modified within the
+        // same second is common in tests, and "most recent" ordering must stay deterministic.
         let modified_at = entry
             .local_metadata
             .modified
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
-            .as_secs();
+            .as_millis() as i64;
+
+        let content_hash = entry
+            .local_metadata
+            .content_hash
+            .map(|h| h.as_bytes().to_vec());
 
         conn.execute(
             r#"
             INSERT OR REPLACE INTO sync_entries
-            (path, state, local_size, modified_at, synced_at, error_reason)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            (path, state, local_size, modified_at, synced_at, error_reason, content_hash)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
             "#,
             params![
                 entry.path.to_string_lossy().to_string(),
@@ -125,7 +133,8 @@ impl SyncDb {
                 entry.local_metadata.size as i64,
                 modified_at as i64,
                 synced_at,
-                error_reason
+                error_reason,
+                content_hash
             ],
         )
         .map_err(|e| Error::Database(format!("Failed to upsert file: {}", e)))?;
@@ -141,7 +150,7 @@ impl SyncDb {
         let result = conn
             .query_row(
                 r#"
-                SELECT state, local_size, modified_at
+                SELECT state, local_size, modified_at, content_hash
                 FROM sync_entries
                 WHERE path = ?1
                 "#,
@@ -150,17 +159,18 @@ impl SyncDb {
                     let state_str: String = row.get(0)?;
                     let size: i64 = row.get(1)?;
                     let modified_at: i64 = row.get(2)?;
+                    let content_hash: Option<Vec<u8>> = row.get(3)?;
 
-                    Ok((state_str, size, modified_at))
+                    Ok((state_str, size, modified_at, content_hash))
                 },
             )
             .optional()
             .map_err(|e| Error::Database(format!("Failed to get file: {}", e)))?;
 
-        if let Some((state_str, size, modified_at)) = result {
+        if let Some((state_str, size, modified_at, content_hash)) = result {
             let state = Self::string_to_state(&state_str)?;
             let modified = SystemTime::UNIX_EPOCH
-                + std::time::Duration::from_secs(modified_at as u64);
+                + std::time::Duration::from_millis(modified_at as u64);
 
             let local_metadata = crate::types::FileMetadata {
                 path: path.to_path_buf(),
@@ -168,7 +178,7 @@ impl SyncDb {
                 modified,
                 is_dir: false,
                 permissions: 0,
-                content_hash: None,
+                content_hash: Self::hash_from_blob(content_hash),
             };
 
             Ok(Some(SyncEntry {
@@ -192,7 +202,7 @@ impl SyncDb {
         let mut stmt = conn
             .prepare(
                 r#"
-                SELECT path, state, local_size, modified_at
+                SELECT path, state, local_size, modified_at, content_hash
                 FROM sync_entries
                 WHERE state = ?1
                 ORDER BY path
@@ -206,12 +216,14 @@ impl SyncDb {
                 let state_str: String = row.get(1)?;
                 let size: i64 = row.get(2)?;
                 let modified_at: i64 = row.get(3)?;
+                let content_hash: Option<Vec<u8>> = row.get(4)?;
 
                 Ok((
                     std::path::PathBuf::from(path_str),
                     state_str,
                     size,
                     modified_at,
+                    content_hash,
                 ))
             })
             .map_err(|e| Error::Database(format!("Failed to query files: {}", e)))?
@@ -219,10 +231,10 @@ impl SyncDb {
             .map_err(|e| Error::Database(format!("Failed to collect results: {}", e)))?;
 
         let mut result = Vec::new();
-        for (path, state_str, size, modified_at) in entries {
+        for (path, state_str, size, modified_at, content_hash) in entries {
             if let Ok(parsed_state) = Self::string_to_state(&state_str) {
                 let modified = SystemTime::UNIX_EPOCH
-                    + std::time::Duration::from_secs(modified_at as u64);
+                    + std::time::Duration::from_millis(modified_at as u64);
 
                 let local_metadata = crate::types::FileMetadata {
                     path: path.clone(),
@@ -230,7 +242,71 @@ impl SyncDb {
                     modified,
                     is_dir: false,
                     permissions: 0,
-                    content_hash: None,
+                    content_hash: Self::hash_from_blob(content_hash),
+                };
+
+                result.push(SyncEntry {
+                    path,
+                    state: parsed_state,
+                    local_metadata,
+                    remote_metadata: None,
+                    chunks: None,
+                    chunk_hashes: None,
+                });
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// List files across all states, most recently modified first
+    pub async fn list_recent(&self, limit: i64) -> Result<Vec<SyncEntry>> {
+        let conn = self.connection.lock();
+
+        let mut stmt = conn
+            .prepare(
+                r#"
+                SELECT path, state, local_size, modified_at, content_hash
+                FROM sync_entries
+                ORDER BY modified_at DESC
+                LIMIT ?1
+                "#,
+            )
+            .map_err(|e| Error::Database(format!("Failed to prepare statement: {}", e)))?;
+
+        let entries = stmt
+            .query_map(params![limit], |row| {
+                let path_str: String = row.get(0)?;
+                let state_str: String = row.get(1)?;
+                let size: i64 = row.get(2)?;
+                let modified_at: i64 = row.get(3)?;
+                let content_hash: Option<Vec<u8>> = row.get(4)?;
+
+                Ok((
+                    std::path::PathBuf::from(path_str),
+                    state_str,
+                    size,
+                    modified_at,
+                    content_hash,
+                ))
+            })
+            .map_err(|e| Error::Database(format!("Failed to query recent files: {}", e)))?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|e| Error::Database(format!("Failed to collect results: {}", e)))?;
+
+        let mut result = Vec::new();
+        for (path, state_str, size, modified_at, content_hash) in entries {
+            if let Ok(parsed_state) = Self::string_to_state(&state_str) {
+                let modified = SystemTime::UNIX_EPOCH
+                    + std::time::Duration::from_millis(modified_at as u64);
+
+                let local_metadata = crate::types::FileMetadata {
+                    path: path.clone(),
+                    size: size as u64,
+                    modified,
+                    is_dir: false,
+                    permissions: 0,
+                    content_hash: Self::hash_from_blob(content_hash),
                 };
 
                 result.push(SyncEntry {
@@ -401,6 +477,12 @@ impl SyncDb {
         }
     }
 
+    fn hash_from_blob(blob: Option<Vec<u8>>) -> Option<Blake3Hash> {
+        let bytes = blob?;
+        let array: [u8; 32] = bytes.try_into().ok()?;
+        Some(Blake3Hash::from_bytes(array))
+    }
+
     fn state_to_string(state: &SyncState) -> String {
         match state {
             SyncState::Pending => "pending".to_string(),
@@ -433,6 +515,26 @@ impl SyncDb {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    /// chunks/version_vectors/hash_references carry a FK on sync_entries.path,
+    /// so tests that exercise them directly need a parent row first.
+    fn dummy_entry(path: &std::path::Path) -> SyncEntry {
+        SyncEntry {
+            path: path.to_path_buf(),
+            state: SyncState::Pending,
+            local_metadata: crate::types::FileMetadata {
+                path: path.to_path_buf(),
+                size: 0,
+                modified: SystemTime::now(),
+                is_dir: false,
+                permissions: 0o644,
+                content_hash: None,
+            },
+            remote_metadata: None,
+            chunks: None,
+            chunk_hashes: None,
+        }
+    }
 
     #[tokio::test]
     async fn test_db_init() {
@@ -492,6 +594,7 @@ mod tests {
             },
         ];
 
+        db.upsert_file(&dummy_entry(&path)).await.unwrap();
         db.store_chunks(&path, &chunks).await.unwrap();
 
         let retrieved = db.get_chunks(&path).await.unwrap();
@@ -512,6 +615,8 @@ mod tests {
         let path1 = std::path::PathBuf::from("/file1.txt");
         let path2 = std::path::PathBuf::from("/file2.txt");
 
+        db.upsert_file(&dummy_entry(&path1)).await.unwrap();
+        db.upsert_file(&dummy_entry(&path2)).await.unwrap();
         db.store_hash_reference(hash, &path1).await.unwrap();
         db.store_hash_reference(hash, &path2).await.unwrap();
 
@@ -531,6 +636,7 @@ mod tests {
         vector.increment("peer2");
 
         let path = std::path::PathBuf::from("/test/file.txt");
+        db.upsert_file(&dummy_entry(&path)).await.unwrap();
         db.store_version_vector(&path, &vector)
             .await
             .unwrap();

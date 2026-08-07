@@ -20,6 +20,8 @@
     "@ffmpeg/core": "^0.12.10",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
+    "@grpc/grpc-js": "^1.14.3",
+    "@grpc/proto-loader": "^0.8.0",
     "@nangohq/frontend": "^0.70.1",
     "@nangohq/node": "^0.70.1",
     "@neondatabase/serverless": "^1.1.0",

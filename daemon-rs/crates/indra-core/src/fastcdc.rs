@@ -76,7 +76,11 @@ impl FastCdcChunker {
         let mut window = [0u8; 32];
         let mut window_pos = 0usize;
 
-        while chunk_start < data.len() {
+        // Guard on the actual index read below (chunk_start + chunk_len), not just
+        // chunk_start: for data shorter than min_chunk_size, chunk_len grows every
+        // iteration while chunk_start stays put, so `chunk_start < data.len()` alone
+        // stays true past the end of the buffer and panics on the index read.
+        while chunk_start + chunk_len < data.len() {
             let byte = data[chunk_start + chunk_len];
             gear_hash = gear_hash.wrapping_shl(1);
             gear_hash = gear_hash.wrapping_add(self.gear_table[byte as usize]);

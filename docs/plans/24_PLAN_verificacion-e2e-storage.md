@@ -236,7 +236,30 @@ innecesario).
   un backend central, no P2P en LAN). El "hub" en este diseño es la integración soberana del
   usuario, no un servidor de Indra ni pairing entre dispositivos.
 
-## Fase 2 — Camino de subida real (local → integración elegida por el usuario)
+## Fase 2 — Camino de subida real (local → integración elegida por el usuario) (**CÓDIGO EJECUTADO** — 2026-08-07, verificación real pendiente)
+
+Ejecutado por un subagente Haiku delegado (ver doctrina §2), supervisado y auditado por el
+Orquestador antes de commitear. `docs/plans/00_NORTH_STAR.md` fila 24 sigue en `EN_EJECUCION`.
+
+**Bug real encontrado en la auditoría, corregido antes del commit**: la primera migración que
+generó el subagente declaraba `local_sync_state` con dos primary keys a la vez (`id` a nivel de
+columna + `PRIMARY KEY(user_id, local_path)` a nivel de tabla) — DDL de Postgres inválido, habría
+fallado en una base de datos real. Su propia migración de seguimiento solo borraba la constraint
+rota, sin agregar ninguna forma real de unicidad — quedaba el upsert de la app (`check` +
+`insert`/`update`) sin respaldo a nivel de DB, vulnerable a condición de carrera. Corregido: la
+tabla ahora tiene `UNIQUE(user_id, local_path)` real vía `unique()` de Drizzle, y las dos
+migraciones rotas se borraron y se regeneró una sola limpia
+(`drizzle/0001_clear_elektra.sql`) — ninguna de las dos versiones llegó nunca a aplicarse contra
+una base de datos real.
+
+El resto del código (las dos rutas, el manejo de tipos, el patrón de auth, el manejo de errores
+por archivo sin abortar el batch completo) pasó la auditoría sin cambios — calidad sólida para
+una ejecución delegada.
+
+**Pendiente, explícito**: la migración generada (`drizzle/0001_clear_elektra.sql`) todavía NO se
+aplicó contra ninguna base de datos — ni de prueba ni real. Aplicarla y probar una subida real
+contra un provider conectado de verdad es la sección `### Verificación` de esta fase, todavía sin
+ejecutar.
 
 ### Corrección de esquema (verificado leyendo el código, no supuesto)
 

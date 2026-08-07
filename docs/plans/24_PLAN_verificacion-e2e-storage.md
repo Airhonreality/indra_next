@@ -238,42 +238,69 @@ innecesario).
 
 ## Fase 2 — Camino de subida real (local → integración elegida por el usuario)
 
-### Operaciones
+### Corrección de esquema (verificado leyendo el código, no supuesto)
 
-1. **Confirmar qué adapters ya implementan `createResumableSession`** antes de ofrecerlos como
-   opción de "drive de sync local" en la UI (`grep -rn "createResumableSession" src/integrations`
-   — hoy confirmado solo en `s3/adapter.ts`; verificar Drive/OneDrive/Mega antes de habilitarlos).
-2. **Agregar tabla `local_sync_state`** a `src/core/db/schema.ts` (junto a `integrations`/
-   `records`, línea ~30) + migración Drizzle:
+El diseño original de esta sección asumía un `integrationId: uuid` como FK. Es incorrecto para
+este repo:
+
+- La identidad de un adapter conectado es su **string de tipo** (`s3`, `mega`, `google-drive`),
+  no un UUID de conexión — confirmado en `src/integrations/s3/adapter.ts:99`
+  (`readonly id = 's3'`, hardcoded) y en cómo `/api/storage/union` filtra
+  (`upstreams.filter(u => u.id === provider)`, `route.ts:36`). El sistema asume como mucho una
+  conexión activa por tipo de proveedor por usuario.
+- `createResumableSession` (el mecanismo de subida real) **ya está implementado en 3 adapters**,
+  no solo S3 — confirmado por grep: `src/integrations/{s3,mega,google-drive}/adapter.ts` y
+  `storage-union/index.ts`. OneDrive NO lo implementa todavía — excluirlo de las opciones de
+  "drive de sync local" hasta que alguien lo agregue.
+- Los storages conectados viven repartidos en **dos tablas**: `integrations` (Notion, Drive,
+  Sheets) y `storage_connections` (Mega, y en general lo agregado como "storage dedicado" —
+  `src/core/db/schema.ts:173`). `getActiveUpstreams()` (`storage-union/helpers.ts:57`) ya las
+  unifica — no reinventar esa unificación.
+
+### Operaciones (corregidas)
+
+1. **Agregar tabla `local_sync_settings`** a `src/core/db/schema.ts` (junto a `users`, línea
+   ~102) + migración Drizzle — una fila por usuario, nunca toca la tabla `user` manejada por el
+   adapter de NextAuth:
+   ```ts
+   export const localSyncSettings = pgTable("local_sync_settings", {
+     userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+     provider: text("provider"), // 'id' del adapter elegido como target, ej. 's3' — nullable = sin target
+     updatedAt: timestamp("updated_at").defaultNow().notNull(),
+   });
+   ```
+2. **Agregar tabla `local_sync_state`** (registro de "qué ya subí", para no re-subir en cada
+   `Pull()`), sin FK a `integrations` (el target puede vivir en cualquiera de las dos tablas):
    ```ts
    export const localSyncState = pgTable("local_sync_state", {
      id: uuid("id").primaryKey().defaultRandom(),
      userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-     integrationId: uuid("integration_id").notNull().references(() => integrations.id, { onDelete: "cascade" }),
+     provider: text("provider").notNull(), // mismo 'id' de adapter que local_sync_settings.provider
      localPath: text("local_path").notNull(),
      blake3Hash: text("blake3_hash").notNull(),
      remoteObjectId: text("remote_object_id"),
      syncedAt: timestamp("synced_at").defaultNow().notNull(),
    });
    ```
-   Único por `(userId, localPath)`. Este es el registro de "qué ya subí", para no re-subir en
-   cada `Pull()`.
-3. **Marcar una integración como target**: reusar el campo libre `integrations.config` (jsonb,
-   `src/core/db/schema.ts:36`) con `config.isLocalSyncTarget = true`. Sin migración nueva — ya es
-   schemaless. Regla MVP: como mucho una integración activa como target por usuario.
-4. **Extender `src/app/api/desktop/files/route.ts` (o endpoint nuevo `desktop/sync/route.ts`)**:
-   tras `daemonPullFiles()`, diffear por `blake3Hash` contra `local_sync_state`. Para cada archivo
-   nuevo/cambiado: leer bytes locales (`fs.readFile` sobre el `path` que ya devuelve `Pull()` —
-   mismo equipo, ver limitación de alcance más abajo), pedir `createResumableSession` al adapter
-   marcado como target, `PUT` de los bytes al `resumableUri`, upsert en `local_sync_state`.
+   Único por `(userId, localPath)`.
+3. **Endpoint para fijar el target**: `PATCH /api/desktop/sync-target` — body `{ provider: string
+   | null }`, valida contra la lista de providers que soporten `createResumableSession` (hoy:
+   `s3`, `mega`, `google-drive`), upsert en `local_sync_settings`.
+4. **Endpoint de subida**: nuevo `src/app/api/desktop/sync/route.ts` (POST). Llama
+   `daemonPullFiles()`, resuelve el adapter target vía `getActiveUpstreams()` filtrando por
+   `local_sync_settings.provider`, diffea por `blake3Hash` contra `local_sync_state`. Para cada
+   archivo nuevo/cambiado: lee bytes locales (`fs.readFile` sobre el `path` que ya devuelve
+   `Pull()` — mismo equipo, ver limitación de alcance en Fase 4), pide `createResumableSession`
+   al adapter, hace `PUT` de los bytes al `resumableUri`, upsert en `local_sync_state`.
 
 ### Verificación
 
 ```
-1. Subir un archivo real vía el flujo de arriba.
-2. GET /api/storage/union?provider=<target> (la nube REAL, ya auditada) debe listar
+1. PATCH /api/desktop/sync-target con un provider real conectado (ej. tu propio R2/S3 de prueba).
+2. POST /api/desktop/sync → sube el archivo de prueba de Fase 1.
+3. GET /api/storage/union?provider=<ese mismo provider> (la nube REAL, ya auditada) debe listar
    ese archivo — mismo nombre, mismo tamaño.
-3. Descargar el objeto subido y comparar su BLAKE3 contra local_sync_state.blake3Hash
+4. Descargar el objeto subido y comparar su BLAKE3 contra local_sync_state.blake3Hash
    → deben coincidir exacto (mismo criterio de integridad usado en Fase 1).
 ```
 

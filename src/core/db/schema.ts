@@ -269,3 +269,18 @@ export const devicePairingCodes = pgTable("device_pairing_codes", {
   consumedAt: timestamp("consumed_at"),
 });
 
+/**
+ * SYNC COMMANDS
+ * Commands queued for execution on paired devices.
+ * Each command has a kind (e.g., 'download_file') and a JSON payload.
+ * Marked consumed_at when the device acknowledges receipt via heartbeat.
+ */
+export const syncCommands = pgTable("sync_commands", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  deviceId: uuid("device_id").notNull().references(() => devices.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  payload: jsonb("payload").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  consumedAt: timestamp("consumed_at"),
+});
+

@@ -38,6 +38,7 @@ rustls.workspace = true
 rcgen.workspace = true
 hostname.workspace = true
 tokio-stream.workspace = true
+reqwest.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 indra-windows = { path = "../indra-windows" }

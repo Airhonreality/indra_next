@@ -2,6 +2,7 @@
 
 mod fs_provider;
 mod grpc;
+mod cloud_client;
 
 use anyhow::Result;
 use fs_provider::LocalFsProvider;
@@ -21,6 +22,30 @@ async fn main() -> Result<()> {
                 .add_directive(tracing::Level::INFO.into()),
         )
         .init();
+
+    // Check for --pair mode
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 && args[1] == "--pair" {
+        if args.len() < 3 {
+            eprintln!("Usage: indra-daemon --pair <CODE>");
+            return Err(anyhow::anyhow!("Missing pairing code"));
+        }
+        let code = &args[2];
+        let config = DaemonConfig::default();
+        let db_path = PathBuf::from(&config.db_path);
+        let cloud_url = std::env::var("INDRA_CLOUD_URL")
+            .unwrap_or_else(|_| "https://indra-next.vercel.app".to_string());
+        match cloud_client::pair(&cloud_url, code, &db_path).await {
+            Ok(_) => {
+                println!("Device successfully paired with cloud!");
+                return Ok(());
+            }
+            Err(e) => {
+                eprintln!("Failed to pair device: {}", e);
+                return Err(e);
+            }
+        }
+    }
 
     tracing::info!(
         "Starting Indra daemon v{}",
@@ -141,6 +166,20 @@ async fn main() -> Result<()> {
             tracing::error!("gRPC server error: {}", e);
         }
     });
+
+    // Check for cloud token and start heartbeat if paired
+    let db_path = PathBuf::from(&config.db_path);
+    if let Some(token) = cloud_client::read_token_from_disk(&db_path) {
+        let cloud_url = std::env::var("INDRA_CLOUD_URL")
+            .unwrap_or_else(|_| "https://indra-next.vercel.app".to_string());
+        let heartbeat_engine = engine.clone();
+        tokio::spawn(async move {
+            cloud_client::start_heartbeat_loop(cloud_url, token, heartbeat_engine).await;
+        });
+        tracing::info!("Cloud sync enabled - heartbeat loop started");
+    } else {
+        tracing::warn!("No emparejado con la nube — correr `indra-daemon.exe --pair <CODIGO>` para habilitar sync");
+    }
 
     tracing::info!(
         "Indra daemon started successfully - Listening on {}",

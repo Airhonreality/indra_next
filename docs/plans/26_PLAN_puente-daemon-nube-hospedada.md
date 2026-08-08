@@ -212,12 +212,41 @@ código (una pantalla, no hace falta que sea linda). Verificación: un dispositi
 no el daemon real todavía) puede canjear un código por un token y el token queda hasheado en DB,
 nunca en claro.
 
-### Fase 2 — Heartbeat saliente real desde el daemon
+### Fase 2 — Heartbeat saliente real desde el daemon (**EJECUTADO Y VERIFICADO CONTRA PRODUCCIÓN REAL** — 2026-08-08)
 
-`cloud_client.rs`, el endpoint `/api/devices/heartbeat`, tabla `sync_commands` (vacía por ahora,
-sin productores todavía). Verificación: con el daemon corriendo en la máquina de Javier y la app
-en Vercel de verdad (no local) — este es el primer test real que SÍ prueba lo que Fase 3 de plan
-24 no pudo probar — el `lastSeenAt` del dispositivo se actualiza solo, sin túneles ni localhost.
+Ejecutado por un subagente Haiku, supervisado y auditado por el Orquestador antes de commitear.
+`cloud_client.rs`, `POST /api/devices/heartbeat`, tabla `sync_commands` (vacía, sin productores
+todavía — correcto para esta fase). Un bug real corregido en la auditoría: el loop de heartbeat
+creaba un `reqwest::Client` nuevo en cada tick de 20s en vez de reusarlo — tira el connection
+pooling y paga el costo de TLS/DNS en cada heartbeat. Corregido moviendo la construcción del
+cliente fuera del loop.
+
+**Este es el primer test real de todo el proyecto que prueba lo que Fase 3 de plan 24 no pudo
+probar** — no local, no simulado:
+
+1. Push a `main` → Vercel autodesplegó a producción real (`indra-next.vercel.app`), confirmado
+   con `vercel ls` hasta que el build quedó `Ready`.
+2. Se generó un código de pairing real en la base de datos real (insertado directo, sin pasar por
+   browser porque el login local sigue roto — ver nota de Fase 3 de plan 24 sobre variables
+   "Sensitive" de Vercel).
+3. Se corrió el binario real, `indra-daemon.exe --pair E2ETEST1`, con `INDRA_CLOUD_URL` apuntando
+   a su default (`https://indra-next.vercel.app`, producción real, no localhost) → pairing exitoso
+   en ~2.6s, token de 68 caracteres guardado en `daemon-rs/data/device_token`.
+4. Se arrancó el daemon normal (sin `--pair`) → log confirma `"Cloud sync enabled - heartbeat loop
+   started"`.
+5. Se consultó la base de datos real ~20s después: `devices.last_seen_at` pasó de `null` a un
+   timestamp real, `device_name = "Airhon"` (hostname real de la máquina de Javier) — el heartbeat
+   viajó de verdad desde esta PC hasta Vercel hospedado y se autenticó correctamente por hash del
+   token.
+
+El dispositivo emparejado (`Airhon`) queda como un pairing real, no dato de prueba — es
+literalmente la primera vez que la máquina de Javier queda enlazada de verdad a su cuenta de Indra
+hospedada. El daemon sigue corriendo en background mandando heartbeats cada 20s salvo que se
+detenga manualmente.
+
+**Pendiente, explícito**: `sync_commands` sigue vacía — no hay todavía ningún productor de
+comandos (eso es Fase 3), así que el heartbeat nunca trae nada que procesar todavía. Eso es
+esperado, no un bug.
 
 ### Fase 3 — Comando `download_file` y camino inverso real
 

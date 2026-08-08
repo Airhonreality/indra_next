@@ -293,6 +293,41 @@ archivo se escribe, `notify` lo detecta solo y `process_file` lo hashea. Para es
 `start_heartbeat_loop` necesita que le pasen el path de "Indra Drive" además de lo que ya recibe
 (hoy solo recibe `cloud_url, token, engine`).
 
+**Resultado (EJECUTADO, verificación viva parcial — 2026-08-08)**: 3a/3b/3c construidos por un
+subagente Haiku, auditados y corregidos antes de commitear. Cuatro problemas reales encontrados:
+
+1. **Dos errores reales de `tsc --noEmit`** (`err` tipado `unknown` usado como si tuviera
+   `.message` en `sync-check` y `download-object`) — el propio agente había reportado "Exit code
+   0 ✓", que era falso. Corregido con el patrón `err instanceof Error ? err.message : '...'` ya
+   usado en el resto del repo.
+2. **Bug de diseño heredado de este mismo plan, no del agente**: nada escribe en
+   `local_sync_state` del lado descarga (el heartbeat solo loguea `files`, no las persiste — así
+   quedó definido a propósito en Fase 2). Consecuencia real: `sync-check` llamado dos veces
+   encolaría el mismo `download_file` de nuevo indefinidamente, porque su chequeo de "ya
+   sincronizado" mira una tabla que nunca se llena para esta dirección. Corregido con una
+   deduplicación contra `sync_commands` ya emitidas por dispositivo+objeto — parche correcto para
+   esta fase, pero **no cierra el círculo completo** (ver pendiente abajo).
+3. `adapter as any` innecesario en `download-object` — `getActiveUpstreams()` ya devuelve el tipo
+   correcto (`IntegrationAdapter & Partial<IBlobCapable>`); limpiado sin necesidad de
+   `eslint-disable`.
+4. **`file_name` sin sanitizar antes de `indra_drive.join(file_name)`** en Rust — `getFileName()`
+   del lado S3 ya hace `basename()` (neutraliza casi todo path traversal), pero se agregó una
+   guarda explícita en el propio daemon (defensa en profundidad en el límite donde un string
+   externo toca el filesystem) que rechaza `/`, `\`, `..`, `.` o vacío.
+
+Verificado independientemente después de las correcciones: `tsc --noEmit` limpio,
+`npm run lint` en 241 (línea base exacta), `cargo build -p indra-daemon --release` limpio
+(el agente solo había corrido `cargo check`, no el build real).
+
+**Pendiente, explícito — no se ejecutó el test en vivo de punta a punta**: `local_sync_settings`
+está vacía para el usuario real (nunca se configuró un target, porque requiere sesión real —
+mismo bloqueo de login local que Fase 3 de plan 24). Fijar un target vía escritura directa a la
+base, como se hizo para probar Fase 1/2, aquí se evitó a propósito: cuál proveedor usar como
+destino de sync es una decisión de producto de Javier, no algo para decidir unilateralmente desde
+una sesión de auditoría. Falta: (a) resolver el login local o probar con sesión real, (b) que
+Javier elija su provider de sync, (c) cerrar el punto 2 de arriba con una confirmación real de
+descarga en vez del parche de deduplicación.
+
 ### Fase 4 — Test E2E real multi-máquina
 
 El test que de verdad hacía falta desde el principio: dos dispositivos físicos distintos (o al

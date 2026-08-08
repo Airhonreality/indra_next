@@ -173,8 +173,9 @@ async fn main() -> Result<()> {
         let cloud_url = std::env::var("INDRA_CLOUD_URL")
             .unwrap_or_else(|_| "https://indra-next.vercel.app".to_string());
         let heartbeat_engine = engine.clone();
+        let indra_drive_clone = indra_drive.clone();
         tokio::spawn(async move {
-            cloud_client::start_heartbeat_loop(cloud_url, token, heartbeat_engine).await;
+            cloud_client::start_heartbeat_loop(cloud_url, token, heartbeat_engine, indra_drive_clone).await;
         });
         tracing::info!("Cloud sync enabled - heartbeat loop started");
     } else {

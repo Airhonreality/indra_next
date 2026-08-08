@@ -109,6 +109,7 @@ pub async fn start_heartbeat_loop(
     cloud_url: String,
     token: String,
     engine: Arc<SyncEngine<LocalFsProvider>>,
+    indra_drive: PathBuf,
 ) {
     // Built once and reused for every tick — reqwest::Client owns a connection pool
     // internally; recreating it per-request would throw that away and pay TLS/DNS
@@ -180,19 +181,68 @@ pub async fn start_heartbeat_loop(
             continue;
         }
 
-        // Parse response and log commands
+        // Parse response and process commands
         match response.json::<serde_json::Value>().await {
             Ok(resp) => {
                 if let Some(commands) = resp.get("commands").and_then(|c| c.as_array()) {
                     if !commands.is_empty() {
-                        for cmd in commands {
-                            let kind = cmd
-                                .get("kind")
-                                .and_then(|k| k.as_str())
-                                .unwrap_or("unknown");
-                            info!("Received command: kind={}", kind);
-                        }
                         info!("Total commands received: {}", commands.len());
+                        // Extract command data before spawning tasks
+                        let download_tasks: Vec<(String, String)> = commands
+                            .iter()
+                            .filter_map(|cmd| {
+                                let kind = cmd
+                                    .get("kind")
+                                    .and_then(|k| k.as_str())
+                                    .unwrap_or("unknown");
+                                info!("Received command: kind={}", kind);
+
+                                // Extract download_file command data
+                                if kind == "download_file" {
+                                    if let Some(payload) = cmd.get("payload").and_then(|p| p.as_object()) {
+                                        if let (Some(remote_object_id), Some(file_name)) = (
+                                            payload.get("remoteObjectId").and_then(|v| v.as_str()),
+                                            payload.get("fileName").and_then(|v| v.as_str()),
+                                        ) {
+                                            return Some((remote_object_id.to_string(), file_name.to_string()));
+                                        } else {
+                                            warn!(
+                                                "download_file command missing remoteObjectId or fileName"
+                                            );
+                                        }
+                                    } else {
+                                        warn!("download_file command has no payload");
+                                    }
+                                }
+                                None
+                            })
+                            .collect();
+
+                        // Now spawn tasks with owned data
+                        for (remote_object_id, file_name) in download_tasks {
+                            let indra_drive_clone = indra_drive.clone();
+                            let cloud_url_clone = cloud_url.clone();
+                            let token_clone = token.clone();
+                            let client_clone = client.clone();
+
+                            tokio::spawn(async move {
+                                if let Err(e) = download_and_save_file(
+                                    &client_clone,
+                                    &cloud_url_clone,
+                                    &token_clone,
+                                    &remote_object_id,
+                                    &file_name,
+                                    &indra_drive_clone,
+                                )
+                                .await
+                                {
+                                    warn!(
+                                        "Failed to download file {}: {}",
+                                        file_name, e
+                                    );
+                                }
+                            });
+                        }
                     }
                 }
             }
@@ -201,6 +251,64 @@ pub async fn start_heartbeat_loop(
             }
         }
     }
+}
+
+/// Downloads a file from the cloud and saves it to Indra Drive.
+async fn download_and_save_file(
+    client: &reqwest::Client,
+    cloud_url: &str,
+    token: &str,
+    remote_object_id: &str,
+    file_name: &str,
+    indra_drive: &Path,
+) -> Result<()> {
+    // Build download URL with objectId query param
+    let download_url = format!("{}/api/devices/download-object", cloud_url);
+
+    // Make the download request with Bearer token and objectId query param
+    let response = client
+        .get(&download_url)
+        .query(&[("objectId", remote_object_id)])
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow::anyhow!(
+            "Download failed with status {}: {}",
+            response.status().as_u16(),
+            response.status()
+        ));
+    }
+
+    // Get the response body as bytes
+    let bytes = response.bytes().await?;
+
+    // Defense in depth: file_name ultimately comes from a remote provider's listing (via the
+    // cloud API), not something this process controls end to end. Reject anything that isn't a
+    // bare filename before it touches the filesystem, even though the server side already
+    // basename()s it today — a path separator or ".." here must never be able to write outside
+    // Indra Drive.
+    if file_name.contains('/') || file_name.contains('\\') || file_name == ".." || file_name == "." || file_name.is_empty() {
+        return Err(anyhow::anyhow!(
+            "Refusing to write file with unsafe name: {:?}",
+            file_name
+        ));
+    }
+
+    // Write to Indra Drive directory
+    let file_path = indra_drive.join(file_name);
+
+    // Ensure parent directory exists
+    if let Some(parent) = file_path.parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
+
+    // Write the file
+    tokio::fs::write(&file_path, bytes).await?;
+
+    info!("Successfully downloaded and saved: {:?}", file_path);
+    Ok(())
 }
 
 pub fn read_token_from_disk(db_path: &Path) -> Option<String> {

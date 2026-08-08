@@ -248,12 +248,50 @@ detenga manualmente.
 comandos (eso es Fase 3), así que el heartbeat nunca trae nada que procesar todavía. Eso es
 esperado, no un bug.
 
-### Fase 3 — Comando `download_file` y camino inverso real
+### Fase 3 — Comando `download_file` y camino inverso real (diseño concreto, listo para delegar)
 
 Lo que hoy Fase 4 de plan 24 resuelve escribiendo directo al filesystem local (porque Next.js y
 el daemon comparten máquina) se reemplaza por: Next.js encola un `sync_command` cuando detecta un
 archivo nuevo en el provider remoto, el daemon lo recibe en su próximo heartbeat y lo descarga él
 mismo. Recién acá el camino inverso funciona de verdad entre dos máquinas distintas.
+
+**Alcance explícito de esta fase**: la detección de "hay un archivo nuevo del lado remoto" queda
+**disparada a mano** (un endpoint que el usuario o un script llama), no automática por cron/
+Inngest — automatizar el disparo es trabajo futuro, no de esta fase (el proyecto ya usa Inngest
+para otros jobs en `src/inngest/functions/`, pero sumar un cron nuevo antes de probar que el
+mecanismo de comando→descarga funciona de punta a punta sería construir en el orden equivocado).
+
+**3a. Productor — `POST /api/devices/sync-check`** (nuevo, sesión de NextAuth requerida):
+1. Lee `local_sync_settings.provider` del usuario de la sesión. Sin target configurado → 400.
+2. Resuelve el adapter real vía `getActiveUpstreams(session.user.id)` filtrando por ese
+   `provider` (mismo patrón que ya usa `POST /api/desktop/sync` de plan 24 Fase 2).
+3. `adapter.listInventory()` — ya existe en el contrato `IntegrationAdapter`, todos los adapters
+   lo implementan.
+4. Para cada objeto remoto: ¿ya hay una fila en `local_sync_state` con ese
+   `remoteObjectId` para este `userId` + `provider`? Si sí, ya está sincronizado (en cualquier
+   sentido), saltar. Si no, es nuevo del lado remoto.
+5. Por cada objeto nuevo × cada dispositivo activo del usuario (`devices` donde `userId` matchea
+   — un usuario puede tener más de uno emparejado, es multi-dispositivo de verdad): insertar una
+   fila en `sync_commands` con `kind: 'download_file'`,
+   `payload: { remoteObjectId, fileName }`.
+6. Responde `{ enqueued: number, devices: number }`.
+
+**3b. Proxy de descarga — `GET /api/devices/download-object?objectId=<id>`** (nuevo): auth por
+`Authorization: Bearer <deviceToken>`, mismo lookup por hash que ya usa `heartbeat`. Resuelve el
+adapter del `userId` del dispositivo vía `local_sync_settings.provider` +
+`getActiveUpstreams()`, llama `adapter.downloadBlob(objectId)` (ya existe, ya lo usa
+`s3/adapter.ts` para el portal de subida — no inventar un segundo mecanismo de descarga), y
+transmite el `ReadableStream` de vuelta como body de la respuesta HTTP. El daemon nunca ve
+credenciales del adapter — solo pide bytes con su device token, igual que el heartbeat.
+
+**3c. Consumidor — daemon (Rust)**: en `cloud_client.rs`, dentro del loop de heartbeat, por cada
+comando recibido con `kind == "download_file"`: `GET {cloud_url}/api/devices/download-object?
+objectId=<payload.remoteObjectId>` con el mismo `Authorization: Bearer` que ya usa el heartbeat,
+escribir los bytes recibidos en `<Indra Drive>/<payload.fileName>`. **No hace falta tocar el
+file watcher ni el hasheo** — ya existen y ya están probados (Fase 0/1 de plan 24): en cuanto el
+archivo se escribe, `notify` lo detecta solo y `process_file` lo hashea. Para esto,
+`start_heartbeat_loop` necesita que le pasen el path de "Indra Drive" además de lo que ya recibe
+(hoy solo recibe `cloud_url, token, engine`).
 
 ### Fase 4 — Test E2E real multi-máquina
 

@@ -79,12 +79,12 @@ depende_de: [NN, NN]
 | 12B | Wiring de `s3` en getActiveUpstreams + ops de gestión en Drive/Mega/OneDrive | orquestador diseña → codex ejecuta | suite de contrato + upstreams generalizado | LISTO |
 | 13 | Diagnóstico y reparación del transcoder (prerrequisito de portales) | orquestador diagnostica → codex ejecuta | archivo de prueba sale optimizado, peso menor al origen | PENDIENTE |
 | 14 | BYODB: onboarding "pega tu link" + bootstrap y versionado de esquema | orquestador diseña esquema → codex implementa UI | migración corre en DB Neon virgen | PENDIENTE |
-| 15 | Colecciones inter-storage (metadata-only) | codex sobre spec del orquestador | CRUD de colecciones sin escrituras en storages | PENDIENTE |
+| 15 | Colecciones inter-storage (metadata-only) — **absorbido por plan 25**, nunca tuvo archivo propio | codex sobre spec del orquestador | CRUD de colecciones sin escrituras en storages | ver plan 25 |
 | 16 | Usabilidad: previews ligeras, renombrado en bloque, panel unificado | codex | checklist visual + /verify | PENDIENTE |
 | 17 | Amplitud: nuevos proveedores (YouTube como publish-target con capacidades reducidas) | codex (uno por proveedor) | suite de contrato | PENDIENTE |
 | 23 | Sync multi-dispositivo vía mDNS/pairing LAN, sin servidor central | codex | n/a | **SUPERADO** — contradice el goal "replicar Google Drive Desktop" (hub central, no P2P); ver decisión de arquitectura en 24 |
 | 24 | Instalador + daemon local real, puente gRPC daemon↔Next.js, verificación E2E de storage | orquestador diseña/verifica → codex/haiku ejecutan fases | ver `## Verificación` por fase en el plan | EN_EJECUCION (Fase 0 y 1 EJECUTADAS Y VERIFICADAS; 2-5 pendientes) |
-| 25 | Capa 2 (esquematización): diseño UX de tags/contextos personalizados | orquestador (diseño no delegable) | n/a (BORRADOR, sin Operaciones aún) | BORRADOR |
+| 25 | Colecciones (absorbe plan 15) + diseño UX de tags/contextos personalizados — resuelve a qué proveedor sube un archivo local en plan 26 | orquestador (diseño no delegable) | n/a (diseño core resuelto, 3 preguntas abiertas antes de Operaciones) | BORRADOR (diseño avanzado) |
 | 26 | Puente daemon↔nube hospedada: pairing de dispositivo + heartbeat saliente (sin esto, Indra hospedado nunca ve al daemon del usuario) | orquestador diseña → codex/haiku ejecutan | Fase 2: `lastSeenAt` se actualiza solo contra Vercel real, sin localhost | EN_EJECUCION (Fase 1 y 2 EJECUTADAS Y VERIFICADAS contra producción real; Fase 3 construida y auditada, verificación en vivo pendiente de que Javier elija su provider de sync) |
 
 **Regla de dependencia**: 11 abarata todo lo posterior; 15 solo tiene sentido con 12 y 14

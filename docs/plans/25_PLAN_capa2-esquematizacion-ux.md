@@ -64,12 +64,96 @@ datos:
   (metadata EXIF, tipo de archivo, contenido), o el etiquetado es 100% manual en esta primera
   iteración?
 
-## Estado
+## Diseño resuelto (2026-08-08) — a partir de la corrección de producto en plan 26
 
-**BORRADOR — sin Operaciones ni Verificación todavía.** No delegar a ningún ejecutor hasta que el
-Orquestador convierta esto en un plan con wireframes/flujos concretos y, recién ahí, un contrato
-de datos (Zod) para tags/colecciones. Verificado (`grep -rn "collections|Collection" src`, sin
-resultados relevantes): el plan 15 ("Colecciones inter-storage") sigue `PENDIENTE` — no hay
-implementación previa que este diseño deba respetar o evitar duplicar. Sí conviene coordinar con
-quien retome el plan 15, porque "colecciones" y "tags/contextos personalizados" son
-probablemente la misma pieza de producto vista desde dos planes distintos.
+Al auditar la Fase 3 de `26_PLAN_puente-daemon-nube-hospedada.md`, Javier corrigió el modelo de
+sync (ver ese documento, sección "Corrección de producto") y de paso resolvió la pregunta abierta
+más importante de este plan: **las colecciones no son una vista guardada sobre tags sueltos — son
+la pieza que responde "a qué proveedor va un archivo nuevo" cuando el usuario marca una carpeta
+local para sincronizar.** Sin esto, la subida automática (Fase de plan 26 deliberadamente sin
+tocar) no tiene una respuesta de diseño real, solo una regla default apurada.
+
+**Nota de alcance**: el plan 15 ("Colecciones inter-storage") nunca tuvo archivo propio — solo
+existía como fila en la matriz del North Star, sin diseño. Este documento lo absorbe; se actualiza
+la matriz para que la fila 15 apunte acá en vez de a un plan fantasma.
+
+### Qué es una colección (entidad de primera clase, no una vista)
+
+Una colección agrupa:
+- **Fuentes de lectura** (`collection_sources`): una o más referencias `(provider, remotePath)`
+  de solo lectura — de dónde vienen los archivos que se ven agregados en esa colección. Puede
+  combinar proveedores distintos (ej. "Fotos del viaje" = carpeta de Drive + carpeta de S3).
+- **Destino de escritura** (opcional, un único `(provider, remotePath)` en la propia colección):
+  a dónde van los archivos nuevos. Una colección sin destino es de solo agregación/lectura —
+  nunca recibe uploads. Se elige **una vez, al crear la colección o al vincularla a una carpeta
+  local**, nunca por archivo — coincide con "no hay botón de sincronizar, las acciones solo
+  pasan".
+- Pura metadata en el Postgres del usuario — jamás reescribe ni reorganiza lo que ya vive en cada
+  storage real (Ley 2 del North Star, sin cambios).
+
+### Cómo resuelve el problema de subida (plan 26, Fase 3, sección "Subida... queda sin tocar")
+
+El usuario marca una carpeta local (`local_folder_mappings`) como vinculada a una colección
+existente. Esa colección ya tiene su destino de escritura definido. A partir de ahí, todo archivo
+nuevo en esa carpeta sube solo al destino de la colección — sin selector de proveedor, sin
+confirmación por archivo. Esto reemplaza el rol que hoy cumple (mal) `local_sync_settings` como
+único target global.
+
+### Cómo resuelve la vista "sub-buckets vs. proveedor literal"
+
+No hace falta un componente nuevo desde cero: `StorageWidgetClient.tsx` ya tiene un selector tipo
+tabs entre "Union Unificada" y "por proveedor" (`activeSilo`, confirmado por auditoría de UI del
+2026-08-08). Las colecciones se suman como un **tercer tipo de silo** navegable ahí mismo —
+mismo patrón de columnas Miller que ya existe (`AgnosticTree`), sin rediseñar el explorador.
+
+### Modelo de datos (propuesta, todavía sin Operaciones — ver preguntas abiertas)
+
+```ts
+export const collections = pgTable("collections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  writeProvider: text("write_provider"),       // null = colección solo-lectura/agregación
+  writeRemotePath: text("write_remote_path"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const collectionSources = pgTable("collection_sources", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  collectionId: uuid("collection_id").notNull().references(() => collections.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(),
+  remotePath: text("remote_path").notNull(),
+});
+
+export const localFolderMappings = pgTable("local_folder_mappings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  deviceId: uuid("device_id").notNull().references(() => devices.id, { onDelete: "cascade" }),
+  localPath: text("local_path").notNull(),
+  collectionId: uuid("collection_id").notNull().references(() => collections.id, { onDelete: "cascade" }),
+});
+```
+
+**Alcance explícito**: en esta primera iteración, las colecciones resuelven la subida (local →
+nube). **No** filtran ni acotan la descarga (nube → local) — `sync-check` de plan 26 sigue
+revisando todos los proveedores conectados sin excepción, tal como quedó corregido. Acotar qué se
+descarga por colección es una extensión futura, no parte de este alcance.
+
+## Preguntas reales que quedan abiertas (necesitan decisión de Javier, no las resuelvo sola)
+
+1. **¿Un `local_folder_mappings` es por dispositivo o por cuenta?** Si Javier tiene dos máquinas
+   emparejadas, ¿una carpeta local marcada en la Máquina A implica que la Máquina B también debe
+   mantener una copia local de esa colección, o cada dispositivo elige sus propias carpetas de
+   forma independiente? Afecta si `deviceId` en la tabla de arriba es correcto o si el mapeo
+   debería vivir a nivel de colección (todo dispositivo que la vincula, sincroniza).
+2. **¿Tags sueltos siguen siendo una capa aparte, o colecciones alcanzan por ahora?** El goal
+   original mencionaba etiquetas relacionadas/grafo de tags además de colecciones. Sugerencia:
+   colecciones primero (resuelven un problema real y bloqueante), tags como iteración futura — pero
+   es una decisión de roadmap de producto, no técnica.
+3. **¿Colección sin destino de escritura es un tipo de primera clase desde el día uno, o se fuerza
+   a elegir un proveedor al crearla?** Permitir "solo agregación" es más flexible pero es una
+   decisión extra en el flujo de creación.
+
+**Estado**: diseño core resuelto, sin Operaciones/Verificación todavía — depende de las 3
+respuestas de arriba antes de convertirse en un plan ejecutable por Codex/Haiku.

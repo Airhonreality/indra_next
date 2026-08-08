@@ -328,6 +328,49 @@ una sesión de auditoría. Falta: (a) resolver el login local o probar con sesi�
 Javier elija su provider de sync, (c) cerrar el punto 2 de arriba con una confirmación real de
 descarga en vez del parche de deduplicación.
 
+### Corrección de producto (2026-08-08): sin selector manual de proveedor para descarga
+
+Javier auditó la interfaz real antes de aceptar la propuesta de UI de la sección anterior y
+corrigió el modelo: **cuando subís un archivo a Google Drive, Drive no te pregunta si lo querés
+sincronizar — pasa solo, en un mismo canvas.** El diseño de 3a con `local_sync_settings.provider`
+(un solo proveedor elegido a mano) contradice eso directamente.
+
+**Goal de producto real** (palabras de Javier):
+
+- Nube → local: sincroniza **todo el bucket Indra** (todos los proveedores conectados), sin
+  selector. La vista puede mostrarse como sub-buckets personalizados (colecciones que combinan
+  proveedores) o por proveedor literal — pero esa es una elección de *visualización* en el canvas,
+  no una elección de *qué se sincroniza*.
+- Local → nube: elección manual de **qué carpetas locales** el usuario quiere bajo gestión de
+  Indra — no de qué proveedor remoto es el destino. Una vez elegida la carpeta, subir a ella "pasa
+  sola", sin botón de confirmación por archivo.
+- No hay botón de "sincronizar" como acción primaria. Puede existir un botón de "forzar
+  actualización" como mecanismo de seguridad/tranquilidad (si el usuario siente latencia o
+  anomalía), pero es secundario, no el flujo principal.
+
+**Decisión de alcance (Javier + Orquestador)**: separar los dos sentidos en vez de resolver los
+dos a la vez:
+
+- **Descarga (nube → local)**: se corrige ahora — mismo trabajo de esta fase, sin dependencias
+  nuevas. `sync-check` deja de mirar `local_sync_settings.provider` y en cambio recorre **todos**
+  los adapters activos de `getActiveUpstreams(userId)`. El `payload` de cada `sync_command` suma
+  el campo `provider` (antes solo tenía `remoteObjectId`/`fileName`), porque ahora puede haber
+  más de un proveedor en juego y `download-object` necesita saber cuál usar para resolver el
+  adapter correcto — ya no alcanza con leer `local_sync_settings.provider` como única fuente.
+- **Subida (local → nube)**: **queda deliberadamente sin tocar por ahora.** No es que falte
+  UI — es que "a qué proveedor va un archivo de una carpeta local recién marcada" es exactamente
+  el problema que resuelve el concepto de colecciones/sub-buckets (plan 25, hoy sin diseñar).
+  Meter una regla default apurada ahora (ej. "todo lo nuevo va al primer proveedor conectado")
+  crea archivos mal ubicados que después hay que migrar de verdad entre proveedores — mucho más
+  caro que una migración de metadata. Mejor no generar ese dato hasta que exista una respuesta de
+  diseño real. El flujo de subida que ya existe (plan 24 Fase 2, `local_sync_settings` +
+  `POST /api/desktop/sync`) queda funcional tal cual está, sin extenderlo ni tirarlo — es una
+  pieza legítima para el caso "un solo proveedor elegido explícitamente", solo que deja de ser
+  el modelo por defecto hacia adelante.
+
+Plan 25 pasa a ser trabajo activo, no solo una línea pendiente — es la pieza que de verdad
+desbloquea la subida automática. Ver ese documento para el diseño en curso.
+
 ### Fase 4 — Test E2E real multi-máquina
 
 El test que de verdad hacía falta desde el principio: dos dispositivos físicos distintos (o al

@@ -1,14 +1,17 @@
 /**
- * GET /api/devices/download-object?objectId=<id>
+ * GET /api/devices/download-object?provider=<id>&objectId=<id>
  *
  * Proxy for daemon to download remote objects.
  * Authentication via Authorization: Bearer <deviceToken> header (not NextAuth session).
- * Resolves the object via the user's configured storage provider.
+ * `provider` identifies which of the device owner's connected adapters to use - there is no
+ * single "sync target" anymore (see docs/plans/26_PLAN_puente-daemon-nube-hospedada.md,
+ * "Corrección de producto"); every sync_command payload already carries the provider it came
+ * from, so the daemon always has it on hand when it calls this endpoint.
  */
 
 import { NextResponse, NextRequest } from 'next/server';
 import { db } from '@/lib/db';
-import { devices, localSyncSettings } from '@/core/db/schema';
+import { devices } from '@/core/db/schema';
 import { getActiveUpstreams } from '@/integrations/storage-union/helpers';
 import { eq } from 'drizzle-orm';
 import { createHash } from 'crypto';
@@ -17,8 +20,15 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    // 1. Extract objectId from query params
+    // 1. Extract provider + objectId from query params
+    const provider = request.nextUrl.searchParams.get('provider');
     const objectId = request.nextUrl.searchParams.get('objectId');
+    if (!provider) {
+      return NextResponse.json(
+        { error: 'missing_provider', message: 'Query parameter ?provider is required' },
+        { status: 400 }
+      );
+    }
     if (!objectId) {
       return NextResponse.json(
         { error: 'missing_object_id', message: 'Query parameter ?objectId is required' },
@@ -65,45 +75,30 @@ export async function GET(request: NextRequest) {
     const device = deviceList[0];
     const userId = device.userId;
 
-    // 3. Read user's sync target
-    const settings = await db
-      .select()
-      .from(localSyncSettings)
-      .where(eq(localSyncSettings.userId, userId))
-      .limit(1);
-
-    if (!settings.length || !settings[0].provider) {
-      return NextResponse.json(
-        { error: 'no_sync_target', message: 'No sync target configured for this user' },
-        { status: 400 }
-      );
-    }
-
-    const targetProvider = settings[0].provider;
-
-    // 4. Resolve the adapter
+    // 3. Resolve the adapter identified by ?provider - among THIS device owner's own
+    // connected upstreams only, so a valid device token can never reach another user's data.
     const upstreams = await getActiveUpstreams(userId);
-    const adapter = upstreams.find((u) => u.id === targetProvider);
+    const adapter = upstreams.find((u) => u.id === provider);
 
     if (!adapter) {
       return NextResponse.json(
         {
           error: 'provider_not_connected',
-          message: `Provider '${targetProvider}' is not connected or active for this user.`,
+          message: `Provider '${provider}' is not connected or active for this user.`,
         },
         { status: 400 }
       );
     }
 
-    // 5. Verify adapter supports blob download
+    // 4. Verify adapter supports blob download
     if (!adapter.downloadBlob) {
       return NextResponse.json(
-        { error: 'provider_no_download', message: `Provider '${targetProvider}' does not support blob download.` },
+        { error: 'provider_no_download', message: `Provider '${provider}' does not support blob download.` },
         { status: 501 }
       );
     }
 
-    // 6. Call adapter.downloadBlob
+    // 5. Call adapter.downloadBlob
     let result;
     try {
       result = await adapter.downloadBlob(objectId);
@@ -128,7 +123,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 7. Return the stream as the response body
+    // 6. Return the stream as the response body
     return new Response(result.data as ReadableStream, {
       status: 200,
       headers: {

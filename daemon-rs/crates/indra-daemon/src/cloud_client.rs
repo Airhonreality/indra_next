@@ -188,7 +188,7 @@ pub async fn start_heartbeat_loop(
                     if !commands.is_empty() {
                         info!("Total commands received: {}", commands.len());
                         // Extract command data before spawning tasks
-                        let download_tasks: Vec<(String, String)> = commands
+                        let download_tasks: Vec<(String, String, String)> = commands
                             .iter()
                             .filter_map(|cmd| {
                                 let kind = cmd
@@ -197,17 +197,24 @@ pub async fn start_heartbeat_loop(
                                     .unwrap_or("unknown");
                                 info!("Received command: kind={}", kind);
 
-                                // Extract download_file command data
+                                // Extract download_file command data. `provider` identifies
+                                // which connected adapter the object came from - there's no
+                                // single "sync target" anymore, every command carries it.
                                 if kind == "download_file" {
                                     if let Some(payload) = cmd.get("payload").and_then(|p| p.as_object()) {
-                                        if let (Some(remote_object_id), Some(file_name)) = (
+                                        if let (Some(provider), Some(remote_object_id), Some(file_name)) = (
+                                            payload.get("provider").and_then(|v| v.as_str()),
                                             payload.get("remoteObjectId").and_then(|v| v.as_str()),
                                             payload.get("fileName").and_then(|v| v.as_str()),
                                         ) {
-                                            return Some((remote_object_id.to_string(), file_name.to_string()));
+                                            return Some((
+                                                provider.to_string(),
+                                                remote_object_id.to_string(),
+                                                file_name.to_string(),
+                                            ));
                                         } else {
                                             warn!(
-                                                "download_file command missing remoteObjectId or fileName"
+                                                "download_file command missing provider, remoteObjectId, or fileName"
                                             );
                                         }
                                     } else {
@@ -219,7 +226,7 @@ pub async fn start_heartbeat_loop(
                             .collect();
 
                         // Now spawn tasks with owned data
-                        for (remote_object_id, file_name) in download_tasks {
+                        for (provider, remote_object_id, file_name) in download_tasks {
                             let indra_drive_clone = indra_drive.clone();
                             let cloud_url_clone = cloud_url.clone();
                             let token_clone = token.clone();
@@ -230,6 +237,7 @@ pub async fn start_heartbeat_loop(
                                     &client_clone,
                                     &cloud_url_clone,
                                     &token_clone,
+                                    &provider,
                                     &remote_object_id,
                                     &file_name,
                                     &indra_drive_clone,
@@ -258,17 +266,18 @@ async fn download_and_save_file(
     client: &reqwest::Client,
     cloud_url: &str,
     token: &str,
+    provider: &str,
     remote_object_id: &str,
     file_name: &str,
     indra_drive: &Path,
 ) -> Result<()> {
-    // Build download URL with objectId query param
+    // Build download URL with provider + objectId query params
     let download_url = format!("{}/api/devices/download-object", cloud_url);
 
-    // Make the download request with Bearer token and objectId query param
+    // Make the download request with Bearer token and provider/objectId query params
     let response = client
         .get(&download_url)
-        .query(&[("objectId", remote_object_id)])
+        .query(&[("provider", provider), ("objectId", remote_object_id)])
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await?;

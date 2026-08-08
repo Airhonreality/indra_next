@@ -2,14 +2,16 @@
  * POST /api/devices/sync-check
  *
  * Producer of download_file commands.
- * Checks the remote provider for new files, enqueues download commands for all paired devices.
+ * Checks EVERY connected provider for new files (no manual "sync target" - see
+ * docs/plans/26_PLAN_puente-daemon-nube-hospedada.md, "Corrección de producto") and enqueues
+ * download commands for all paired devices.
  * Requires NextAuth session.
  */
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
-import { localSyncSettings, localSyncState, syncCommands, devices } from '@/core/db/schema';
+import { localSyncState, syncCommands, devices } from '@/core/db/schema';
 import { getActiveUpstreams } from '@/integrations/storage-union/helpers';
 import { eq, and, inArray } from 'drizzle-orm';
 
@@ -20,100 +22,66 @@ export async function POST() {
   }
 
   try {
-    // Step 1: Read user's sync target from local_sync_settings
-    const settings = await db
-      .select()
-      .from(localSyncSettings)
-      .where(eq(localSyncSettings.userId, session.user.id))
-      .limit(1);
+    const userId = session.user.id;
 
-    if (!settings.length || !settings[0].provider) {
-      return NextResponse.json(
-        {
-          error: 'no_sync_target',
-          message: 'No sync target configured.',
-        },
-        { status: 400 }
-      );
-    }
+    // Step 1: Resolve every connected provider - no single "sync target" to pick.
+    const upstreams = await getActiveUpstreams(userId);
 
-    const targetProvider = settings[0].provider;
+    // Step 2: List inventory from each provider, collecting new files per provider.
+    // A failure on one provider shouldn't block the others.
+    const newRemoteItems: Array<{ provider: string; id: string; name: string }> = [];
+    const providerErrors: Array<{ provider: string; message: string }> = [];
 
-    // Step 2: Resolve the adapter
-    const upstreams = await getActiveUpstreams(session.user.id);
-    const adapter = upstreams.find((u) => u.id === targetProvider);
+    for (const adapter of upstreams) {
+      let inventoryResult;
+      try {
+        inventoryResult = await adapter.listInventory();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        providerErrors.push({ provider: adapter.id, message: msg });
+        continue;
+      }
 
-    if (!adapter) {
-      return NextResponse.json(
-        {
-          error: 'provider_not_connected',
-          message: `Provider '${targetProvider}' is not connected or active for this user.`,
-        },
-        { status: 400 }
-      );
-    }
+      if (!inventoryResult.ok) {
+        providerErrors.push({ provider: adapter.id, message: inventoryResult.error || 'Failed to list remote inventory' });
+        continue;
+      }
 
-    // Step 3: List inventory from remote
-    let inventoryResult;
-    try {
-      inventoryResult = await adapter.listInventory();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      return NextResponse.json(
-        {
-          error: 'inventory_list_failed',
-          message: `Failed to list remote inventory: ${msg}`,
-        },
-        { status: 502 }
-      );
-    }
+      const remoteItems = inventoryResult.data || [];
 
-    if (!inventoryResult.ok) {
-      return NextResponse.json(
-        {
-          error: 'inventory_list_failed',
-          message: inventoryResult.error || 'Failed to list remote inventory',
-        },
-        { status: 502 }
-      );
-    }
+      for (const item of remoteItems) {
+        if (item.type !== 'file') continue; // Skip folders
 
-    const remoteItems = inventoryResult.data || [];
-
-    // Step 4: Identify new files (not yet in local_sync_state)
-    const newRemoteItems = [];
-    for (const item of remoteItems) {
-      if (item.type !== 'file') continue; // Skip folders
-
-      const existing = await db
-        .select()
-        .from(localSyncState)
-        .where(
-          and(
-            eq(localSyncState.userId, session.user.id),
-            eq(localSyncState.provider, targetProvider),
-            eq(localSyncState.remoteObjectId, item.id)
+        const existing = await db
+          .select()
+          .from(localSyncState)
+          .where(
+            and(
+              eq(localSyncState.userId, userId),
+              eq(localSyncState.provider, adapter.id),
+              eq(localSyncState.remoteObjectId, item.id)
+            )
           )
-        )
-        .limit(1);
+          .limit(1);
 
-      if (!existing.length) {
-        newRemoteItems.push(item);
+        if (!existing.length) {
+          newRemoteItems.push({ provider: adapter.id, id: item.id, name: item.name });
+        }
       }
     }
 
-    // Step 5: Get all active devices for this user
+    // Step 3: Get all active devices for this user
     const userDevices = await db
       .select()
       .from(devices)
-      .where(eq(devices.userId, session.user.id));
+      .where(eq(devices.userId, userId));
 
     // Nothing currently writes local_sync_state for the download direction (a device
-    // downloading a file only updates its own local SQLite, not this table) - so the Step 4
-    // check above can never see a previously-downloaded object as "already synced". Without
-    // this guard, calling sync-check twice would enqueue duplicate download_file commands for
-    // the same object forever. Until a download-confirmation round trip exists (future fase),
-    // dedupe against sync_commands already issued for each device/object pair instead.
+    // downloading a file only updates its own local SQLite, not this table) - so the dedup
+    // above can never see a previously-downloaded object as "already synced". Without this
+    // guard, calling sync-check twice would enqueue duplicate download_file commands for the
+    // same object forever. Until a download-confirmation round trip exists (future fase),
+    // dedupe against sync_commands already issued for each device/provider/object triple.
     const deviceIds = userDevices.map((d) => d.id);
     const alreadyQueued = new Set<string>();
     if (deviceIds.length > 0) {
@@ -123,27 +91,30 @@ export async function POST() {
         .where(and(inArray(syncCommands.deviceId, deviceIds), eq(syncCommands.kind, 'download_file')));
 
       for (const cmd of existingCommands) {
-        const remoteObjectId = (cmd.payload as { remoteObjectId?: string } | null)?.remoteObjectId;
-        if (remoteObjectId) {
-          alreadyQueued.add(`${cmd.deviceId}:${remoteObjectId}`);
+        const payload = cmd.payload as { provider?: string; remoteObjectId?: string } | null;
+        if (payload?.provider && payload?.remoteObjectId) {
+          alreadyQueued.add(`${cmd.deviceId}:${payload.provider}:${payload.remoteObjectId}`);
         }
       }
     }
 
-    // Step 6: For each new remote file x each device, insert a sync_command (skip duplicates)
+    // Step 4: For each new remote file x each device, insert a sync_command (skip duplicates)
     let enqueuedCount = 0;
     for (const item of newRemoteItems) {
       for (const device of userDevices) {
-        if (alreadyQueued.has(`${device.id}:${item.id}`)) continue;
+        const key = `${device.id}:${item.provider}:${item.id}`;
+        if (alreadyQueued.has(key)) continue;
 
         await db.insert(syncCommands).values({
           deviceId: device.id,
           kind: 'download_file',
           payload: {
+            provider: item.provider,
             remoteObjectId: item.id,
             fileName: item.name,
           },
         });
+        alreadyQueued.add(key);
         enqueuedCount++;
       }
     }
@@ -151,6 +122,8 @@ export async function POST() {
     return NextResponse.json({
       enqueued: enqueuedCount,
       devices: userDevices.length,
+      providersChecked: upstreams.length,
+      providerErrors,
     });
   } catch (error: unknown) {
     console.error('[sync-check] POST failed:', error);

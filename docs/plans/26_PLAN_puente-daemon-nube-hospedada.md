@@ -119,7 +119,39 @@ necesidad.
 
 ## Fases
 
-### Fase 1 — Pairing y autenticación de dispositivo (sin esto, nada más tiene sentido)
+### Fase 1 — Pairing y autenticación de dispositivo (**EJECUTADO Y VERIFICADO** — 2026-08-07)
+
+Ejecutado por un subagente Haiku, supervisado y auditado por el Orquestador antes de commitear
+(mismo protocolo que Fase 2 de plan 24). Tablas `devices`/`device_pairing_codes`,
+`POST /api/devices/pair/start`, `POST /api/devices/pair/claim`, tarjeta `DevicePairingCard` en
+`DesktopPanel`. Migración generada y **aplicada** contra la base real
+(`drizzle/0002_nappy_blink.sql` — verificado: cada tabla con una sola PK, un FK a `user`, sin
+duplicados).
+
+**Dos bugs reales encontrados en la auditoría, corregidos antes del commit:**
+
+1. **Condición de carrera en `pair/claim`.** La primera versión hacía `SELECT` para validar el
+   código y recién después `UPDATE` para marcarlo consumido — dos requests con el mismo código
+   casi simultáneas podían pasar el chequeo antes de que cualquiera escribiera, generando dos
+   dispositivos para un código que debía ser de un solo uso. Corregido a un `UPDATE ... WHERE
+   consumed_at IS NULL AND expires_at > now() RETURNING *` atómico (Postgres solo deja que una
+   transacción concurrente gane esa carrera), envuelto en `db.transaction()` junto con el
+   `INSERT` del dispositivo — si el insert falla, el código no queda quemado sin dispositivo
+   creado. **Verificado contra la base real**: primer intento de canje afecta 1 fila, segundo
+   intento con el mismo código afecta 0 filas.
+2. **Error de lint real (no cosmético) en la UI**: `Date.now()` llamado directo en el cuerpo del
+   render viola la regla de pureza de React del linter del proyecto — hubiera bloqueado cualquier
+   build estricto. Corregido con `useState(() => Date.now())` (inicializador perezoso, la forma
+   sancionada de sembrar un valor impuro una sola vez) + un `setInterval` dentro de un `useEffect`
+   que además hace que la cuenta regresiva del código realmente cuente hacia atrás en pantalla
+   (antes quedaba congelada en el primer render).
+
+Verificado independientemente: `tsc --noEmit` limpio, `npm run lint` en 241 problemas — exactamente
+la misma línea base preexistente, cero nuevos.
+
+**Pendiente, explícito**: el daemon (Rust) todavía no sabe canjear un código — eso es Fase 2. No
+se probó el flujo completo con la UI real de un navegador (la tarjeta de pairing no se clickeó de
+verdad todavía), solo su lógica de backend contra la base real.
 
 Tablas `devices` + `device_pairing_codes`, los dos endpoints de pairing, UI mínima para mostrar el
 código (una pantalla, no hace falta que sea linda). Verificación: un dispositivo simulado (script,

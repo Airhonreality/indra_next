@@ -53,3 +53,6 @@ daemon-rs/data/
 daemon-rs/*.log
 daemon-rs/daemon_output.txt
 daemon-rs/*.exe
+
+.vercel
+.env*

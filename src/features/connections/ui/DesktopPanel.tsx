@@ -232,6 +232,8 @@ export function DesktopPanel() {
             />
           </div>
 
+          <DevicePairingCard />
+
           <div className="grid gap-3 sm:grid-cols-2">
             <ActionCard
               title={rootActionLabel}
@@ -484,6 +486,96 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <div className="min-w-0">
         <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
         <p className="mt-1 break-words text-sm text-foreground">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function DevicePairingCard() {
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<Date | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Date.now() can't be called directly during render (impure) — a lazy useState initializer
+  // is the sanctioned way to seed a one-time impure value; the effect below only subscribes
+  // to the interval (setState happens inside its callback, not in the effect body directly),
+  // which also makes the countdown actually count down rather than freezing at first render.
+  const [now, setNow] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    if (!expiresAt) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
+  const timeRemaining = expiresAt
+    ? Math.max(0, Math.floor((expiresAt.getTime() - now) / 1000))
+    : null;
+
+  const generateCode = async () => {
+    setLoading(true);
+    setError(null);
+    setPairingCode(null);
+    setExpiresAt(null);
+
+    try {
+      const response = await fetch('/api/devices/pair/start', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate pairing code');
+      }
+
+      const data = await response.json();
+      setPairingCode(data.code);
+      setExpiresAt(new Date(data.expiresAt));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-border/40 bg-muted/20 p-4">
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <h4 className="text-xs font-bold uppercase tracking-[0.24em] text-foreground">Emparejar dispositivo</h4>
+            <p className="text-sm text-muted-foreground">
+              Genera un código para conectar un dispositivo local (daemon) a esta cuenta.
+            </p>
+          </div>
+        </div>
+
+        {pairingCode ? (
+          <div className="space-y-2">
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-center">
+              <p className="text-xs text-muted-foreground uppercase tracking-[0.24em]">Código de emparejamiento</p>
+              <p className="mt-2 font-mono text-2xl font-bold tracking-widest text-primary">{pairingCode}</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {timeRemaining !== null && timeRemaining > 0
+                  ? `Expira en ${timeRemaining} segundos`
+                  : 'El código ha expirado'}
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Comparte este código con tu dispositivo antes de que expire. Se puede usar solo una vez.
+            </p>
+          </div>
+        ) : (
+          <>
+            {error && <p className="text-xs text-red-500">{error}</p>}
+            <Button
+              onClick={generateCode}
+              disabled={loading}
+              className="w-full rounded-xl bg-primary py-2 text-xs font-bold uppercase tracking-[0.24em]"
+            >
+              {loading ? 'Generando...' : 'Generar código'}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

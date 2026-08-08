@@ -241,3 +241,31 @@ export const localSyncState = pgTable(
   })
 );
 
+/**
+ * DEVICES
+ * Stores paired devices linked to a user.
+ * Each device has a unique token (hash of the secret, never stored in plaintext).
+ * Used for daemon authentication and device identity in the cloud-bridge architecture.
+ */
+export const devices = pgTable("devices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  deviceName: text("device_name").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  lastSeenAt: timestamp("last_seen_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/**
+ * DEVICE PAIRING CODES
+ * Short-lived, single-use codes for pairing a device.
+ * Generated on the web (secured by user session), claimed by the daemon (headless, no session).
+ * Expires in 10 minutes; marks consumed_at when successfully redeemed to prevent replay.
+ */
+export const devicePairingCodes = pgTable("device_pairing_codes", {
+  code: text("code").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at").notNull(),
+  consumedAt: timestamp("consumed_at"),
+});
+

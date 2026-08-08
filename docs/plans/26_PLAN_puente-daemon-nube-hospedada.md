@@ -108,14 +108,68 @@ necesidad.
 
 ### Daemon (Rust)
 
-- Agregar `reqwest` (con soporte TLS) a `crates/indra-daemon/Cargo.toml` — no está en el
-  workspace hoy.
-- Nuevo módulo `crates/indra-daemon/src/cloud_client.rs`: guarda/lee el device token localmente,
-  hace `POST /api/devices/heartbeat` cada 15-30s con el resultado de `SyncEngine::list_recent()`
-  (mismo dato que ya expone `Pull()` — no inventar un segundo formato), procesa los comandos que
-  vengan en la respuesta.
-- Primer comando soportado: `download_file` — mínimo indispensable para que el camino inverso de
-  Fase 4 de plan 24 dejara de depender de que Next.js y el daemon compartan filesystem.
+- `reqwest` **ya está en el workspace** (`daemon-rs/Cargo.toml:48`, versión 0.11, feature
+  `stream` nada más) — corregido de lo que decía antes este documento. Falta agregarle los
+  features `json` y `rustls-tls` (el proyecto ya usa `rustls` en otros lados, evita depender de
+  OpenSSL del sistema en Windows — ya fue un dolor de cabeza real en la Fase 0 de plan 24, no
+  reintroducirlo) y agregar `reqwest.workspace = true` a `crates/indra-daemon/Cargo.toml`.
+- **Dónde vive el token localmente**: un archivo de texto simple, hermano del SQLite que ya usa
+  el daemon — `<carpeta de db_path>/device_token` (con el `db_path` default `./data/indra.db`,
+  eso da `./data/device_token`). Sin cifrado en esta fase — el token es revocable del lado
+  servidor si se compromete, que es la mitigación aceptada para un MVP; no resolver key
+  management acá, sería sobre-ingeniería para esta fase.
+- **URL de la nube**: variable de entorno `INDRA_CLOUD_URL`, default
+  `https://indra-next.vercel.app` (el proyecto real de Vercel, confirmado con `vercel project
+  ls`). Configurable para poder seguir probando contra `localhost:3000` si hace falta más
+  adelante.
+- **Cómo se empareja el daemon** (no estaba resuelto antes, se resuelve acá): un modo CLI nuevo,
+  `indra-daemon.exe --pair <CODIGO>` — un solo uso: lee el código del argumento, hace
+  `POST {INDRA_CLOUD_URL}/api/devices/pair/claim` con `{ code, deviceName: <hostname> }`, si sale
+  bien escribe el token devuelto en el archivo de arriba, imprime confirmación y termina (exit 0).
+  Si falla, imprime el error y termina (exit 1). En este modo NO arranca el resto del daemon
+  (nada de gRPC, nada de file watcher) — es una corrida de un solo propósito.
+- **Arranque normal** (`indra-daemon.exe` sin argumentos, el modo de siempre): al principio de
+  `main()`, revisar si existe el archivo de token. Si existe: leerlo, arrancar
+  `cloud_client::start_heartbeat_loop(...)` como una tarea de tokio más (mismo patrón que ya usa
+  el spawn del server gRPC en `main.rs`). Si no existe: loguear un aviso claro una sola vez ("no
+  emparejado con la nube — correr `indra-daemon.exe --pair <CODIGO>` para habilitar sync") y
+  seguir funcionando igual que hoy (gRPC local, file watcher) — degradación elegante, no bloquear
+  el uso local por no estar emparejado.
+- Nuevo módulo `crates/indra-daemon/src/cloud_client.rs`: cada 20s, llama
+  `SyncEngine::list_recent()` (ya existe, mismo dato que expone `Pull()` — no inventar un segundo
+  formato), hace `POST {INDRA_CLOUD_URL}/api/devices/heartbeat` con
+  `Authorization: Bearer <token>` y `{ deviceName, files: [{ path, sizeBytes, modifiedAtMs,
+  blake3Hex }] }`. Loguea los `commands` que vengan en la respuesta — en esta fase no hace falta
+  procesarlos todavía (`sync_commands` arranca vacía, sin productores, ver abajo), pero el
+  parseo tiene que ser real, no un stub, para que Fase 3 solo tenga que agregar el productor sin
+  tocar el consumidor.
+
+### Nueva tabla (agregar en esta fase, no en Fase 1 — ahí no hacía falta todavía)
+
+```ts
+export const syncCommands = pgTable("sync_commands", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  deviceId: uuid("device_id").notNull().references(() => devices.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  payload: jsonb("payload").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  consumedAt: timestamp("consumed_at"),
+});
+```
+
+### Endpoint nuevo: `POST /api/devices/heartbeat`
+
+- **Sin sesión de NextAuth** — auth por `Authorization: Bearer <deviceToken>`. Hashear el token
+  recibido con SHA-256 (mismo algoritmo que `pair/claim`) y buscar en `devices` por
+  `tokenHash` — si no hay match, 401.
+- Actualiza `lastSeenAt = now()` del dispositivo encontrado.
+- Body: acepta `{ deviceName?, files: [...] }` — en esta fase no hace falta persistir `files` en
+  ningún lado (eso es trabajo de Fase 3, cuando haya productores reales de `sync_commands`); con
+  loguear la cantidad recibida alcanza. No construir de más.
+- Consume comandos pendientes con el mismo patrón atómico que ya se usó en `pair/claim` (lección
+  de Fase 1, no repetir el bug de condición de carrera): `UPDATE sync_commands SET consumed_at =
+  now() WHERE device_id = ? AND consumed_at IS NULL RETURNING *`.
+- Devuelve `{ acknowledged: true, commands: [...] }`.
 
 ## Fases
 

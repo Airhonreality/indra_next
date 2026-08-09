@@ -50,6 +50,14 @@ export function decryptMegaCredentials(encryptedData: string, sessionToken: stri
   }
 }
 
+// MEGA deshabilitado globalmente: su API puede bloquear la cuenta del usuario ante
+// llamadas repetidas/mal manejadas (rate limiting / re-auth) y el adapter no implementa
+// el backoff que su propio comentario dice tener. Ver docs/research/INVS Mega storage.md
+// (códigos -16 API_EBLOCKED, -4 API_ERATELIMIT, -3 API_EAGAIN) y
+// docs/plans/26_PLAN_puente-daemon-nube-hospedada.md. Re-habilitar solo cuando
+// src/integrations/mega/adapter.ts implemente manejo real de esos códigos.
+const MEGA_ADAPTER_DISABLED = true;
+
 /**
  * Instantiates all active and capable storage upstreams for a given user.
  * Now queries Neon Postgres dedicated tables and decrypts credentials server-side.
@@ -103,6 +111,9 @@ export async function getActiveUpstreams(
     try {
       instantiatedTypes.add(storage.provider);
       if (storage.provider === 'mega') {
+        if (MEGA_ADAPTER_DISABLED) {
+          continue;
+        }
         let creds = megaCredentials;
         if (!creds && storage.encryptedCredentials) {
           // Si no se pasaron en cabeceras, las desencriptamos del servidor

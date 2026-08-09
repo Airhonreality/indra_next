@@ -23,27 +23,174 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    // Check for --pair mode
+    // Check for diagnostic/pairing commands
     let args: Vec<String> = std::env::args().collect();
-    if args.len() > 1 && args[1] == "--pair" {
-        if args.len() < 3 {
-            eprintln!("Usage: indra-daemon --pair <CODE>");
-            return Err(anyhow::anyhow!("Missing pairing code"));
+    if args.len() > 1 {
+        let cmd = &args[1];
+
+        // --pair: establish cloud connection
+        if cmd == "--pair" {
+            if args.len() < 3 {
+                eprintln!("Usage: indra-daemon --pair <CODE>");
+                return Err(anyhow::anyhow!("Missing pairing code"));
+            }
+            let code = &args[2];
+            let config = DaemonConfig::default();
+            let db_path = PathBuf::from(&config.db_path);
+            let cloud_url = std::env::var("INDRA_CLOUD_URL")
+                .unwrap_or_else(|_| "https://indra-next.vercel.app".to_string());
+            match cloud_client::pair(&cloud_url, code, &db_path).await {
+                Ok(_) => {
+                    println!("Device successfully paired with cloud!");
+                    return Ok(());
+                }
+                Err(e) => {
+                    eprintln!("Failed to pair device: {}", e);
+                    return Err(e);
+                }
+            }
         }
-        let code = &args[2];
-        let config = DaemonConfig::default();
-        let db_path = PathBuf::from(&config.db_path);
-        let cloud_url = std::env::var("INDRA_CLOUD_URL")
-            .unwrap_or_else(|_| "https://indra-next.vercel.app".to_string());
-        match cloud_client::pair(&cloud_url, code, &db_path).await {
-            Ok(_) => {
-                println!("Device successfully paired with cloud!");
-                return Ok(());
+
+        // --status: check local and remote pairing status
+        if cmd == "--status" {
+            let config = DaemonConfig::default();
+            let db_path = PathBuf::from(&config.db_path);
+
+            match cloud_client::read_token_from_disk(&db_path) {
+                None => {
+                    println!("Emparejado: NO — correr indra-daemon.exe --pair <CODIGO>");
+                    return Ok(());
+                }
+                Some(token) => {
+                    println!("Emparejado: SÍ (token local: {}…)", &token[..8.min(token.len())]);
+
+                    let cloud_url = std::env::var("INDRA_CLOUD_URL")
+                        .unwrap_or_else(|_| "https://indra-next.vercel.app".to_string());
+
+                    match cloud_client::fetch_whoami(&cloud_url, &token).await {
+                        Ok(json) => {
+                            if let (Some(device_name), Some(paired_at), Some(last_seen)) = (
+                                json.get("deviceName").and_then(|v| v.as_str()),
+                                json.get("pairedAt").and_then(|v| v.as_str()),
+                                json.get("lastSeenAt").and_then(|v| v.as_str()),
+                            ) {
+                                println!("Servidor: VERIFICADO");
+                                println!("  Device Name: {}", device_name);
+                                println!("  Paired At: {}", paired_at);
+                                println!("  Last Seen: {}", last_seen);
+                            } else {
+                                println!("Servidor: VERIFICADO (pero falta información)");
+                            }
+                        }
+                        Err(e) => {
+                            let err_msg = e.to_string();
+                            if err_msg.contains("REVOKED") {
+                                println!("Servidor: REVOCADO — el token fue revocado o es inválido");
+                                println!("Acción: re-emparejar con `indra-daemon.exe --pair <CODIGO>`");
+                            } else {
+                                println!("Servidor: NO VERIFICADO (sin conexión?) — {}", err_msg);
+                            }
+                        }
+                    }
+                    return Ok(());
+                }
             }
-            Err(e) => {
-                eprintln!("Failed to pair device: {}", e);
-                return Err(e);
+        }
+
+        // --list-providers: show connected providers
+        if cmd == "--list-providers" {
+            let config = DaemonConfig::default();
+            let db_path = PathBuf::from(&config.db_path);
+
+            match cloud_client::read_token_from_disk(&db_path) {
+                None => {
+                    println!("Emparejado: NO — correr indra-daemon.exe --pair <CODIGO>");
+                    return Ok(());
+                }
+                Some(token) => {
+                    let cloud_url = std::env::var("INDRA_CLOUD_URL")
+                        .unwrap_or_else(|_| "https://indra-next.vercel.app".to_string());
+
+                    match cloud_client::fetch_providers(&cloud_url, &token).await {
+                        Ok(json) => {
+                            if let Some(providers) = json.get("providers").and_then(|v| v.as_array()) {
+                                println!("{:<25} {:<10} {}", "ID", "Status", "Error");
+                                println!("{:-<25} {:-<10} {}", "", "", "");
+                                for provider in providers {
+                                    let id = provider.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
+                                    let status = provider.get("status").and_then(|v| v.as_str()).unwrap_or("unknown");
+                                    let error = provider.get("error").and_then(|v| v.as_str()).unwrap_or("");
+                                    println!("{:<25} {:<10} {}", id, status, error);
+                                }
+                            } else {
+                                println!("No providers found or empty response");
+                            }
+                        }
+                        Err(e) => {
+                            let err_msg = e.to_string();
+                            if err_msg.contains("REVOKED") {
+                                eprintln!("Servidor: REVOCADO — re-emparejar con `indra-daemon.exe --pair <CODIGO>`");
+                            } else {
+                                eprintln!("Failed to fetch providers: {}", err_msg);
+                            }
+                            return Err(e);
+                        }
+                    }
+                    return Ok(());
+                }
             }
+        }
+
+        // --list-files: show recently tracked files
+        if cmd == "--list-files" {
+            let config = DaemonConfig::default();
+            let db_path = PathBuf::from(&config.db_path);
+
+            // Construct Indra Drive path (same as normal daemon initialization)
+            let indra_drive = if cfg!(target_os = "windows") {
+                let username = std::env::var("USERNAME").unwrap_or_else(|_| "User".to_string());
+                PathBuf::from(format!(r"C:\Users\{}\Indra Drive", username))
+            } else {
+                PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| ".".to_string()))
+                    .join("Indra Drive")
+            };
+
+            // Initialize only LocalFsProvider and SyncEngine (no gRPC, no watcher, no heartbeat)
+            let fs_provider = LocalFsProvider::new(indra_drive);
+
+            match indra_core::engine::SyncEngine::new(fs_provider, &db_path).await {
+                Ok(engine) => {
+                    match engine.list_recent(200).await {
+                        Ok(entries) => {
+                            println!("{:<60} {:<15} {:<20}", "Path", "State", "Size (bytes)");
+                            println!("{:-<60} {:-<15} {:-<20}", "", "", "");
+                            for entry in entries {
+                                // Truncate by chars, not bytes — byte-index slicing (e.g.
+                                // `&s[..60]`) panics if the cut lands inside a multi-byte
+                                // UTF-8 character, which real filenames (tildes, ñ) can hit.
+                                let path_str: String =
+                                    entry.path.to_string_lossy().chars().take(60).collect();
+                                let state_str = format!("{:?}", entry.state);
+                                let size_str = format!("{}", entry.local_metadata.size);
+                                println!("{:<60} {:<15} {:<20}",
+                                    path_str,
+                                    &state_str[..15.min(state_str.len())],
+                                    size_str
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to list files: {}", e);
+                            return Err(anyhow::anyhow!("Failed to list files: {}", e));
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to initialize SyncEngine: {}", e);
+                    return Err(anyhow::anyhow!("Failed to initialize SyncEngine: {}", e));
+                }
+            }
+            return Ok(());
         }
     }
 

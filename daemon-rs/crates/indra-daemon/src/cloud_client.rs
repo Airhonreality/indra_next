@@ -374,3 +374,50 @@ async fn download_and_save_file(
 pub fn read_token_from_disk(db_path: &Path) -> Option<String> {
     read_token(db_path)
 }
+
+/// Fetches device identity from cloud (whoami endpoint).
+/// Returns 401 if token is revoked/invalid, other errors if network unreachable.
+pub async fn fetch_whoami(cloud_url: &str, token: &str) -> Result<serde_json::Value> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/api/devices/whoami", cloud_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to reach cloud API: {}", e))?;
+
+    let status = response.status();
+    if status == reqwest::StatusCode::UNAUTHORIZED {
+        return Err(anyhow::anyhow!("REVOKED")); // Special marker for caller
+    }
+    if !status.is_success() {
+        return Err(anyhow::anyhow!("Cloud API returned {}", status.as_u16()));
+    }
+    response.json::<serde_json::Value>().await
+        .map_err(|e| anyhow::anyhow!("Failed to parse cloud response: {}", e))
+}
+
+/// Fetches list of connected providers from cloud.
+pub async fn fetch_providers(cloud_url: &str, token: &str) -> Result<serde_json::Value> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/api/devices/providers", cloud_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to reach cloud API: {}", e))?;
+
+    let status = response.status();
+    if status == reqwest::StatusCode::UNAUTHORIZED {
+        return Err(anyhow::anyhow!("REVOKED")); // Special marker for caller
+    }
+    if !status.is_success() {
+        return Err(anyhow::anyhow!("Cloud API returned {}", status.as_u16()));
+    }
+    response.json::<serde_json::Value>().await
+        .map_err(|e| anyhow::anyhow!("Failed to parse cloud response: {}", e))
+}

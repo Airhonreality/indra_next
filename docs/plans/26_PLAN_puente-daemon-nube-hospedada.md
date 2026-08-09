@@ -463,6 +463,94 @@ directa a la base para lo que no requiere sesión de navegador):
    llamada y confirmar que sigue habiendo **una sola fila** (UPDATE, no duplicado) — mismo criterio
    de idempotencia que ya se verificó para `pair/claim` en Fase 1.
 
+**Resultado (EJECUTADO Y VERIFICADO — 2026-08-09)**: implementado por un subagente Haiku
+(interrumpido por el usuario a mitad del reporte de verificación; el Orquestador retomó desde el
+diff ya escrito, lo auditó línea por línea contra este diseño y corrió la verificación de forma
+independiente). `tsc`/`lint`/`cargo build` en verde, cero regresiones. Verificación funcional
+corrida contra la base real de producción (Neon, la misma que usa Vercel): device de prueba
+desechable + dos llamadas reales a `POST /api/devices/heartbeat` contra un `npm run dev` local
+confirmaron insert-luego-update de una sola fila en `local_sync_state` (mismo id en ambas
+llamadas). Device y fila de prueba borrados después — sin residuo en la base real.
+
+Pusheado a `main` (`7cdded0`) y deployado a producción real vía Vercel para permitir la
+verificación en vivo con sesión de navegador real de Javier — el mismo patrón de Fase 2.
+
+**Notas de UX descubiertas durante el primer test en vivo real (2026-08-09), no bugs de esta
+fase, documentadas para no perderlas**:
+
+1. **El emparejamiento sigue siendo 100% manual**, tal como quedó diseñado en la sección "Cómo se
+   empareja el daemon" de este documento: generar código en `/desktop` → copiarlo a mano → correr
+   `indra-daemon.exe --pair <CODIGO>` en una terminal. Si el daemon arranca sin token, no abre un
+   navegador ni intenta autenticar solo — solo loguea un warning y sigue en modo local
+   (degradación elegante, ya documentada arriba). Un flujo "de verdad" (auto-abrir navegador,
+   callback local, cero copiar/pegar) es trabajo nuevo, no construido, no planeado todavía en
+   ningún plan existente.
+2. **La carpeta "Indra Drive" hoy es una carpeta común y corriente**, sin integración real con el
+   Explorador de Windows. `daemon-rs/crates/indra-windows/src/registry.rs::register_provider`
+   solo escribe claves propias bajo `HKCU\SOFTWARE\SyncEngines\Providers\Indra` — una ruta de
+   registro no estándar que el Explorador no lee para nada. La pieza que sí generaría el
+   comportamiento tipo Google Drive/OneDrive (ícono de sincronización, aparecer en el panel
+   lateral, archivos placeholder on-demand) es `daemon-rs/crates/indra-windows/src/cfapi/root.rs`
+   — pero `register_sync_root` tiene la llamada real a `CfRegisterSyncRoot` **comentada**
+   (comentario explícito: "In a real implementation...") y `connect_sync_root` devuelve un handle
+   fijo (`1u64`) sin llamar a ninguna API de Windows. Esto no es un bug de plan 26: es exactamente
+   el alcance declarado de `docs/plans/04_PLAN_bridge-nativo.md` ("Este plan NO implementa un
+   daemon nativo funcional... Fase 6+"), que sigue sin construirse. `main.rs` solo invoca
+   `register_provider`, nunca `register_sync_root`. Hoy, para Windows, "Indra Drive" no se ve
+   distinto de cualquier otra carpeta.
+
+### Fase 3.6 — MEGA apagado + CLI de diagnóstico del daemon (EJECUTADO Y VERIFICADO — 2026-08-09)
+
+Durante la verificación en vivo de arriba salieron dos problemas reales, ajenos al código de
+Fase 3.5, que se resolvieron en la misma sesión (diseño completo en un plan aparte de Claude Code,
+`ojo-esta-tambine-docuemntado-declarative-willow.md`, aprobado por Javier antes de ejecutar):
+
+1. **MEGA apagado globalmente.** Javier señaló que la API de MEGA puede bloquear la cuenta del
+   usuario ante llamadas repetidas/mal manejadas — riesgo real, no hipotético, y el adapter
+   (`src/integrations/mega/adapter.ts`) no tiene implementado el backoff que su propio comentario
+   dice tener. Se agregó `MEGA_ADAPTER_DISABLED = true` en
+   `src/integrations/storage-union/helpers.ts`, con un `continue` que saca a MEGA de
+   `getActiveUpstreams()` para cualquier caller — sync automático (sync-check, heartbeat) y
+   navegador de almacenamiento web por igual, decisión explícita de Javier (más simple que un
+   apagado parcial). Es un cambio de código deliberado, no una env var — se revierte con un commit
+   cuando `mega/adapter.ts` maneje de verdad los códigos de error documentados en
+   `docs/research/INVS Mega storage.md` (`-16 API_EBLOCKED`, `-4 API_ERATELIMIT`, `-3 API_EAGAIN`).
+2. **CLI de diagnóstico nuevo para el daemon**, porque cada verificación de esta sesión requirió
+   scripts ad-hoc contra Postgres — insostenible como forma de operar. Tres comandos nuevos:
+   - `indra-daemon.exe --status`: verifica pairing local (lee `device_token`, nunca imprime el
+     token completo) y además contra el servidor real, vía endpoint nuevo `GET
+     /api/devices/whoami` — deliberadamente NO reusa `heartbeat` para esto, porque ese endpoint
+     consume `sync_commands` pendientes como efecto secundario y `--status` correrlo dos veces
+     robaría comandos de descarga sin que el daemon real los procese.
+   - `indra-daemon.exe --list-providers`: vía endpoint nuevo `GET /api/devices/providers`, que
+     llama `getActiveUpstreams(device.userId)` + `testConnection()` por adapter (más liviano que
+     `listInventory()`, no genera tráfico de listado real hacia proveedores ya frágiles). MEGA
+     nunca aparece acá, automático por el punto 1.
+   - `indra-daemon.exe --list-files`: inicializa solo `LocalFsProvider` + `SyncEngine` (sin gRPC,
+     sin watcher, sin heartbeat loop) y lista lo que el daemon ve localmente.
+
+   Parsing de argumentos sigue siendo manual (`std::env::args()`), sin agregar `clap` — consistente
+   con `--pair`, que ya existía.
+
+**Bug real encontrado y corregido en la auditoría, antes de este commit**: el subagente que
+implementó el CLI truncaba paths largos con `&path_str[..60]` — slicing por índice de bytes, que
+panickea si el corte cae en medio de un carácter UTF-8 multi-byte. Con nombres de archivo con
+tildes o "ñ" (público hispanohablante del proyecto) esto era un crash real y plausible, no
+hipotético. Corregido a truncado por `.chars().take(60)`.
+
+**Verificado end-to-end contra un dev server local real** (`npm run dev`, puerto 3001, con el
+device ya emparejado "Airhon"):
+- `--status` → `Emparejado: SÍ`, verificación remota `VERIFICADO` con nombre de dispositivo y
+  fechas reales.
+- `--list-providers` → devolvió los 4 proveedores reales del usuario (`google-drive` ×2,
+  `google-sheets`, `youtube`, todos con su error real de auth ya conocido de esta sesión) — **MEGA
+  ausente**, confirmando el apagado.
+- `--list-files` → listó el archivo real presente en `Indra Drive` (truncado cosmético de columna
+  en nombres largos, sin crashear — el fix de arriba funciona).
+
+Verificado también: `npx tsc --noEmit` limpio, `npm run lint` en 241 (línea base exacta),
+`cargo build -p indra-daemon --release` limpio, sin warnings nuevos en los archivos tocados.
+
 ### Fase 4 — Test E2E real multi-máquina
 
 El test que de verdad hacía falta desde el principio: dos dispositivos físicos distintos (o al

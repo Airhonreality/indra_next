@@ -371,6 +371,98 @@ dos a la vez:
 Plan 25 pasa a ser trabajo activo, no solo una línea pendiente — es la pieza que de verdad
 desbloquea la subida automática. Ver ese documento para el diseño en curso.
 
+### Fase 3.5 — Cierre del bucle de confirmación de descarga (diseño concreto, listo para delegar)
+
+**Contexto (releído contra el código real, 2026-08-09, no contra este documento)**: `sync-check`
+(línea 55-65 de `src/app/api/devices/sync-check/route.ts`) ya consulta `local_sync_state` para
+decidir si un objeto remoto es "nuevo" — ese chequeo está bien escrito y no necesita tocarse.
+El problema es que **nada escribe en `local_sync_state` del lado descarga**: el heartbeat
+(`src/app/api/devices/heartbeat/route.ts`) marca `consumed_at = now()` en el momento en que
+*entrega* el comando al daemon (antes de que exista certeza de que se descargó nada), y
+`cloud_client.rs::download_and_save_file` es fire-and-forget dentro de un `tokio::spawn` — si
+falla, solo hace `warn!` local; la nube nunca se entera. Por eso `sync-check` hoy depende
+enteramente del parche de deduplicación contra `sync_commands` ya emitidos (correcto como
+salvaguarda contra reencolado mientras el comando está en vuelo, pero no es lo mismo que saber
+que el archivo de verdad llegó a disco).
+
+**Decisión de alcance**: esta fase cierra *solo* la brecha de reporte de estado (que
+`local_sync_state` refleje la realidad), no la semántica de entrega. `consumed_at` sigue
+marcándose al entregar el comando (at-most-once, igual que hoy) — redecidir eso sería meter
+infraestructura de reintento/reconfirmación que el plan ya prohíbe adelantar sin medir primero
+(ver `## Prohibiciones`). Si una descarga falla tras la entrega, el comando se sigue perdiendo en
+silencio — limitación conocida y aceptada para este MVP, no resuelta acá. El parche de dedup
+contra `sync_commands` **se mantiene tal cual está** (sigue siendo necesario para la ventana entre
+"comando entregado" y "descarga confirmada"); esta fase lo vuelve un salvavidas secundario en vez
+de la única fuente de verdad.
+
+**Operaciones**:
+
+1. `daemon-rs/crates/indra-daemon/src/cloud_client.rs`:
+   - `download_and_save_file` ya tiene los bytes descargados en memoria (línea ~294, variable
+     `bytes`) — calcular `blake3::hash(&bytes)` ahí mismo (el crate `blake3` ya es dependencia
+     directa de `indra-daemon`, confirmado en `Cargo.toml:25`, sin dependencia nueva) y devolver
+     `(file_path, blake3_hex)` en el `Ok` en vez de `()`.
+   - En `start_heartbeat_loop`: crear un `tokio::sync::mpsc::unbounded_channel::<CompletedDownload>()`
+     una sola vez, antes del `loop {}`. Clonar el `Sender` dentro de cada tarea `tokio::spawn` que
+     ya se lanza por comando; al terminar `download_and_save_file` con éxito, mandar
+     `CompletedDownload { provider, remote_object_id, local_path, blake3_hex }` por el canal
+     (best-effort — si falla el `send` porque el receiver ya no existe, ignorar, no hacer panic).
+   - Al principio de cada tick (antes de construir `files`), drenar el canal sin bloquear
+     (`while let Ok(item) = rx.try_recv() { ... }`) en un `Vec`. Si no está vacío, agregar
+     `"completedDownloads": [...]` al body JSON del heartbeat existente, con forma
+     `{ provider, remoteObjectId, localPath, blake3Hex }` por entrada (mismos nombres de campo que
+     ya usa `payload` de `sync_commands`, para no introducir una tercera convención de nombres).
+   - Si el POST del heartbeat falla (ya existe ese manejo, línea ~172), los items drenados de este
+     tick simplemente se pierden — no hay buffer de reintento. Mismo criterio de "best-effort" que
+     ya rige el resto del heartbeat (la lista de `files` tampoco es un log garantizado).
+
+2. `src/app/api/devices/heartbeat/route.ts`:
+   - Extender el tipo del body: agregar
+     `completedDownloads?: Array<{ provider: string; remoteObjectId: string; localPath: string; blake3Hex: string }>`.
+   - Después de actualizar `lastSeenAt` (ya tenés `device` en scope, con `device.userId` — no hace
+     falta sesión, es auth por bearer token igual que el resto del endpoint), por cada entrada de
+     `completedDownloads`: aplicar **el mismo patrón select-then-insert/update** que ya usa
+     `src/app/api/desktop/sync/route.ts` líneas 196-226 contra `localSyncState`, keyed por
+     `(userId, localPath)` — si existe fila, `UPDATE` (`provider`, `blake3Hash`, `remoteObjectId`,
+     `syncedAt: now()`); si no, `INSERT`. No usar un mecanismo distinto al que ya existe en el
+     repo para el mismo propósito.
+   - Envolver el procesamiento de `completedDownloads` en su propio try/catch (por entrada o por
+     lote) que solo loguea y continúa — un error acá **nunca** debe tirar abajo la respuesta 200 al
+     daemon, porque esa respuesta es la que le confirma al daemon que sus comandos fueron
+     consumidos y le entrega los próximos.
+
+3. **No tocar** `src/app/api/devices/sync-check/route.ts` ni `src/app/api/devices/download-object/route.ts`
+   — su lógica ya es correcta una vez que `local_sync_state` empieza a recibir filas reales; no
+   necesitan ningún cambio.
+
+**Prohibiciones (además de las del documento general)**:
+
+- No cambiar cuándo se marca `consumed_at` en `heartbeat` — eso es un rediseño de garantías de
+  entrega, no el alcance de esta fase.
+- No agregar reintento de comandos fallidos, cola persistente, ni tabla nueva — el canal en
+  memoria del daemon y la extensión del body del heartbeat ya existente alcanzan.
+- No tocar `sync-check` ni `download-object`.
+
+**Verificación**:
+
+```
+npx tsc --noEmit                                    # limpio
+npm run lint                                         # 241 (línea base exacta), cero nuevos
+cargo build -p indra-daemon --release                # limpio, build real no solo `cargo check`
+```
+
+Más una verificación funcional sin depender de login real (mismo criterio que Fase 1/2: escritura
+directa a la base para lo que no requiere sesión de navegador):
+
+1. Insertar un `device` de prueba + su `tokenHash` conocido directo en la base (mismo patrón que
+   ya se usó para probar `pair/claim` y `heartbeat` en Fases 1/2).
+2. Llamar `POST /api/devices/heartbeat` con ese bearer token y un body con
+   `completedDownloads: [{ provider: 'test', remoteObjectId: 'obj1', localPath: 'C:\\fake\\path.txt', blake3Hex: '<64 hex chars>' }]`.
+3. Confirmar en la base: existe una fila en `local_sync_state` con ese `userId` (el del dueño del
+   device de prueba), `provider = 'test'`, `localPath` y `blake3Hash` exactos. Repetir la misma
+   llamada y confirmar que sigue habiendo **una sola fila** (UPDATE, no duplicado) — mismo criterio
+   de idempotencia que ya se verificó para `pair/claim` en Fase 1.
+
 ### Fase 4 — Test E2E real multi-máquina
 
 El test que de verdad hacía falta desde el principio: dos dispositivos físicos distintos (o al

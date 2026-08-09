@@ -117,8 +117,17 @@ pub async fn start_heartbeat_loop(
     let client = reqwest::Client::new();
     let mut interval = time::interval(Duration::from_secs(20));
 
+    // Channel for reporting completed downloads
+    let (completed_tx, mut completed_rx) = tokio::sync::mpsc::unbounded_channel::<CompletedDownload>();
+
     loop {
         interval.tick().await;
+
+        // Drain completed downloads from the channel (non-blocking)
+        let mut completed_downloads: Vec<CompletedDownload> = Vec::new();
+        while let Ok(item) = completed_rx.try_recv() {
+            completed_downloads.push(item);
+        }
 
         // Get recent files from engine
         let entries = match engine.list_recent(200).await {
@@ -154,9 +163,26 @@ pub async fn start_heartbeat_loop(
             })
             .collect();
 
-        let body = serde_json::json!({
+        // Build the heartbeat body with optional completedDownloads
+        let mut body = serde_json::json!({
             "files": files,
         });
+
+        // Add completedDownloads if there are any
+        if !completed_downloads.is_empty() {
+            let completed_array: Vec<serde_json::Value> = completed_downloads
+                .iter()
+                .map(|cd| {
+                    serde_json::json!({
+                        "provider": cd.provider,
+                        "remoteObjectId": cd.remote_object_id,
+                        "localPath": cd.local_path,
+                        "blake3Hex": cd.blake3_hex,
+                    })
+                })
+                .collect();
+            body["completedDownloads"] = serde_json::json!(completed_array);
+        }
 
         // Send heartbeat
         let url = format!("{}/api/devices/heartbeat", cloud_url);
@@ -231,9 +257,10 @@ pub async fn start_heartbeat_loop(
                             let cloud_url_clone = cloud_url.clone();
                             let token_clone = token.clone();
                             let client_clone = client.clone();
+                            let completed_tx_clone = completed_tx.clone();
 
                             tokio::spawn(async move {
-                                if let Err(e) = download_and_save_file(
+                                match download_and_save_file(
                                     &client_clone,
                                     &cloud_url_clone,
                                     &token_clone,
@@ -244,10 +271,21 @@ pub async fn start_heartbeat_loop(
                                 )
                                 .await
                                 {
-                                    warn!(
-                                        "Failed to download file {}: {}",
-                                        file_name, e
-                                    );
+                                    Ok((file_path, blake3_hex)) => {
+                                        // Send completion report (best-effort, ignore if receiver dropped)
+                                        let _ = completed_tx_clone.send(CompletedDownload {
+                                            provider,
+                                            remote_object_id,
+                                            local_path: file_path.to_string_lossy().to_string(),
+                                            blake3_hex,
+                                        });
+                                    }
+                                    Err(e) => {
+                                        warn!(
+                                            "Failed to download file {}: {}",
+                                            file_name, e
+                                        );
+                                    }
                                 }
                             });
                         }
@@ -261,7 +299,16 @@ pub async fn start_heartbeat_loop(
     }
 }
 
+/// Struct representing a completed download for reporting to the cloud.
+struct CompletedDownload {
+    provider: String,
+    remote_object_id: String,
+    local_path: String,
+    blake3_hex: String,
+}
+
 /// Downloads a file from the cloud and saves it to Indra Drive.
+/// Returns the file path and BLAKE3 hex hash on success.
 async fn download_and_save_file(
     client: &reqwest::Client,
     cloud_url: &str,
@@ -270,7 +317,7 @@ async fn download_and_save_file(
     remote_object_id: &str,
     file_name: &str,
     indra_drive: &Path,
-) -> Result<()> {
+) -> Result<(PathBuf, String)> {
     // Build download URL with provider + objectId query params
     let download_url = format!("{}/api/devices/download-object", cloud_url);
 
@@ -314,10 +361,14 @@ async fn download_and_save_file(
     }
 
     // Write the file
-    tokio::fs::write(&file_path, bytes).await?;
+    tokio::fs::write(&file_path, &bytes).await?;
+
+    // Calculate BLAKE3 hash of the bytes
+    let blake3_hash = blake3::hash(&bytes);
+    let blake3_hex = hex::encode(blake3_hash.as_bytes());
 
     info!("Successfully downloaded and saved: {:?}", file_path);
-    Ok(())
+    Ok((file_path, blake3_hex))
 }
 
 pub fn read_token_from_disk(db_path: &Path) -> Option<String> {

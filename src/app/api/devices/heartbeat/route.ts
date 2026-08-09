@@ -8,7 +8,7 @@
 
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { devices, syncCommands } from '@/core/db/schema';
+import { devices, syncCommands, localSyncState } from '@/core/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { createHash } from 'crypto';
 
@@ -53,7 +53,11 @@ export async function POST(request: Request) {
     const device = deviceList[0];
 
     // Parse request body
-    let body: { deviceName?: string; files?: Array<{ path: string; sizeBytes: number; modifiedAtMs: number; blake3Hex: string | null }> } = {};
+    let body: {
+      deviceName?: string;
+      files?: Array<{ path: string; sizeBytes: number; modifiedAtMs: number; blake3Hex: string | null }>;
+      completedDownloads?: Array<{ provider: string; remoteObjectId: string; localPath: string; blake3Hex: string }>;
+    } = {};
     try {
       body = await request.json();
     } catch (e) {
@@ -71,6 +75,51 @@ export async function POST(request: Request) {
       .update(devices)
       .set({ lastSeenAt: now })
       .where(eq(devices.id, device.id));
+
+    // Process completed downloads if provided
+    if (body.completedDownloads && Array.isArray(body.completedDownloads)) {
+      for (const entry of body.completedDownloads) {
+        try {
+          // Check if a state entry already exists for this user + localPath
+          const stateExisting = await db
+            .select()
+            .from(localSyncState)
+            .where(
+              and(
+                eq(localSyncState.userId, device.userId),
+                eq(localSyncState.localPath, entry.localPath)
+              )
+            )
+            .limit(1);
+
+          if (stateExisting.length > 0) {
+            // Update existing entry
+            await db
+              .update(localSyncState)
+              .set({
+                provider: entry.provider,
+                blake3Hash: entry.blake3Hex,
+                remoteObjectId: entry.remoteObjectId,
+                syncedAt: now,
+              })
+              .where(eq(localSyncState.id, stateExisting[0].id));
+          } else {
+            // Insert new entry
+            await db.insert(localSyncState).values({
+              userId: device.userId,
+              provider: entry.provider,
+              localPath: entry.localPath,
+              blake3Hash: entry.blake3Hex,
+              remoteObjectId: entry.remoteObjectId,
+              syncedAt: now,
+            });
+          }
+        } catch (error) {
+          console.error(`[heartbeat] Error processing completed download for ${entry.localPath}:`, error);
+          // Continue with next entry; do not fail the entire heartbeat response
+        }
+      }
+    }
 
     // Consume pending commands atomically
     const consumed = await db
